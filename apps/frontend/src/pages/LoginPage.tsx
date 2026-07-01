@@ -1,27 +1,29 @@
 import { useState } from "react";
+import { Navigate, useNavigate } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
-import { login } from "@/lib/api";
+import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
 export function LoginPage() {
+  const { user, login } = useAuth();
+  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
   const mutation = useMutation({
     mutationFn: () => login(email, password),
-    onSuccess: (data) => {
-      localStorage.setItem("accessToken", data.accessToken);
-      localStorage.setItem("refreshToken", data.refreshToken);
-    },
+    onSuccess: () => navigate("/empresas", { replace: true }),
   });
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     mutation.mutate();
   }
+
+  if (user) return <Navigate to="/empresas" replace />;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/30">
