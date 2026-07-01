@@ -1,0 +1,9 @@
+{
+  "name": "email-worker",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Serviço de sincronização IMAP/SMTP — a implementar na Fase 4",
+  "scripts": {
+    "dev": "echo \"email-worker ainda não implementado (Fase 4)\""
+  }
+}
