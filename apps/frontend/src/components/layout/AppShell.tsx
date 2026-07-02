@@ -1,11 +1,12 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { Building2, KanbanSquare, Users } from "lucide-react";
+import { Building2, CheckSquare, KanbanSquare, Users } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { to: "/funis", label: "Funis", icon: KanbanSquare },
+  { to: "/tarefas", label: "Tarefas", icon: CheckSquare },
   { to: "/empresas", label: "Empresas", icon: Building2 },
   { to: "/contactos", label: "Contactos", icon: Users },
 ];

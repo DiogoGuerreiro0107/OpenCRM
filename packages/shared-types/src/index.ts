@@ -105,3 +105,39 @@ export interface Deal {
   createdAt: string;
   updatedAt: string;
 }
+
+export type TaskStatus = "PENDING" | "IN_PROGRESS" | "DONE";
+
+export interface Reminder {
+  id: string;
+  remindAt: string;
+  message: string | null;
+  taskId: string;
+  createdAt: string;
+}
+
+export interface UserSummary {
+  id: string;
+  name: string;
+  email: string;
+  role: Role;
+}
+
+export interface Task {
+  id: string;
+  title: string;
+  description: string | null;
+  status: TaskStatus;
+  dueDate: string | null;
+  assigneeId: string;
+  assignee: { id: string; name: string };
+  contactId: string | null;
+  contact: { id: string; name: string } | null;
+  companyId: string | null;
+  company: { id: string; name: string } | null;
+  dealId: string | null;
+  deal: { id: string; title: string } | null;
+  reminders: Reminder[];
+  createdAt: string;
+  updatedAt: string;
+}

@@ -39,9 +39,9 @@ Utilizador inicial criado pelo seed: `admin@globaltoner.local` / `admin123` (pap
 ```
 apps/
   backend/         NestJS API (auth JWT+refresh, RBAC, Prisma)
-                    módulos: users, companies, contacts, activity-log, pipelines, deals
+                    módulos: users, companies, contacts, activity-log, pipelines, deals, tasks
   frontend/        React + Vite + Tailwind + shadcn/ui
-                    páginas: login, empresas, contactos, funis (kanban)
+                    páginas: login, empresas, contactos, funis (kanban), tarefas (lista + calendário)
   email-worker/    Sincronização IMAP/SMTP (Fase 4, ainda por implementar)
 packages/
   shared-types/    Tipos TypeScript partilhados
@@ -53,12 +53,12 @@ scripts/
 
 Ver secção 7 de [CLAUDE.md](./CLAUDE.md) para a descrição completa de cada fase.
 
-Estado atual: **Fases 0, 1 e 2 concluídas.**
+Estado atual: **Fases 0, 1, 2 e 3 concluídas.**
 
 - [x] Fase 0 — Setup do monorepo, Docker Compose, autenticação JWT + RBAC
 - [x] Fase 1 — Contactos/Empresas + histórico de atividades
 - [x] Fase 2 — Funis de vendas / Kanban (Pipelines, Stages, Deals, drag-and-drop)
-- [ ] Fase 3 — Tarefas e Calendário
+- [x] Fase 3 — Tarefas e Calendário (lista, filtros por estado, vista mensal, lembretes)
 - [ ] Fase 4 — Integração de Email (IMAP/SMTP)
 - [ ] Fase 5 — Automações (webhooks para n8n)
 - [ ] Fase 6 — Relatórios e Dashboards

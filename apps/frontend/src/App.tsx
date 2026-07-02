@@ -9,6 +9,7 @@ import { ContactsListPage } from "@/pages/contacts/ContactsListPage";
 import { NewContactPage } from "@/pages/contacts/NewContactPage";
 import { ContactDetailPage } from "@/pages/contacts/ContactDetailPage";
 import { DealsBoardPage } from "@/pages/deals/DealsBoardPage";
+import { TasksListPage } from "@/pages/tasks/TasksListPage";
 
 export default function App() {
   return (
@@ -25,6 +26,7 @@ export default function App() {
           <Route path="/contactos/novo" element={<NewContactPage />} />
           <Route path="/contactos/:id" element={<ContactDetailPage />} />
           <Route path="/funis" element={<DealsBoardPage />} />
+          <Route path="/tarefas" element={<TasksListPage />} />
         </Route>
       </Route>
 
