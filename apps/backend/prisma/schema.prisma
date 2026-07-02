@@ -24,6 +24,7 @@ model User {
   updatedAt     DateTime      @updatedAt
   activityLogs  ActivityLog[]
   deals         Deal[]
+  tasks         Task[]
 }
 
 enum ActivityType {
@@ -47,6 +48,7 @@ model Company {
   contacts  Contact[]
   activities ActivityLog[]
   deals     Deal[]
+  tasks     Task[]
 }
 
 model Contact {
@@ -62,6 +64,7 @@ model Contact {
   updatedAt DateTime      @updatedAt
   activities ActivityLog[]
   deals     Deal[]
+  tasks     Task[]
 
   @@index([companyId])
 }
@@ -128,7 +131,47 @@ model Deal {
   closedAt    DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+  tasks       Task[]
 
   @@index([pipelineId])
   @@index([stageId])
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  DONE
+}
+
+model Task {
+  id          String     @id @default(uuid())
+  title       String
+  description String?
+  status      TaskStatus @default(PENDING)
+  dueDate     DateTime?
+  assigneeId  String
+  assignee    User       @relation(fields: [assigneeId], references: [id])
+  contactId   String?
+  contact     Contact?   @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  companyId   String?
+  company     Company?   @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  dealId      String?
+  deal        Deal?      @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  reminders   Reminder[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  @@index([assigneeId])
+  @@index([dueDate])
+}
+
+model Reminder {
+  id        String   @id @default(uuid())
+  remindAt  DateTime
+  message   String?
+  taskId    String
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@index([taskId])
 }

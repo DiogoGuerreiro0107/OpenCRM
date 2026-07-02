@@ -14,6 +14,13 @@ export class UsersService {
     return this.prisma.user.findUnique({ where: { id } });
   }
 
+  findAllSummary() {
+    return this.prisma.user.findMany({
+      select: { id: true, name: true, email: true, role: true },
+      orderBy: { name: "asc" },
+    });
+  }
+
   create(data: { email: string; name: string; passwordHash: string; role?: Role }) {
     return this.prisma.user.create({ data });
   }
