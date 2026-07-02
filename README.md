@@ -70,7 +70,7 @@ Estado atual: **todas as fases do roadmap consolidado concluídas** (implementa�
 - [x] Fase 7 — Estrutura de Integrações Futuras (contratos TypeScript: Bitrix24, Zadarma, Gmail, MS Graph, Mail providers, WhatsApp)
 - [ ] **Revisão final** — aplicar as revisões pendentes às Fases 0-4
   - [x] 6 papéis (roles) + restrição de escrita para `LEITURA_APENAS`
-  - [ ] Campos completos em Empresa/Contacto/Negócio/Tarefa
+  - [x] Campos completos em Empresa/Contacto/Negócio/Tarefa
   - [ ] `TimelineEvent` genérico a substituir o `ActivityLog`
   - [ ] Templates de email
   - [ ] Recuperação de password

@@ -1,4 +1,4 @@
-import type { Task, TaskStatus, UserSummary } from "@opencrm/shared-types";
+import type { Task, TaskPriority, TaskStatus, TaskType, UserSummary } from "@opencrm/shared-types";
 import { api } from "./api";
 
 export interface TaskInput {
@@ -6,6 +6,9 @@ export interface TaskInput {
   description?: string;
   dueDate?: string;
   status?: TaskStatus;
+  type?: TaskType;
+  priority?: TaskPriority;
+  result?: string;
   assigneeId?: string;
   contactId?: string;
   companyId?: string;
@@ -15,9 +18,15 @@ export interface TaskInput {
 
 export interface TaskFilters {
   status?: TaskStatus;
+  type?: TaskType;
+  priority?: TaskPriority;
   assigneeId?: string;
+  companyId?: string;
+  contactId?: string;
   from?: string;
   to?: string;
+  overdue?: "true";
+  dueToday?: "true";
 }
 
 export async function listTasks(filters: TaskFilters = {}) {

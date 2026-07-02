@@ -20,13 +20,25 @@ export interface ActivityLog {
   createdAt: string;
 }
 
+export type CompanyStatus = "ATIVO" | "POTENCIAL" | "INATIVO" | "PERDIDO";
+
+export type CompanySource = "SITE" | "LOJA" | "CHAMADA" | "CAMPANHA" | "IMPORTACAO" | "RECOMENDACAO" | "OUTRO";
+
 export interface Company {
   id: string;
   name: string;
+  legalName: string | null;
   taxId: string | null;
   website: string | null;
   phone: string | null;
+  email: string | null;
   address: string | null;
+  postalCode: string | null;
+  city: string | null;
+  country: string | null;
+  status: CompanyStatus;
+  source: CompanySource | null;
+  ownerId: string | null;
   notes: string | null;
   createdAt: string;
   updatedAt: string;
@@ -41,14 +53,22 @@ export interface CompanyDetail extends Company {
   activities: ActivityLog[];
 }
 
+export type PreferredChannel = "TELEFONE" | "EMAIL" | "WHATSAPP" | "PRESENCIAL";
+
 export interface Contact {
   id: string;
   name: string;
   email: string | null;
   phone: string | null;
+  mobilePhone: string | null;
   jobTitle: string | null;
+  department: string | null;
+  preferredChannel: PreferredChannel | null;
+  isDecisionMaker: boolean;
+  marketingConsent: boolean;
   notes: string | null;
   companyId: string | null;
+  ownerId: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -93,6 +113,9 @@ export interface Deal {
   value: number;
   probability: number;
   order: number;
+  type: BusinessArea | null;
+  estimatedMargin: number | null;
+  lossReason: string | null;
   pipelineId: string;
   stageId: string;
   contactId: string | null;
@@ -107,6 +130,10 @@ export interface Deal {
 }
 
 export type TaskStatus = "PENDING" | "IN_PROGRESS" | "DONE";
+
+export type TaskType = "CHAMADA" | "EMAIL" | "VISITA" | "PROPOSTA" | "COBRANCA" | "ASSISTENCIA" | "OUTRO";
+
+export type TaskPriority = "BAIXA" | "NORMAL" | "ALTA" | "URGENTE";
 
 export interface Reminder {
   id: string;
@@ -128,6 +155,9 @@ export interface Task {
   title: string;
   description: string | null;
   status: TaskStatus;
+  type: TaskType | null;
+  priority: TaskPriority;
+  result: string | null;
   dueDate: string | null;
   assigneeId: string;
   assignee: { id: string; name: string };
@@ -173,7 +203,7 @@ export interface EmailMessage {
   createdAt: string;
 }
 
-export type LeadInterest =
+export type BusinessArea =
   | "IMPRESSAO"
   | "SOFTWARE"
   | "INFORMATICA"
@@ -191,7 +221,7 @@ export interface Lead {
   phone: string | null;
   email: string | null;
   source: string | null;
-  interest: LeadInterest | null;
+  interest: BusinessArea | null;
   status: LeadStatus;
   responsavelId: string | null;
   responsavel: { id: string; name: string } | null;

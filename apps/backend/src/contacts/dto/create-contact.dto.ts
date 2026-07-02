@@ -1,4 +1,5 @@
-import { IsEmail, IsOptional, IsString, MinLength } from "class-validator";
+import { PreferredChannel } from "@prisma/client";
+import { IsBoolean, IsEmail, IsEnum, IsOptional, IsString, MinLength } from "class-validator";
 
 export class CreateContactDto {
   @IsString()
@@ -15,7 +16,27 @@ export class CreateContactDto {
 
   @IsOptional()
   @IsString()
+  mobilePhone?: string;
+
+  @IsOptional()
+  @IsString()
   jobTitle?: string;
+
+  @IsOptional()
+  @IsString()
+  department?: string;
+
+  @IsOptional()
+  @IsEnum(PreferredChannel)
+  preferredChannel?: PreferredChannel;
+
+  @IsOptional()
+  @IsBoolean()
+  isDecisionMaker?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  marketingConsent?: boolean;
 
   @IsOptional()
   @IsString()
@@ -24,4 +45,8 @@ export class CreateContactDto {
   @IsOptional()
   @IsString()
   companyId?: string;
+
+  @IsOptional()
+  @IsString()
+  ownerId?: string;
 }

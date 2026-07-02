@@ -1,6 +1,6 @@
 import { Type } from "class-transformer";
 import { IsArray, IsDateString, IsEnum, IsOptional, IsString, MinLength, ValidateNested } from "class-validator";
-import { TaskStatus } from "@prisma/client";
+import { TaskPriority, TaskStatus, TaskType } from "@prisma/client";
 import { ReminderInputDto } from "./reminder-input.dto";
 
 export class CreateTaskDto {
@@ -19,6 +19,18 @@ export class CreateTaskDto {
   @IsOptional()
   @IsEnum(TaskStatus)
   status?: TaskStatus;
+
+  @IsOptional()
+  @IsEnum(TaskType)
+  type?: TaskType;
+
+  @IsOptional()
+  @IsEnum(TaskPriority)
+  priority?: TaskPriority;
+
+  @IsOptional()
+  @IsString()
+  result?: string;
 
   @IsOptional()
   @IsString()

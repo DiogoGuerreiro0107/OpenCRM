@@ -26,8 +26,9 @@ async function main() {
           create: [
             { name: "Novo", type: "OPEN", order: 0 },
             { name: "Em negociação", type: "OPEN", order: 1 },
-            { name: "Ganho", type: "WON", order: 2 },
-            { name: "Perdido", type: "LOST", order: 3 },
+            { name: "Proposta enviada", type: "OPEN", order: 2 },
+            { name: "Ganho", type: "WON", order: 3 },
+            { name: "Perdido", type: "LOST", order: 4 },
           ],
         },
       },

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import type { Task, TaskStatus } from "@opencrm/shared-types";
+import type { Task, TaskPriority, TaskStatus } from "@opencrm/shared-types";
 import { listTasks } from "@/lib/tasks-api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -8,12 +8,30 @@ import { cn } from "@/lib/utils";
 import { MonthCalendar } from "@/components/calendar/MonthCalendar";
 import { TaskDialog } from "./TaskDialog";
 
-const STATUS_TABS: { value: TaskStatus | "ALL"; label: string }[] = [
+type TabValue = TaskStatus | "ALL" | "OVERDUE" | "TODAY";
+
+const STATUS_TABS: { value: TabValue; label: string }[] = [
   { value: "ALL", label: "Todas" },
   { value: "PENDING", label: "Pendentes" },
   { value: "IN_PROGRESS", label: "Em progresso" },
   { value: "DONE", label: "Concluídas" },
+  { value: "OVERDUE", label: "Atrasadas" },
+  { value: "TODAY", label: "Hoje" },
 ];
+
+const PRIORITY_LABELS: Record<TaskPriority, string> = {
+  BAIXA: "Baixa",
+  NORMAL: "Normal",
+  ALTA: "Alta",
+  URGENTE: "Urgente",
+};
+
+const PRIORITY_BADGE_CLASS: Record<TaskPriority, string> = {
+  BAIXA: "",
+  NORMAL: "bg-blue-100 text-blue-800 border-blue-200",
+  ALTA: "bg-amber-100 text-amber-800 border-amber-200",
+  URGENTE: "bg-red-100 text-red-800 border-red-200",
+};
 
 const STATUS_BADGE_CLASS: Record<TaskStatus, string> = {
   PENDING: "",
@@ -33,14 +51,19 @@ function formatDate(iso: string | null) {
 }
 
 export function TasksListPage() {
-  const [statusFilter, setStatusFilter] = useState<TaskStatus | "ALL">("ALL");
+  const [statusFilter, setStatusFilter] = useState<TabValue>("ALL");
   const [view, setView] = useState<"list" | "calendar">("list");
   const [month, setMonth] = useState(() => new Date());
   const [dialogState, setDialogState] = useState<{ task: Task | null; defaultDueDate?: string } | null>(null);
 
   const { data: tasks, isLoading } = useQuery({
     queryKey: ["tasks", statusFilter],
-    queryFn: () => listTasks(statusFilter === "ALL" ? {} : { status: statusFilter }),
+    queryFn: () => {
+      if (statusFilter === "ALL") return listTasks({});
+      if (statusFilter === "OVERDUE") return listTasks({ overdue: "true" });
+      if (statusFilter === "TODAY") return listTasks({ dueToday: "true" });
+      return listTasks({ status: statusFilter });
+    },
   });
 
   return (
@@ -93,6 +116,7 @@ export function TasksListPage() {
                 <th className="px-4 py-2 font-medium">Título</th>
                 <th className="px-4 py-2 font-medium">Prazo</th>
                 <th className="px-4 py-2 font-medium">Estado</th>
+                <th className="px-4 py-2 font-medium">Prioridade</th>
                 <th className="px-4 py-2 font-medium">Responsável</th>
                 <th className="px-4 py-2 font-medium">Relacionado com</th>
               </tr>
@@ -100,14 +124,14 @@ export function TasksListPage() {
             <tbody>
               {isLoading && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">
+                  <td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">
                     A carregar...
                   </td>
                 </tr>
               )}
               {!isLoading && tasks?.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">
+                  <td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">
                     Nenhuma tarefa encontrada.
                   </td>
                 </tr>
@@ -122,6 +146,9 @@ export function TasksListPage() {
                   <td className="px-4 py-2 text-muted-foreground">{formatDate(task.dueDate)}</td>
                   <td className="px-4 py-2">
                     <Badge className={STATUS_BADGE_CLASS[task.status]}>{STATUS_LABELS[task.status]}</Badge>
+                  </td>
+                  <td className="px-4 py-2">
+                    <Badge className={PRIORITY_BADGE_CLASS[task.priority]}>{PRIORITY_LABELS[task.priority]}</Badge>
                   </td>
                   <td className="px-4 py-2 text-muted-foreground">{task.assignee.name}</td>
                   <td className="px-4 py-2 text-muted-foreground">

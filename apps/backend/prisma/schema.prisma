@@ -17,18 +17,20 @@ enum Role {
 }
 
 model User {
-  id            String        @id @default(uuid())
-  email         String        @unique
-  name          String
-  passwordHash  String
-  role          Role          @default(COMERCIAL)
-  refreshToken  String?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-  activityLogs  ActivityLog[]
-  deals         Deal[]
-  tasks         Task[]
-  leads         Lead[]
+  id             String        @id @default(uuid())
+  email          String        @unique
+  name           String
+  passwordHash   String
+  role           Role          @default(COMERCIAL)
+  refreshToken   String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  activityLogs   ActivityLog[]
+  deals          Deal[]
+  tasks          Task[]
+  leads          Lead[]
+  ownedCompanies Company[]
+  ownedContacts  Contact[]
 }
 
 enum ActivityType {
@@ -39,40 +41,83 @@ enum ActivityType {
   FILE
 }
 
+enum CompanyStatus {
+  ATIVO
+  POTENCIAL
+  INATIVO
+  PERDIDO
+}
+
+enum CompanySource {
+  SITE
+  LOJA
+  CHAMADA
+  CAMPANHA
+  IMPORTACAO
+  RECOMENDACAO
+  OUTRO
+}
+
+enum PreferredChannel {
+  TELEFONE
+  EMAIL
+  WHATSAPP
+  PRESENCIAL
+}
+
 model Company {
-  id        String        @id @default(uuid())
-  name      String
-  taxId     String?
-  website   String?
-  phone     String?
-  address   String?
-  notes     String?
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
-  contacts  Contact[]
+  id         String         @id @default(uuid())
+  name       String
+  legalName  String?
+  taxId      String?
+  website    String?
+  phone      String?
+  email      String?
+  address    String?
+  postalCode String?
+  city       String?
+  country    String?
+  status     CompanyStatus  @default(POTENCIAL)
+  source     CompanySource?
+  ownerId    String?
+  owner      User?          @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  notes      String?
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  contacts   Contact[]
   activities ActivityLog[]
-  deals     Deal[]
-  tasks     Task[]
-  emails    EmailMessage[]
+  deals      Deal[]
+  tasks      Task[]
+  emails     EmailMessage[]
+
+  @@index([ownerId])
 }
 
 model Contact {
-  id        String        @id @default(uuid())
-  name      String
-  email     String?
-  phone     String?
-  jobTitle  String?
-  notes     String?
-  companyId String?
-  company   Company?      @relation(fields: [companyId], references: [id], onDelete: SetNull)
-  createdAt DateTime      @default(now())
-  updatedAt DateTime      @updatedAt
-  activities ActivityLog[]
-  deals     Deal[]
-  tasks     Task[]
-  emails    EmailMessage[]
+  id               String            @id @default(uuid())
+  name             String
+  email            String?
+  phone            String?
+  mobilePhone      String?
+  jobTitle         String?
+  department       String?
+  preferredChannel PreferredChannel?
+  isDecisionMaker  Boolean           @default(false)
+  marketingConsent Boolean           @default(false)
+  notes            String?
+  companyId        String?
+  company          Company?          @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  ownerId          String?
+  owner            User?             @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  activities       ActivityLog[]
+  deals            Deal[]
+  tasks            Task[]
+  emails           EmailMessage[]
 
   @@index([companyId])
+  @@index([ownerId])
 }
 
 model ActivityLog {
@@ -119,26 +164,29 @@ model Stage {
 }
 
 model Deal {
-  id          String    @id @default(uuid())
-  title       String
-  value       Float     @default(0)
-  probability Int       @default(0)
-  order       Int       @default(0)
-  pipelineId  String
-  pipeline    Pipeline  @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
-  stageId     String
-  stage       Stage     @relation(fields: [stageId], references: [id], onDelete: Restrict)
-  contactId   String?
-  contact     Contact?  @relation(fields: [contactId], references: [id], onDelete: SetNull)
-  companyId   String?
-  company     Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
-  ownerId     String
-  owner       User      @relation(fields: [ownerId], references: [id])
-  closedAt    DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  tasks       Task[]
-  lead        Lead?
+  id              String        @id @default(uuid())
+  title           String
+  value           Float         @default(0)
+  probability     Int           @default(0)
+  order           Int           @default(0)
+  type            BusinessArea?
+  estimatedMargin Float?
+  lossReason      String?
+  pipelineId      String
+  pipeline        Pipeline      @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  stageId         String
+  stage           Stage         @relation(fields: [stageId], references: [id], onDelete: Restrict)
+  contactId       String?
+  contact         Contact?      @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  companyId       String?
+  company         Company?      @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  ownerId         String
+  owner           User          @relation(fields: [ownerId], references: [id])
+  closedAt        DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  tasks           Task[]
+  lead            Lead?
 
   @@index([pipelineId])
   @@index([stageId])
@@ -150,25 +198,45 @@ enum TaskStatus {
   DONE
 }
 
+enum TaskType {
+  CHAMADA
+  EMAIL
+  VISITA
+  PROPOSTA
+  COBRANCA
+  ASSISTENCIA
+  OUTRO
+}
+
+enum TaskPriority {
+  BAIXA
+  NORMAL
+  ALTA
+  URGENTE
+}
+
 model Task {
-  id          String     @id @default(uuid())
+  id          String       @id @default(uuid())
   title       String
   description String?
-  status      TaskStatus @default(PENDING)
+  status      TaskStatus   @default(PENDING)
+  type        TaskType?
+  priority    TaskPriority @default(NORMAL)
+  result      String?
   dueDate     DateTime?
   assigneeId  String
-  assignee    User       @relation(fields: [assigneeId], references: [id])
+  assignee    User         @relation(fields: [assigneeId], references: [id])
   contactId   String?
-  contact     Contact?   @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  contact     Contact?     @relation(fields: [contactId], references: [id], onDelete: SetNull)
   companyId   String?
-  company     Company?   @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  company     Company?     @relation(fields: [companyId], references: [id], onDelete: SetNull)
   dealId      String?
-  deal        Deal?      @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  deal        Deal?        @relation(fields: [dealId], references: [id], onDelete: SetNull)
   leadId      String?
-  lead        Lead?      @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  lead        Lead?        @relation(fields: [leadId], references: [id], onDelete: SetNull)
   reminders   Reminder[]
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 
   @@index([assigneeId])
   @@index([dueDate])
@@ -191,19 +259,19 @@ enum EmailDirection {
 }
 
 model EmailAccount {
-  id            String         @id @default(uuid())
-  email         String         @unique
-  imapHost      String
-  imapPort      Int
-  imapSecure    Boolean        @default(true)
-  smtpHost      String
-  smtpPort      Int
-  smtpSecure    Boolean        @default(true)
-  username      String
-  password      String
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  messages      EmailMessage[]
+  id         String         @id @default(uuid())
+  email      String         @unique
+  imapHost   String
+  imapPort   Int
+  imapSecure Boolean        @default(true)
+  smtpHost   String
+  smtpPort   Int
+  smtpSecure Boolean        @default(true)
+  username   String
+  password   String
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  messages   EmailMessage[]
 }
 
 model EmailMessage {
@@ -244,7 +312,7 @@ model Attachment {
   @@index([messageId])
 }
 
-enum LeadInterest {
+enum BusinessArea {
   IMPRESSAO
   SOFTWARE
   INFORMATICA
@@ -263,23 +331,23 @@ enum LeadStatus {
 }
 
 model Lead {
-  id             String        @id @default(uuid())
-  name           String
-  companyName    String?
-  phone          String?
-  email          String?
-  source         String?
-  interest       LeadInterest?
-  status         LeadStatus    @default(NOVO)
-  responsavelId  String?
-  responsavel    User?         @relation(fields: [responsavelId], references: [id], onDelete: SetNull)
-  nextActionAt   DateTime?
-  notes          String?
-  convertedDealId String?      @unique
-  convertedDeal   Deal?        @relation(fields: [convertedDealId], references: [id], onDelete: SetNull)
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-  tasks          Task[]
+  id              String        @id @default(uuid())
+  name            String
+  companyName     String?
+  phone           String?
+  email           String?
+  source          String?
+  interest        BusinessArea?
+  status          LeadStatus    @default(NOVO)
+  responsavelId   String?
+  responsavel     User?         @relation(fields: [responsavelId], references: [id], onDelete: SetNull)
+  nextActionAt    DateTime?
+  notes           String?
+  convertedDealId String?       @unique
+  convertedDeal   Deal?         @relation(fields: [convertedDealId], references: [id], onDelete: SetNull)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  tasks           Task[]
 
   @@index([responsavelId])
   @@index([status])

@@ -1,4 +1,4 @@
-import { LeadInterest, LeadStatus } from "@prisma/client";
+import { BusinessArea, LeadStatus } from "@prisma/client";
 import { IsDateString, IsEmail, IsEnum, IsOptional, IsString, MinLength } from "class-validator";
 
 export class CreateLeadDto {
@@ -23,8 +23,8 @@ export class CreateLeadDto {
   source?: string;
 
   @IsOptional()
-  @IsEnum(LeadInterest)
-  interest?: LeadInterest;
+  @IsEnum(BusinessArea)
+  interest?: BusinessArea;
 
   @IsOptional()
   @IsEnum(LeadStatus)
