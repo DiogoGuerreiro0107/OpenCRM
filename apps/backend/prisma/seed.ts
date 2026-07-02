@@ -13,7 +13,7 @@ async function main() {
       email: "admin@globaltoner.local",
       name: "Administrador",
       passwordHash,
-      role: "ADMIN",
+      role: "ADMINISTRADOR",
     },
   });
 
