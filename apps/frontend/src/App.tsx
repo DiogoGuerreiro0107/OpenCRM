@@ -13,6 +13,7 @@ import { TasksListPage } from "@/pages/tasks/TasksListPage";
 import { EmailInboxPage } from "@/pages/email/EmailInboxPage";
 import { LeadsListPage } from "@/pages/leads/LeadsListPage";
 import { CustomFieldsSettingsPage } from "@/pages/settings/CustomFieldsSettingsPage";
+import { DashboardPage } from "@/pages/dashboard/DashboardPage";
 
 export default function App() {
   return (
@@ -21,7 +22,8 @@ export default function App() {
 
       <Route element={<ProtectedRoute />}>
         <Route element={<AppShell />}>
-          <Route path="/" element={<Navigate to="/empresas" replace />} />
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/empresas" element={<CompaniesListPage />} />
           <Route path="/empresas/novo" element={<NewCompanyPage />} />
           <Route path="/empresas/:id" element={<CompanyDetailPage />} />

@@ -247,3 +247,27 @@ export interface CustomFieldValue {
   customFieldId: string;
   value: string | number | boolean | string[] | null;
 }
+
+export interface PipelineSummaryStats {
+  id: string;
+  name: string;
+  open: number;
+  won: number;
+  lost: number;
+  conversionRate: number;
+}
+
+export interface DashboardSummary {
+  companiesTotal: number;
+  contactsTotal: number;
+  leadsNew: number;
+  dealsOpen: number;
+  dealsWon: number;
+  dealsLost: number;
+  openValue: number;
+  tasksToday: number;
+  tasksOverdue: number;
+  staleDeals: number;
+  staleDealDays: number;
+  pipelines: PipelineSummaryStats[];
+}

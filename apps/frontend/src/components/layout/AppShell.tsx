@@ -1,10 +1,11 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { Building2, CheckSquare, KanbanSquare, Mail, Settings, UserPlus, Users } from "lucide-react";
+import { Building2, CheckSquare, KanbanSquare, LayoutDashboard, Mail, Settings, UserPlus, Users } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const navItems = [
+  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/leads", label: "Leads", icon: UserPlus },
   { to: "/funis", label: "Funis", icon: KanbanSquare },
   { to: "/tarefas", label: "Tarefas", icon: CheckSquare },
