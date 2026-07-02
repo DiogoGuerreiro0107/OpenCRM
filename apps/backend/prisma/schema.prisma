@@ -17,15 +17,15 @@ enum Role {
 }
 
 model User {
-  id             String        @id @default(uuid())
-  email          String        @unique
+  id             String          @id @default(uuid())
+  email          String          @unique
   name           String
   passwordHash   String
-  role           Role          @default(COMERCIAL)
+  role           Role            @default(COMERCIAL)
   refreshToken   String?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
-  activityLogs   ActivityLog[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  timelineEvents TimelineEvent[]
   deals          Deal[]
   tasks          Task[]
   leads          Lead[]
@@ -33,12 +33,36 @@ model User {
   ownedContacts  Contact[]
 }
 
-enum ActivityType {
+enum TimelineEventType {
   NOTE
   CALL
   EMAIL
   MEETING
   FILE
+  SYSTEM
+}
+
+enum TimelineEntityType {
+  COMPANY
+  CONTACT
+  LEAD
+  DEAL
+  TASK
+}
+
+model TimelineEvent {
+  id          String             @id @default(uuid())
+  entityType  TimelineEntityType
+  entityId    String
+  userId      String
+  user        User               @relation(fields: [userId], references: [id])
+  type        TimelineEventType  @default(NOTE)
+  title       String?
+  description String?
+  metadata    Json?
+  createdAt   DateTime           @default(now())
+
+  @@index([entityType, entityId])
 }
 
 enum CompanyStatus {
@@ -85,7 +109,6 @@ model Company {
   createdAt  DateTime       @default(now())
   updatedAt  DateTime       @updatedAt
   contacts   Contact[]
-  activities ActivityLog[]
   deals      Deal[]
   tasks      Task[]
   emails     EmailMessage[]
@@ -111,29 +134,12 @@ model Contact {
   owner            User?             @relation(fields: [ownerId], references: [id], onDelete: SetNull)
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
-  activities       ActivityLog[]
   deals            Deal[]
   tasks            Task[]
   emails           EmailMessage[]
 
   @@index([companyId])
   @@index([ownerId])
-}
-
-model ActivityLog {
-  id        String       @id @default(uuid())
-  type      ActivityType @default(NOTE)
-  content   String
-  contactId String?
-  contact   Contact?     @relation(fields: [contactId], references: [id], onDelete: Cascade)
-  companyId String?
-  company   Company?     @relation(fields: [companyId], references: [id], onDelete: Cascade)
-  authorId  String
-  author    User         @relation(fields: [authorId], references: [id])
-  createdAt DateTime     @default(now())
-
-  @@index([contactId])
-  @@index([companyId])
 }
 
 enum StageType {

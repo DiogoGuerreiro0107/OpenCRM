@@ -36,10 +36,6 @@ export class CompaniesService {
       where: { id },
       include: {
         contacts: { orderBy: { name: "asc" } },
-        activities: {
-          orderBy: { createdAt: "desc" },
-          include: { author: { select: { id: true, name: true } } },
-        },
       },
     });
     if (!company) throw new NotFoundException("Empresa não encontrada");
@@ -48,12 +44,13 @@ export class CompaniesService {
 
   async create(dto: CreateCompanyDto, authorId: string) {
     const company = await this.prisma.company.create({ data: dto });
-    await this.prisma.activityLog.create({
+    await this.prisma.timelineEvent.create({
       data: {
-        type: "NOTE",
-        content: `Empresa "${company.name}" criada.`,
-        companyId: company.id,
-        authorId,
+        entityType: "COMPANY",
+        entityId: company.id,
+        type: "SYSTEM",
+        description: `Empresa "${company.name}" criada.`,
+        userId: authorId,
       },
     });
     return company;

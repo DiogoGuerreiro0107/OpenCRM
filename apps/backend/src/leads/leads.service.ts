@@ -115,14 +115,14 @@ export class LeadsService {
     });
 
     const noteContent = `Convertido a partir do lead "${lead.name}"${lead.source ? ` (origem: ${lead.source})` : ""}.`;
-    await this.prisma.activityLog.create({
-      data: {
-        type: "NOTE",
-        content: noteContent,
-        contactId: contact.id,
-        companyId: company?.id,
-        authorId: actingUserId,
-      },
+    await this.prisma.timelineEvent.createMany({
+      data: [
+        { entityType: "CONTACT", entityId: contact.id, type: "SYSTEM", description: noteContent, userId: actingUserId },
+        ...(company
+          ? [{ entityType: "COMPANY" as const, entityId: company.id, type: "SYSTEM" as const, description: noteContent, userId: actingUserId }]
+          : []),
+        { entityType: "LEAD", entityId: lead.id, type: "SYSTEM", description: `Convertido para contacto "${contact.name}".`, userId: actingUserId },
+      ],
     });
 
     const updatedLead = await this.prisma.lead.update({

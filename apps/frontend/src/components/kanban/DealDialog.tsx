@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { CustomFieldsSection } from "@/components/CustomFieldsSection";
+import { TimelineSection } from "@/components/TimelineSection";
 
 const TYPE_LABELS: Record<BusinessArea, string> = {
   IMPRESSAO: "Impressão",
@@ -199,6 +200,12 @@ export function DealDialog({ open, onClose, pipelineId, stageId, deal }: DealDia
         {deal && (
           <div className="border-t border-border pt-4">
             <CustomFieldsSection entityType="DEAL" entityId={deal.id} />
+          </div>
+        )}
+
+        {deal && (
+          <div className="border-t border-border pt-4">
+            <TimelineSection entityType="DEAL" entityId={deal.id} />
           </div>
         )}
 
