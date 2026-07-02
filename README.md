@@ -42,9 +42,9 @@ Utilizador inicial criado pelo seed: `admin@globaltoner.local` / `admin123` (pap
 ```
 apps/
   backend/         NestJS API (auth JWT+refresh, RBAC, Prisma)
-                    módulos: users, companies, contacts, activity-log, pipelines, deals, tasks, email
+                    módulos: users, companies, contacts, activity-log, pipelines, deals, tasks, email, leads
   frontend/        React + Vite + Tailwind + shadcn/ui
-                    páginas: login, empresas, contactos, funis (kanban), tarefas (lista + calendário), email
+                    páginas: login, leads, empresas, contactos, funis (kanban), tarefas (lista + calendário), email
   email-worker/    Sincronização IMAP (imapflow + mailparser), fala com o backend por HTTP
 packages/
   shared-types/    Tipos TypeScript partilhados
@@ -54,16 +54,20 @@ scripts/
 
 ## Roadmap
 
-Ver secção 7 de [CLAUDE.md](./CLAUDE.md) para a descrição completa de cada fase.
+Ver secção 7 de [CLAUDE.md](./CLAUDE.md) para a descrição original de cada fase, e "Roadmap consolidado" no mesmo ficheiro para a versão revista (mais papéis, mais campos, Leads, Campos Personalizados, timeline genérica, etc.).
 
-Estado atual: **Fases 0, 1, 2, 3 e 4 concluídas.**
+Estado atual: **Fases 0, 1, 2, 3, 4 e 1.5 concluídas** (implementação inicial — as revisões marcadas no `CLAUDE.md` para as Fases 0-4 ficam para uma revisão final, depois de todas as fases estarem construídas).
 
 - [x] Fase 0 — Setup do monorepo, Docker Compose, autenticação JWT + RBAC
 - [x] Fase 1 — Contactos/Empresas + histórico de atividades
+- [x] Fase 1.5 — Leads (CRUD + conversão para Empresa/Contacto/Oportunidade)
 - [x] Fase 2 — Funis de vendas / Kanban (Pipelines, Stages, Deals, drag-and-drop)
+- [ ] Fase 2.5 — Campos Personalizados (transversal)
 - [x] Fase 3 — Tarefas e Calendário (lista, filtros por estado, vista mensal, lembretes)
 - [x] Fase 4 — Integração de Email (IMAP/SMTP, anexos via MinIO, associação automática a contactos/empresas)
 - [ ] Fase 5 — Automações (webhooks para n8n)
 - [ ] Fase 6 — Relatórios e Dashboards
+- [ ] Fase 7 — Estrutura de Integrações Futuras (Bitrix24, Zadarma, Gmail, MS Graph, Mail providers)
+- [ ] **Revisão final** — aplicar as revisões pendentes às Fases 0-4 (6 papéis, campos completos, timeline genérica, templates de email)
 
 Decisões de arquitetura de cada fase em [docs/decisoes.md](docs/decisoes.md).

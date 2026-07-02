@@ -25,6 +25,7 @@ model User {
   activityLogs  ActivityLog[]
   deals         Deal[]
   tasks         Task[]
+  leads         Lead[]
 }
 
 enum ActivityType {
@@ -134,6 +135,7 @@ model Deal {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   tasks       Task[]
+  lead        Lead?
 
   @@index([pipelineId])
   @@index([stageId])
@@ -159,6 +161,8 @@ model Task {
   company     Company?   @relation(fields: [companyId], references: [id], onDelete: SetNull)
   dealId      String?
   deal        Deal?      @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  leadId      String?
+  lead        Lead?      @relation(fields: [leadId], references: [id], onDelete: SetNull)
   reminders   Reminder[]
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
@@ -235,4 +239,45 @@ model Attachment {
   createdAt  DateTime     @default(now())
 
   @@index([messageId])
+}
+
+enum LeadInterest {
+  IMPRESSAO
+  SOFTWARE
+  INFORMATICA
+  PAPELARIA
+  POS
+  ASSISTENCIA
+  OUTRO
+}
+
+enum LeadStatus {
+  NOVO
+  CONTACTADO
+  SEM_RESPOSTA
+  CONVERTIDO
+  PERDIDO
+}
+
+model Lead {
+  id             String        @id @default(uuid())
+  name           String
+  companyName    String?
+  phone          String?
+  email          String?
+  source         String?
+  interest       LeadInterest?
+  status         LeadStatus    @default(NOVO)
+  responsavelId  String?
+  responsavel    User?         @relation(fields: [responsavelId], references: [id], onDelete: SetNull)
+  nextActionAt   DateTime?
+  notes          String?
+  convertedDealId String?      @unique
+  convertedDeal   Deal?        @relation(fields: [convertedDealId], references: [id], onDelete: SetNull)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  tasks          Task[]
+
+  @@index([responsavelId])
+  @@index([status])
 }

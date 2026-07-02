@@ -10,6 +10,7 @@ import { PipelinesModule } from "./pipelines/pipelines.module";
 import { DealsModule } from "./deals/deals.module";
 import { TasksModule } from "./tasks/tasks.module";
 import { EmailModule } from "./email/email.module";
+import { LeadsModule } from "./leads/leads.module";
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { EmailModule } from "./email/email.module";
     DealsModule,
     TasksModule,
     EmailModule,
+    LeadsModule,
   ],
 })
 export class AppModule {}

@@ -11,6 +11,7 @@ import { ContactDetailPage } from "@/pages/contacts/ContactDetailPage";
 import { DealsBoardPage } from "@/pages/deals/DealsBoardPage";
 import { TasksListPage } from "@/pages/tasks/TasksListPage";
 import { EmailInboxPage } from "@/pages/email/EmailInboxPage";
+import { LeadsListPage } from "@/pages/leads/LeadsListPage";
 
 export default function App() {
   return (
@@ -29,6 +30,7 @@ export default function App() {
           <Route path="/funis" element={<DealsBoardPage />} />
           <Route path="/tarefas" element={<TasksListPage />} />
           <Route path="/email" element={<EmailInboxPage />} />
+          <Route path="/leads" element={<LeadsListPage />} />
         </Route>
       </Route>
 
