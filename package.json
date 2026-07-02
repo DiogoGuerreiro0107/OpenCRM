@@ -6,11 +6,12 @@
     "node": ">=20"
   },
   "scripts": {
-    "dev": "node scripts/dev-setup.mjs && concurrently -n backend,frontend -c blue,green \"pnpm --filter backend dev\" \"pnpm --filter frontend dev\"",
+    "dev": "node scripts/dev-setup.mjs && concurrently -n backend,frontend,email-worker -c blue,green,yellow \"pnpm --filter backend dev\" \"pnpm --filter frontend dev\" \"pnpm --filter email-worker dev\"",
     "dev:setup": "node scripts/dev-setup.mjs",
     "dev:backend": "pnpm --filter backend dev",
     "dev:frontend": "pnpm --filter frontend dev",
-    "stop": "docker compose stop postgres",
+    "dev:email-worker": "pnpm --filter email-worker dev",
+    "stop": "docker compose stop postgres minio",
     "build": "pnpm -r build",
     "lint": "pnpm -r lint"
   },

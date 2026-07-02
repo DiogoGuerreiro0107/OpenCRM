@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ActivityTimeline } from "@/components/ActivityTimeline";
+import { EmailSection } from "@/components/email/EmailSection";
 
 export function CompanyDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -148,18 +149,29 @@ export function CompanyDetailPage() {
         </Card>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Atividade</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ActivityTimeline
-            activities={company.activities}
-            onAdd={(input) => activityMutation.mutateAsync(input).then(() => undefined)}
-            isSubmitting={activityMutation.isPending}
-          />
-        </CardContent>
-      </Card>
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Atividade</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ActivityTimeline
+              activities={company.activities}
+              onAdd={(input) => activityMutation.mutateAsync(input).then(() => undefined)}
+              isSubmitting={activityMutation.isPending}
+            />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Email</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <EmailSection companyId={company.id} />
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

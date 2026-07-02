@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ActivityTimeline } from "@/components/ActivityTimeline";
+import { EmailSection } from "@/components/email/EmailSection";
 
 export function ContactDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -137,18 +138,29 @@ export function ContactDetailPage() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Atividade</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ActivityTimeline
-            activities={contact.activities}
-            onAdd={(input) => activityMutation.mutateAsync(input).then(() => undefined)}
-            isSubmitting={activityMutation.isPending}
-          />
-        </CardContent>
-      </Card>
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Atividade</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ActivityTimeline
+              activities={contact.activities}
+              onAdd={(input) => activityMutation.mutateAsync(input).then(() => undefined)}
+              isSubmitting={activityMutation.isPending}
+            />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Email</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <EmailSection contactId={contact.id} defaultTo={contact.email ?? undefined} />
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
