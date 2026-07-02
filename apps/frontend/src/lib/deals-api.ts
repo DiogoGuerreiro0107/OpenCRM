@@ -1,4 +1,4 @@
-import type { Deal } from "@opencrm/shared-types";
+import type { BusinessArea, Deal } from "@opencrm/shared-types";
 import { api } from "./api";
 
 export interface DealInput {
@@ -7,6 +7,9 @@ export interface DealInput {
   stageId: string;
   value?: number;
   probability?: number;
+  type?: BusinessArea;
+  estimatedMargin?: number;
+  lossReason?: string;
   contactId?: string;
   companyId?: string;
 }
@@ -26,8 +29,8 @@ export async function updateDeal(id: string, input: Partial<Omit<DealInput, "pip
   return data;
 }
 
-export async function moveDeal(id: string, stageId: string, index: number) {
-  const { data } = await api.patch<Deal>(`/deals/${id}/move`, { stageId, index });
+export async function moveDeal(id: string, stageId: string, index: number, lossReason?: string) {
+  const { data } = await api.patch<Deal>(`/deals/${id}/move`, { stageId, index, lossReason });
   return data;
 }
 

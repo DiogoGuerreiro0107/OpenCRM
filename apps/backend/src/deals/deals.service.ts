@@ -49,6 +49,9 @@ export class DealsService {
         title: dto.title,
         value: dto.value ?? 0,
         probability: dto.probability ?? 0,
+        type: dto.type,
+        estimatedMargin: dto.estimatedMargin,
+        lossReason: dto.lossReason,
         pipelineId: dto.pipelineId,
         stageId: dto.stageId,
         contactId: dto.contactId,
@@ -92,6 +95,10 @@ export class DealsService {
       throw new BadRequestException("A fase indicada não pertence ao funil deste negócio");
     }
 
+    if (targetStage.type === "LOST" && !dto.lossReason && !deal.lossReason) {
+      throw new BadRequestException("O motivo de perda é obrigatório ao mover um negócio para uma fase perdida");
+    }
+
     const siblings = await this.prisma.deal.findMany({
       where: { stageId: dto.stageId, id: { not: id } },
       orderBy: { order: "asc" },
@@ -108,6 +115,7 @@ export class DealsService {
         data: {
           stageId: dto.stageId,
           closedAt: targetStage.type === "OPEN" ? null : (deal.closedAt ?? new Date()),
+          lossReason: dto.lossReason ?? undefined,
         },
       }),
       ...orderedIds.map((dealId, index) =>
@@ -126,6 +134,15 @@ export class DealsService {
         toStageName: targetStage.name,
         toStageType: targetStage.type,
       });
+
+      if (targetStage.name.trim().toLowerCase() === "proposta enviada") {
+        this.webhooks.trigger("deal.proposal_sent", {
+          dealId: deal.id,
+          title: deal.title,
+          pipelineId: deal.pipelineId,
+          stageId: targetStage.id,
+        });
+      }
     }
 
     return this.findOne(id);

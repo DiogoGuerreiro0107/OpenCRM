@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Task, TaskStatus } from "@opencrm/shared-types";
+import type { Task, TaskPriority, TaskStatus, TaskType } from "@opencrm/shared-types";
 import { createTask, deleteTask, listUsers, updateTask } from "@/lib/tasks-api";
 import { listCompanies } from "@/lib/companies-api";
 import { listContacts } from "@/lib/contacts-api";
@@ -15,6 +15,23 @@ const STATUS_LABELS: Record<TaskStatus, string> = {
   PENDING: "Pendente",
   IN_PROGRESS: "Em progresso",
   DONE: "Concluída",
+};
+
+const TYPE_LABELS: Record<TaskType, string> = {
+  CHAMADA: "Chamada",
+  EMAIL: "Email",
+  VISITA: "Visita",
+  PROPOSTA: "Proposta",
+  COBRANCA: "Cobrança",
+  ASSISTENCIA: "Assistência",
+  OUTRO: "Outro",
+};
+
+const PRIORITY_LABELS: Record<TaskPriority, string> = {
+  BAIXA: "Baixa",
+  NORMAL: "Normal",
+  ALTA: "Alta",
+  URGENTE: "Urgente",
 };
 
 interface ReminderRow {
@@ -56,6 +73,9 @@ export function TaskDialog({ open, onClose, task, defaultDueDate }: TaskDialogPr
     description: "",
     dueDate: "",
     status: "PENDING" as TaskStatus,
+    type: "" as TaskType | "",
+    priority: "NORMAL" as TaskPriority,
+    result: "",
     assigneeId: "",
     contactId: "",
     companyId: "",
@@ -69,6 +89,9 @@ export function TaskDialog({ open, onClose, task, defaultDueDate }: TaskDialogPr
       description: task?.description ?? "",
       dueDate: task ? toDateTimeLocal(task.dueDate) : defaultDueDate ? `${defaultDueDate}T09:00` : "",
       status: task?.status ?? "PENDING",
+      type: task?.type ?? "",
+      priority: task?.priority ?? "NORMAL",
+      result: task?.result ?? "",
       assigneeId: task?.assigneeId ?? "",
       contactId: task?.contactId ?? "",
       companyId: task?.companyId ?? "",
@@ -89,6 +112,9 @@ export function TaskDialog({ open, onClose, task, defaultDueDate }: TaskDialogPr
         description: form.description || undefined,
         dueDate: form.dueDate ? new Date(form.dueDate).toISOString() : undefined,
         status: form.status,
+        type: form.type || undefined,
+        priority: form.priority,
+        result: form.result || undefined,
         assigneeId: form.assigneeId || undefined,
         contactId: form.contactId || undefined,
         companyId: form.companyId || undefined,
@@ -157,6 +183,29 @@ export function TaskDialog({ open, onClose, task, defaultDueDate }: TaskDialogPr
             </Select>
           </div>
         </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-2">
+            <Label htmlFor="type">Tipo</Label>
+            <Select id="type" value={form.type} onChange={handleChange("type")}>
+              <option value="">Não definido</option>
+              {Object.entries(TYPE_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="priority">Prioridade</Label>
+            <Select id="priority" value={form.priority} onChange={handleChange("priority")}>
+              {Object.entries(PRIORITY_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </Select>
+          </div>
+        </div>
         <div className="space-y-2">
           <Label htmlFor="assigneeId">Responsável</Label>
           <Select id="assigneeId" value={form.assigneeId} onChange={handleChange("assigneeId")}>
@@ -191,6 +240,15 @@ export function TaskDialog({ open, onClose, task, defaultDueDate }: TaskDialogPr
               ))}
             </Select>
           </div>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="result">Resultado</Label>
+          <Textarea
+            id="result"
+            value={form.result}
+            onChange={handleChange("result")}
+            placeholder="Preenchido ao concluir a tarefa"
+          />
         </div>
 
         <div className="space-y-2">

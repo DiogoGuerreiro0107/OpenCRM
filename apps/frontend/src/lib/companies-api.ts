@@ -1,17 +1,32 @@
-import type { CompanyDetail, CompanySummary } from "@opencrm/shared-types";
+import type { CompanyDetail, CompanySource, CompanyStatus, CompanySummary } from "@opencrm/shared-types";
 import { api } from "./api";
 
 export interface CompanyInput {
   name: string;
+  legalName?: string;
   taxId?: string;
   website?: string;
   phone?: string;
+  email?: string;
   address?: string;
+  postalCode?: string;
+  city?: string;
+  country?: string;
+  status?: CompanyStatus;
+  source?: CompanySource;
+  ownerId?: string;
   notes?: string;
 }
 
-export async function listCompanies(search?: string) {
-  const { data } = await api.get<CompanySummary[]>("/companies", { params: { search } });
+export interface CompanyFilters {
+  search?: string;
+  status?: CompanyStatus;
+  source?: CompanySource;
+  ownerId?: string;
+}
+
+export async function listCompanies(filters: CompanyFilters = {}) {
+  const { data } = await api.get<CompanySummary[]>("/companies", { params: filters });
   return data;
 }
 

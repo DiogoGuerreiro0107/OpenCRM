@@ -20,12 +20,26 @@ export class TasksService {
   findAll(query: QueryTasksDto) {
     const where: Prisma.TaskWhereInput = {};
     if (query.status) where.status = query.status;
+    if (query.type) where.type = query.type;
+    if (query.priority) where.priority = query.priority;
     if (query.assigneeId) where.assigneeId = query.assigneeId;
+    if (query.companyId) where.companyId = query.companyId;
+    if (query.contactId) where.contactId = query.contactId;
     if (query.from || query.to) {
       where.dueDate = {
         ...(query.from ? { gte: new Date(query.from) } : {}),
         ...(query.to ? { lte: new Date(query.to) } : {}),
       };
+    }
+
+    if (query.overdue === "true" || query.dueToday === "true") {
+      const now = new Date();
+      const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const startOfTomorrow = new Date(startOfToday);
+      startOfTomorrow.setDate(startOfTomorrow.getDate() + 1);
+
+      where.status = { not: "DONE" };
+      where.dueDate = query.overdue === "true" ? { lt: startOfToday } : { gte: startOfToday, lt: startOfTomorrow };
     }
 
     return this.prisma.task.findMany({

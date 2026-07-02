@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
-import type { Lead, LeadInterest, LeadStatus } from "@opencrm/shared-types";
+import type { Lead, BusinessArea, LeadStatus } from "@opencrm/shared-types";
 import { convertLead, createLead, deleteLead, updateLead } from "@/lib/leads-api";
 import { listUsers } from "@/lib/tasks-api";
 import { Dialog, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { CustomFieldsSection } from "@/components/CustomFieldsSection";
 
-const INTEREST_LABELS: Record<LeadInterest, string> = {
+const INTEREST_LABELS: Record<BusinessArea, string> = {
   IMPRESSAO: "Impressão",
   SOFTWARE: "Software",
   INFORMATICA: "Informática",
@@ -47,7 +47,7 @@ export function LeadDialog({ open, onClose, lead }: LeadDialogProps) {
     phone: "",
     email: "",
     source: "",
-    interest: "" as LeadInterest | "",
+    interest: "" as BusinessArea | "",
     status: "NOVO" as LeadStatus,
     responsavelId: "",
     nextActionAt: "",

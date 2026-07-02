@@ -1,17 +1,29 @@
-import type { ContactDetail, ContactSummary } from "@opencrm/shared-types";
+import type { ContactDetail, ContactSummary, PreferredChannel } from "@opencrm/shared-types";
 import { api } from "./api";
 
 export interface ContactInput {
   name: string;
   email?: string;
   phone?: string;
+  mobilePhone?: string;
   jobTitle?: string;
+  department?: string;
+  preferredChannel?: PreferredChannel;
+  isDecisionMaker?: boolean;
+  marketingConsent?: boolean;
   notes?: string;
+  companyId?: string;
+  ownerId?: string;
+}
+
+export interface ContactFilters {
+  search?: string;
+  ownerId?: string;
   companyId?: string;
 }
 
-export async function listContacts(search?: string) {
-  const { data } = await api.get<ContactSummary[]>("/contacts", { params: { search } });
+export async function listContacts(filters: ContactFilters = {}) {
+  const { data } = await api.get<ContactSummary[]>("/contacts", { params: filters });
   return data;
 }
 

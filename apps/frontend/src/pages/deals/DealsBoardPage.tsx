@@ -39,6 +39,9 @@ export function DealsBoardPage() {
       queryClient.invalidateQueries({ queryKey: ["deals", pipelineId] });
       queryClient.invalidateQueries({ queryKey: ["pipelines"] });
     },
+    onError: () => {
+      queryClient.invalidateQueries({ queryKey: ["deals", pipelineId] });
+    },
   });
 
   const pipeline = pipelines?.find((p) => p.id === pipelineId);
@@ -73,6 +76,13 @@ export function DealsBoardPage() {
           <p className="py-2 text-sm text-muted-foreground">Ainda não existem funis.</p>
         )}
       </div>
+
+      {moveMutation.isError && (
+        <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          Não foi possível mover o negócio. Se a fase de destino for uma fase perdida, abre o negócio e preenche o
+          "Motivo de perda" antes de o mover.
+        </p>
+      )}
 
       {pipeline && deals && (
         <KanbanBoard

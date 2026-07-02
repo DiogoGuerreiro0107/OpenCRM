@@ -9,7 +9,7 @@ export function ContactsListPage() {
   const [search, setSearch] = useState("");
   const { data: contacts, isLoading } = useQuery({
     queryKey: ["contacts", search],
-    queryFn: () => listContacts(search || undefined),
+    queryFn: () => listContacts({ search: search || undefined }),
   });
 
   return (
@@ -22,7 +22,7 @@ export function ContactsListPage() {
       </div>
 
       <Input
-        placeholder="Pesquisar por nome..."
+        placeholder="Pesquisar por nome, email, telefone..."
         value={search}
         onChange={(e) => setSearch(e.target.value)}
         className="max-w-sm"

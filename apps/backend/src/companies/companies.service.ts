@@ -1,15 +1,31 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateCompanyDto } from "./dto/create-company.dto";
 import { UpdateCompanyDto } from "./dto/update-company.dto";
+import { QueryCompaniesDto } from "./dto/query-companies.dto";
 
 @Injectable()
 export class CompaniesService {
   constructor(private readonly prisma: PrismaService) {}
 
-  findAll(search?: string) {
+  findAll(query: QueryCompaniesDto) {
+    const where: Prisma.CompanyWhereInput = {};
+    if (query.search) {
+      where.OR = [
+        { name: { contains: query.search, mode: "insensitive" } },
+        { legalName: { contains: query.search, mode: "insensitive" } },
+        { taxId: { contains: query.search, mode: "insensitive" } },
+        { phone: { contains: query.search, mode: "insensitive" } },
+        { email: { contains: query.search, mode: "insensitive" } },
+      ];
+    }
+    if (query.status) where.status = query.status;
+    if (query.source) where.source = query.source;
+    if (query.ownerId) where.ownerId = query.ownerId;
+
     return this.prisma.company.findMany({
-      where: search ? { name: { contains: search, mode: "insensitive" } } : undefined,
+      where,
       orderBy: { name: "asc" },
       include: { _count: { select: { contacts: true } } },
     });

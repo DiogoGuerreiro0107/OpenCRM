@@ -1,4 +1,5 @@
-import { IsInt, IsNumber, IsOptional, IsString, Max, Min, MinLength } from "class-validator";
+import { BusinessArea } from "@prisma/client";
+import { IsEnum, IsInt, IsNumber, IsOptional, IsString, Max, Min, MinLength } from "class-validator";
 
 export class CreateDealDto {
   @IsString()
@@ -21,6 +22,18 @@ export class CreateDealDto {
   @Min(0)
   @Max(100)
   probability?: number;
+
+  @IsOptional()
+  @IsEnum(BusinessArea)
+  type?: BusinessArea;
+
+  @IsOptional()
+  @IsNumber()
+  estimatedMargin?: number;
+
+  @IsOptional()
+  @IsString()
+  lossReason?: string;
 
   @IsOptional()
   @IsString()

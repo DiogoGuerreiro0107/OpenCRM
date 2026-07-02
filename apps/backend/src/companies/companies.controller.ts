@@ -16,6 +16,7 @@ import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { CompaniesService } from "./companies.service";
 import { CreateCompanyDto } from "./dto/create-company.dto";
 import { UpdateCompanyDto } from "./dto/update-company.dto";
+import { QueryCompaniesDto } from "./dto/query-companies.dto";
 
 @UseGuards(JwtAuthGuard)
 @Controller("companies")
@@ -23,8 +24,8 @@ export class CompaniesController {
   constructor(private readonly companiesService: CompaniesService) {}
 
   @Get()
-  findAll(@Query("search") search?: string) {
-    return this.companiesService.findAll(search);
+  findAll(@Query() query: QueryCompaniesDto) {
+    return this.companiesService.findAll(query);
   }
 
   @Get(":id")

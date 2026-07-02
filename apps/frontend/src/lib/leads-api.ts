@@ -1,4 +1,4 @@
-import type { Lead, LeadConversionResult, LeadInterest, LeadStatus } from "@opencrm/shared-types";
+import type { Lead, LeadConversionResult, BusinessArea, LeadStatus } from "@opencrm/shared-types";
 import { api } from "./api";
 
 export interface LeadInput {
@@ -7,7 +7,7 @@ export interface LeadInput {
   phone?: string;
   email?: string;
   source?: string;
-  interest?: LeadInterest;
+  interest?: BusinessArea;
   status?: LeadStatus;
   responsavelId?: string;
   nextActionAt?: string;

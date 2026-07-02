@@ -15,6 +15,7 @@ import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { ContactsService } from "./contacts.service";
 import { CreateContactDto } from "./dto/create-contact.dto";
 import { UpdateContactDto } from "./dto/update-contact.dto";
+import { QueryContactsDto } from "./dto/query-contacts.dto";
 
 @UseGuards(JwtAuthGuard)
 @Controller("contacts")
@@ -22,8 +23,8 @@ export class ContactsController {
   constructor(private readonly contactsService: ContactsService) {}
 
   @Get()
-  findAll(@Query("search") search?: string) {
-    return this.contactsService.findAll(search);
+  findAll(@Query() query: QueryContactsDto) {
+    return this.contactsService.findAll(query);
   }
 
   @Get(":id")
