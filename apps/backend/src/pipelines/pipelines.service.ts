@@ -53,7 +53,14 @@ export class PipelinesService {
   }
 
   async remove(id: string) {
-    await this.ensurePipelineExists(id);
+    const pipeline = await this.prisma.pipeline.findUnique({
+      where: { id },
+      include: { _count: { select: { deals: true } } },
+    });
+    if (!pipeline) throw new NotFoundException("Funil não encontrado");
+    if (pipeline._count.deals > 0) {
+      throw new BadRequestException("Move ou elimina os negócios deste funil antes de o eliminar");
+    }
     await this.prisma.pipeline.delete({ where: { id } });
   }
 

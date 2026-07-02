@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
+import { AutomationsService } from "../automations/automations.service";
 import { CreateTaskDto } from "./dto/create-task.dto";
 import { UpdateTaskDto } from "./dto/update-task.dto";
 import { QueryTasksDto } from "./dto/query-tasks.dto";
@@ -15,7 +16,10 @@ const TASK_INCLUDE = {
 
 @Injectable()
 export class TasksService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly automations: AutomationsService,
+  ) {}
 
   findAll(query: QueryTasksDto) {
     const where: Prisma.TaskWhereInput = {};
@@ -104,6 +108,10 @@ export class TasksService {
       await this.prisma.timelineEvent.createMany({
         data: events.map((e) => ({ ...e, type: "SYSTEM", description, userId: actingUserId })),
       });
+
+      if (task.dealId) {
+        await this.automations.evaluateTaskCompletedRules(task.dealId);
+      }
     }
 
     return task;
