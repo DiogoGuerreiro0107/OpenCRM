@@ -13,6 +13,7 @@ import { TasksListPage } from "@/pages/tasks/TasksListPage";
 import { EmailInboxPage } from "@/pages/email/EmailInboxPage";
 import { LeadsListPage } from "@/pages/leads/LeadsListPage";
 import { CustomFieldsSettingsPage } from "@/pages/settings/CustomFieldsSettingsPage";
+import { EmailTemplatesSettingsPage } from "@/pages/settings/EmailTemplatesSettingsPage";
 import { DashboardPage } from "@/pages/dashboard/DashboardPage";
 
 export default function App() {
@@ -35,6 +36,7 @@ export default function App() {
           <Route path="/email" element={<EmailInboxPage />} />
           <Route path="/leads" element={<LeadsListPage />} />
           <Route path="/configuracoes/campos-personalizados" element={<CustomFieldsSettingsPage />} />
+          <Route path="/configuracoes/templates-email" element={<EmailTemplatesSettingsPage />} />
         </Route>
       </Route>
 

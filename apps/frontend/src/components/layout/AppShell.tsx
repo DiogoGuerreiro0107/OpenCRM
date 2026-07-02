@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from "react-router-dom";
-import { Building2, CheckSquare, KanbanSquare, LayoutDashboard, Mail, Settings, UserPlus, Users } from "lucide-react";
+import { Building2, CheckSquare, FileText, KanbanSquare, LayoutDashboard, Mail, Settings, UserPlus, Users } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -16,6 +16,7 @@ const navItems = [
 
 const settingsItems = [
   { to: "/configuracoes/campos-personalizados", label: "Campos Personalizados", icon: Settings },
+  { to: "/configuracoes/templates-email", label: "Templates de Email", icon: FileText },
 ];
 
 export function AppShell() {
