@@ -13,6 +13,7 @@ import { EmailModule } from "./email/email.module";
 import { LeadsModule } from "./leads/leads.module";
 import { CustomFieldsModule } from "./custom-fields/custom-fields.module";
 import { WebhooksModule } from "./webhooks/webhooks.module";
+import { DashboardModule } from "./dashboard/dashboard.module";
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { WebhooksModule } from "./webhooks/webhooks.module";
     EmailModule,
     LeadsModule,
     CustomFieldsModule,
+    DashboardModule,
   ],
 })
 export class AppModule {}

@@ -15,7 +15,7 @@ export function LoginPage() {
 
   const mutation = useMutation({
     mutationFn: () => login(email, password),
-    onSuccess: () => navigate("/empresas", { replace: true }),
+    onSuccess: () => navigate("/dashboard", { replace: true }),
   });
 
   function handleSubmit(e: React.FormEvent) {
@@ -23,7 +23,7 @@ export function LoginPage() {
     mutation.mutate();
   }
 
-  if (user) return <Navigate to="/empresas" replace />;
+  if (user) return <Navigate to="/dashboard" replace />;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/30">
