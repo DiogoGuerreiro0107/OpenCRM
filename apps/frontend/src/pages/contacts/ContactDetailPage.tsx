@@ -12,6 +12,7 @@ import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ActivityTimeline } from "@/components/ActivityTimeline";
 import { EmailSection } from "@/components/email/EmailSection";
+import { CustomFieldsSection } from "@/components/CustomFieldsSection";
 
 export function ContactDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -139,6 +140,15 @@ export function ContactDetailPage() {
       </Card>
 
       <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Campos personalizados</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <CustomFieldsSection entityType="CONTACT" entityId={contact.id} />
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle>Atividade</CardTitle>

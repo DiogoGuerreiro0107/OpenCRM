@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { CustomFieldsSection } from "@/components/CustomFieldsSection";
 
 interface DealDialogProps {
   open: boolean;
@@ -141,6 +142,12 @@ export function DealDialog({ open, onClose, pipelineId, stageId, deal }: DealDia
             ))}
           </Select>
         </div>
+
+        {deal && (
+          <div className="border-t border-border pt-4">
+            <CustomFieldsSection entityType="DEAL" entityId={deal.id} />
+          </div>
+        )}
 
         {saveMutation.isError && (
           <p className="text-sm text-red-600">Não foi possível guardar o negócio. Tenta novamente.</p>

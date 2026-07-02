@@ -42,9 +42,9 @@ Utilizador inicial criado pelo seed: `admin@globaltoner.local` / `admin123` (pap
 ```
 apps/
   backend/         NestJS API (auth JWT+refresh, RBAC, Prisma)
-                    módulos: users, companies, contacts, activity-log, pipelines, deals, tasks, email, leads
+                    módulos: users, companies, contacts, activity-log, pipelines, deals, tasks, email, leads, custom-fields
   frontend/        React + Vite + Tailwind + shadcn/ui
-                    páginas: login, leads, empresas, contactos, funis (kanban), tarefas (lista + calendário), email
+                    páginas: login, leads, empresas, contactos, funis (kanban), tarefas (lista + calendário), email, configurações
   email-worker/    Sincronização IMAP (imapflow + mailparser), fala com o backend por HTTP
 packages/
   shared-types/    Tipos TypeScript partilhados
@@ -56,13 +56,13 @@ scripts/
 
 Ver secção 7 de [CLAUDE.md](./CLAUDE.md) para a descrição original de cada fase, e "Roadmap consolidado" no mesmo ficheiro para a versão revista (mais papéis, mais campos, Leads, Campos Personalizados, timeline genérica, etc.).
 
-Estado atual: **Fases 0, 1, 2, 3, 4 e 1.5 concluídas** (implementação inicial — as revisões marcadas no `CLAUDE.md` para as Fases 0-4 ficam para uma revisão final, depois de todas as fases estarem construídas).
+Estado atual: **Fases 0, 1, 1.5, 2, 2.5, 3 e 4 concluídas** (implementação inicial — as revisões marcadas no `CLAUDE.md` para as Fases 0-4 ficam para uma revisão final, depois de todas as fases estarem construídas).
 
 - [x] Fase 0 — Setup do monorepo, Docker Compose, autenticação JWT + RBAC
 - [x] Fase 1 — Contactos/Empresas + histórico de atividades
 - [x] Fase 1.5 — Leads (CRUD + conversão para Empresa/Contacto/Oportunidade)
 - [x] Fase 2 — Funis de vendas / Kanban (Pipelines, Stages, Deals, drag-and-drop)
-- [ ] Fase 2.5 — Campos Personalizados (transversal)
+- [x] Fase 2.5 — Campos Personalizados (transversal a Empresas/Contactos/Leads/Oportunidades)
 - [x] Fase 3 — Tarefas e Calendário (lista, filtros por estado, vista mensal, lembretes)
 - [x] Fase 4 — Integração de Email (IMAP/SMTP, anexos via MinIO, associação automática a contactos/empresas)
 - [ ] Fase 5 — Automações (webhooks para n8n)
