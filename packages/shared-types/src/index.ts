@@ -172,3 +172,40 @@ export interface EmailMessage {
   sentAt: string;
   createdAt: string;
 }
+
+export type LeadInterest =
+  | "IMPRESSAO"
+  | "SOFTWARE"
+  | "INFORMATICA"
+  | "PAPELARIA"
+  | "POS"
+  | "ASSISTENCIA"
+  | "OUTRO";
+
+export type LeadStatus = "NOVO" | "CONTACTADO" | "SEM_RESPOSTA" | "CONVERTIDO" | "PERDIDO";
+
+export interface Lead {
+  id: string;
+  name: string;
+  companyName: string | null;
+  phone: string | null;
+  email: string | null;
+  source: string | null;
+  interest: LeadInterest | null;
+  status: LeadStatus;
+  responsavelId: string | null;
+  responsavel: { id: string; name: string } | null;
+  nextActionAt: string | null;
+  notes: string | null;
+  convertedDealId: string | null;
+  convertedDeal: { id: string; title: string } | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LeadConversionResult {
+  lead: Lead;
+  company: { id: string; name: string } | null;
+  contact: { id: string; name: string };
+  deal: { id: string; title: string };
+}
