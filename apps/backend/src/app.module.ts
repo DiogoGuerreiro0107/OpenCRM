@@ -10,6 +10,7 @@ import { PipelinesModule } from "./pipelines/pipelines.module";
 import { DealsModule } from "./deals/deals.module";
 import { TasksModule } from "./tasks/tasks.module";
 import { EmailModule } from "./email/email.module";
+import { EmailTemplatesModule } from "./email-templates/email-templates.module";
 import { LeadsModule } from "./leads/leads.module";
 import { CustomFieldsModule } from "./custom-fields/custom-fields.module";
 import { WebhooksModule } from "./webhooks/webhooks.module";
@@ -29,6 +30,7 @@ import { DashboardModule } from "./dashboard/dashboard.module";
     DealsModule,
     TasksModule,
     EmailModule,
+    EmailTemplatesModule,
     LeadsModule,
     CustomFieldsModule,
     DashboardModule,

@@ -303,3 +303,14 @@ export interface DashboardSummary {
   staleDealDays: number;
   pipelines: PipelineSummaryStats[];
 }
+
+export interface EmailTemplate {
+  id: string;
+  name: string;
+  subject: string;
+  body: string;
+  category: string | null;
+  active: boolean;
+  createdAt: string;
+  updatedAt: string;
+}

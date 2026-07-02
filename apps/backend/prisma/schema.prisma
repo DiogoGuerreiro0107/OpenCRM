@@ -318,6 +318,17 @@ model Attachment {
   @@index([messageId])
 }
 
+model EmailTemplate {
+  id        String   @id @default(uuid())
+  name      String
+  subject   String
+  body      String
+  category  String?
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 enum BusinessArea {
   IMPRESSAO
   SOFTWARE
