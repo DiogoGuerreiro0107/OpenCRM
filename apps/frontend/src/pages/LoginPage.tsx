@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Navigate, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -65,6 +65,11 @@ export function LoginPage() {
               {mutation.isPending ? "A entrar..." : "Entrar"}
             </Button>
           </form>
+          <p className="mt-4 text-center text-sm text-muted-foreground">
+            <Link to="/esqueci-a-password" className="text-primary hover:underline">
+              Esqueceste-te da password?
+            </Link>
+          </p>
         </CardContent>
       </Card>
     </div>
