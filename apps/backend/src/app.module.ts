@@ -12,11 +12,13 @@ import { TasksModule } from "./tasks/tasks.module";
 import { EmailModule } from "./email/email.module";
 import { LeadsModule } from "./leads/leads.module";
 import { CustomFieldsModule } from "./custom-fields/custom-fields.module";
+import { WebhooksModule } from "./webhooks/webhooks.module";
 
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     PrismaModule,
+    WebhooksModule,
     UsersModule,
     AuthModule,
     CompaniesModule,

@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
+import { WebhooksService } from "../webhooks/webhooks.service";
 import { CreateLeadDto } from "./dto/create-lead.dto";
 import { UpdateLeadDto } from "./dto/update-lead.dto";
 import { QueryLeadsDto } from "./dto/query-leads.dto";
@@ -12,7 +13,10 @@ const LEAD_INCLUDE = {
 
 @Injectable()
 export class LeadsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly webhooks: WebhooksService,
+  ) {}
 
   findAll(query: QueryLeadsDto) {
     const where: Prisma.LeadWhereInput = {};
@@ -49,6 +53,15 @@ export class LeadsService {
         assigneeId: lead.responsavelId ?? creatorId,
         leadId: lead.id,
       },
+    });
+
+    this.webhooks.trigger("lead.created", {
+      leadId: lead.id,
+      name: lead.name,
+      companyName: lead.companyName,
+      email: lead.email,
+      phone: lead.phone,
+      source: lead.source,
     });
 
     return lead;

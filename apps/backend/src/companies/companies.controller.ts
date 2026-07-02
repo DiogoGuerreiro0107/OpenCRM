@@ -12,6 +12,7 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { CompaniesService } from "./companies.service";
 import { CreateCompanyDto } from "./dto/create-company.dto";
 import { UpdateCompanyDto } from "./dto/update-company.dto";
@@ -32,8 +33,8 @@ export class CompaniesController {
   }
 
   @Post()
-  create(@Body() dto: CreateCompanyDto) {
-    return this.companiesService.create(dto);
+  create(@Body() dto: CreateCompanyDto, @CurrentUser() user: { userId: string }) {
+    return this.companiesService.create(dto, user.userId);
   }
 
   @Patch(":id")

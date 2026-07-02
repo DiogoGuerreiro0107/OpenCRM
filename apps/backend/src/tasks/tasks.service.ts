@@ -56,11 +56,12 @@ export class TasksService {
     });
   }
 
-  async update(id: string, dto: UpdateTaskDto) {
-    await this.ensureExists(id);
+  async update(id: string, dto: UpdateTaskDto, actingUserId: string) {
+    const existing = await this.prisma.task.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException("Tarefa não encontrada");
     const { reminders, ...rest } = dto;
 
-    return this.prisma.task.update({
+    const task = await this.prisma.task.update({
       where: { id },
       data: {
         ...rest,
@@ -75,6 +76,20 @@ export class TasksService {
       },
       include: TASK_INCLUDE,
     });
+
+    if (dto.status === "DONE" && existing.status !== "DONE" && (task.contactId || task.companyId)) {
+      await this.prisma.activityLog.create({
+        data: {
+          type: "NOTE",
+          content: `Tarefa concluída: "${task.title}".`,
+          contactId: task.contactId ?? undefined,
+          companyId: task.companyId ?? undefined,
+          authorId: actingUserId,
+        },
+      });
+    }
+
+    return task;
   }
 
   async remove(id: string) {

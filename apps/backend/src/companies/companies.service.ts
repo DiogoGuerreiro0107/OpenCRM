@@ -30,8 +30,17 @@ export class CompaniesService {
     return company;
   }
 
-  create(dto: CreateCompanyDto) {
-    return this.prisma.company.create({ data: dto });
+  async create(dto: CreateCompanyDto, authorId: string) {
+    const company = await this.prisma.company.create({ data: dto });
+    await this.prisma.activityLog.create({
+      data: {
+        type: "NOTE",
+        content: `Empresa "${company.name}" criada.`,
+        companyId: company.id,
+        authorId,
+      },
+    });
+    return company;
   }
 
   async update(id: string, dto: UpdateCompanyDto) {

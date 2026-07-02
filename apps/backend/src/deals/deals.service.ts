@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
+import { WebhooksService } from "../webhooks/webhooks.service";
 import { CreateDealDto } from "./dto/create-deal.dto";
 import { UpdateDealDto } from "./dto/update-deal.dto";
 import { MoveDealDto } from "./dto/move-deal.dto";
@@ -12,7 +13,10 @@ const DEAL_INCLUDE = {
 
 @Injectable()
 export class DealsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly webhooks: WebhooksService,
+  ) {}
 
   findAllByPipeline(pipelineId: string) {
     return this.prisma.deal.findMany({
@@ -40,7 +44,7 @@ export class DealsService {
       orderBy: { order: "desc" },
     });
 
-    return this.prisma.deal.create({
+    const deal = await this.prisma.deal.create({
       data: {
         title: dto.title,
         value: dto.value ?? 0,
@@ -55,6 +59,17 @@ export class DealsService {
       },
       include: DEAL_INCLUDE,
     });
+
+    this.webhooks.trigger("deal.created", {
+      dealId: deal.id,
+      title: deal.title,
+      value: deal.value,
+      pipelineId: deal.pipelineId,
+      stageId: deal.stageId,
+      stageName: stage.name,
+    });
+
+    return deal;
   }
 
   async update(id: string, dto: UpdateDealDto) {
@@ -68,7 +83,7 @@ export class DealsService {
   }
 
   async move(id: string, dto: MoveDealDto) {
-    const deal = await this.prisma.deal.findUnique({ where: { id } });
+    const deal = await this.prisma.deal.findUnique({ where: { id }, include: { stage: true } });
     if (!deal) throw new NotFoundException("Negócio não encontrado");
 
     const targetStage = await this.prisma.stage.findUnique({ where: { id: dto.stageId } });
@@ -99,6 +114,19 @@ export class DealsService {
         this.prisma.deal.update({ where: { id: dealId }, data: { order: index } }),
       ),
     ]);
+
+    if (deal.stageId !== dto.stageId) {
+      this.webhooks.trigger("deal.stage_changed", {
+        dealId: deal.id,
+        title: deal.title,
+        pipelineId: deal.pipelineId,
+        fromStageId: deal.stageId,
+        fromStageName: deal.stage.name,
+        toStageId: targetStage.id,
+        toStageName: targetStage.name,
+        toStageType: targetStage.type,
+      });
+    }
 
     return this.findOne(id);
   }
