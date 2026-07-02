@@ -121,6 +121,20 @@ export class EmailService {
     });
   }
 
+  async sendRaw(to: string, subject: string, text: string) {
+    const account = await this.prisma.emailAccount.findFirst();
+    if (!account) throw new BadRequestException("Nenhuma conta de email configurada");
+
+    const transporter = nodemailer.createTransport({
+      host: account.smtpHost,
+      port: account.smtpPort,
+      secure: account.smtpSecure,
+      auth: { user: account.username, pass: account.password },
+    });
+
+    await transporter.sendMail({ from: account.email, to, subject, text });
+  }
+
   private async matchContactAndCompany(addresses: string[]) {
     const normalized = addresses.map((a) => a.toLowerCase());
     const contact = await this.prisma.contact.findFirst({

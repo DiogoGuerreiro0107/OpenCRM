@@ -56,7 +56,7 @@ scripts/
 
 Ver secção 7 de [CLAUDE.md](./CLAUDE.md) para a descrição original de cada fase, e "Roadmap consolidado" no mesmo ficheiro para a versão revista (mais papéis, mais campos, Leads, Campos Personalizados, timeline genérica, etc.).
 
-Estado atual: **todas as fases do roadmap consolidado concluídas** (implementação inicial). Falta só a **revisão final**.
+Estado atual: **todas as fases do roadmap consolidado e a revisão final concluídas**.
 
 - [x] Fase 0 — Setup do monorepo, Docker Compose, autenticação JWT + RBAC
 - [x] Fase 1 — Contactos/Empresas + histórico de atividades
@@ -68,11 +68,11 @@ Estado atual: **todas as fases do roadmap consolidado concluídas** (implementa�
 - [x] Fase 5 — Automações (webhooks para n8n em eventos-chave + eventos locais na timeline)
 - [x] Fase 6 — Dashboard e KPIs (empresas/contactos/leads/oportunidades, valor em aberto, tarefas hoje/atrasadas, negócios parados, gráfico por funil)
 - [x] Fase 7 — Estrutura de Integrações Futuras (contratos TypeScript: Bitrix24, Zadarma, Gmail, MS Graph, Mail providers, WhatsApp)
-- [ ] **Revisão final** — aplicar as revisões pendentes às Fases 0-4
+- [x] **Revisão final** — revisões pendentes às Fases 0-4
   - [x] 6 papéis (roles) + restrição de escrita para `LEITURA_APENAS`
   - [x] Campos completos em Empresa/Contacto/Negócio/Tarefa
   - [x] `TimelineEvent` genérico a substituir o `ActivityLog`
   - [x] Templates de email
-  - [ ] Recuperação de password
+  - [x] Recuperação de password
 
 Decisões de arquitetura de cada fase em [docs/decisoes.md](docs/decisoes.md).

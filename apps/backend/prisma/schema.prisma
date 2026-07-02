@@ -17,20 +17,22 @@ enum Role {
 }
 
 model User {
-  id             String          @id @default(uuid())
-  email          String          @unique
-  name           String
-  passwordHash   String
-  role           Role            @default(COMERCIAL)
-  refreshToken   String?
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  timelineEvents TimelineEvent[]
-  deals          Deal[]
-  tasks          Task[]
-  leads          Lead[]
-  ownedCompanies Company[]
-  ownedContacts  Contact[]
+  id                  String          @id @default(uuid())
+  email               String          @unique
+  name                String
+  passwordHash        String
+  role                Role            @default(COMERCIAL)
+  refreshToken        String?
+  resetToken          String?         @unique
+  resetTokenExpiresAt DateTime?
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  timelineEvents      TimelineEvent[]
+  deals               Deal[]
+  tasks               Task[]
+  leads               Lead[]
+  ownedCompanies      Company[]
+  ownedContacts       Contact[]
 }
 
 enum TimelineEventType {

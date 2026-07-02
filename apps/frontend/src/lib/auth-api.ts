@@ -20,3 +20,13 @@ export async function fetchCurrentUser() {
 export async function logoutRequest() {
   await api.post("/auth/logout");
 }
+
+export async function forgotPasswordRequest(email: string) {
+  const { data } = await api.post<{ message: string }>("/auth/forgot-password", { email });
+  return data;
+}
+
+export async function resetPasswordRequest(token: string, newPassword: string) {
+  const { data } = await api.post<{ message: string }>("/auth/reset-password", { token, newPassword });
+  return data;
+}

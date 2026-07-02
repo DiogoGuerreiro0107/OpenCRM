@@ -28,4 +28,19 @@ export class UsersService {
   setRefreshToken(id: string, refreshToken: string | null) {
     return this.prisma.user.update({ where: { id }, data: { refreshToken } });
   }
+
+  findByResetToken(token: string) {
+    return this.prisma.user.findUnique({ where: { resetToken: token } });
+  }
+
+  setResetToken(id: string, resetToken: string | null, resetTokenExpiresAt: Date | null) {
+    return this.prisma.user.update({ where: { id }, data: { resetToken, resetTokenExpiresAt } });
+  }
+
+  updatePassword(id: string, passwordHash: string) {
+    return this.prisma.user.update({
+      where: { id },
+      data: { passwordHash, resetToken: null, resetTokenExpiresAt: null, refreshToken: null },
+    });
+  }
 }

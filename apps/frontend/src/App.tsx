@@ -1,5 +1,7 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { LoginPage } from "./pages/LoginPage";
+import { ForgotPasswordPage } from "./pages/ForgotPasswordPage";
+import { ResetPasswordPage } from "./pages/ResetPasswordPage";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { AppShell } from "@/components/layout/AppShell";
 import { CompaniesListPage } from "@/pages/companies/CompaniesListPage";
@@ -20,6 +22,8 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/esqueci-a-password" element={<ForgotPasswordPage />} />
+      <Route path="/redefinir-password" element={<ResetPasswordPage />} />
 
       <Route element={<ProtectedRoute />}>
         <Route element={<AppShell />}>
