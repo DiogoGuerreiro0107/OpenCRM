@@ -88,3 +88,10 @@ O `CLAUDE.md` foi atualizado com revisões às Fases 0-4 já implementadas (mais
 - Taxa de conversão por funil = `ganhas / (ganhas + perdidas) × 100`, arredondada; `0%` quando não há negócios fechados (evita divisão por zero).
 - Gráfico de barras com `recharts` (biblioteca já recomendada no `CLAUDE.md` para dashboards), um único gráfico simples (abertos/ganhos/perdidos por funil) — sem introduzir mais tipos de visualização do que o pedido "KPIs mínimos" exige.
 - `/dashboard` passou a ser a rota inicial (`/`) e o destino após login, substituindo `/empresas`.
+
+## Fase 7 — Estrutura de Integrações Futuras (2026-07-02)
+
+- `apps/backend/src/integrations/`: só interfaces TypeScript (`BitrixService`, `ZadarmaService`, `GmailService`, `MicrosoftGraphService`, `MailProviderService`, `WhatsAppService`), sem classes NestJS `@Injectable()` nem providers registados em nenhum módulo — não há nada a instanciar ainda, e criar stubs vazios só para existirem introduziria código morto. Ficam prontas a implementar (e a passar a `@Injectable()` com um `providers`/`imports` próprio) quando a integração real de cada uma avançar.
+- `MailProviderService` está deliberadamente desligado do `EmailService` da Fase 4 — o `CLAUDE.md` sugere que a Fase 4 "pode já implementar este contrato", mas isso seria uma alteração a uma fase já construída, pelo que fica para a revisão final em vez de ser feita agora fora de ordem.
+- Sem alterações ao schema, à API, nem ao frontend nesta fase — é puramente estrutural/preparatória, conforme descrito no `CLAUDE.md`.
+- **Esta é a última fase do roadmap consolidado antes da revisão final.** A partir daqui, o trabalho passa a ser: aplicar as revisões pendentes marcadas no `CLAUDE.md` para as Fases 0-4 (6 papéis, campos completos em Empresa/Contacto/Negócio/Tarefa, `TimelineEvent` genérico a substituir o `ActivityLog`, templates de email, recuperação de password).
