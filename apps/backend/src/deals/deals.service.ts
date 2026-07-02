@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { WebhooksService } from "../webhooks/webhooks.service";
+import { AutomationsService } from "../automations/automations.service";
 import { CreateDealDto } from "./dto/create-deal.dto";
 import { UpdateDealDto } from "./dto/update-deal.dto";
 import { MoveDealDto } from "./dto/move-deal.dto";
@@ -11,11 +12,14 @@ const DEAL_INCLUDE = {
   owner: { select: { id: true, name: true } },
 } as const;
 
+const WATCHED_FIELDS = ["value", "probability", "type", "estimatedMargin"] as const;
+
 @Injectable()
 export class DealsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly webhooks: WebhooksService,
+    private readonly automations: AutomationsService,
   ) {}
 
   findAllByPipeline(pipelineId: string) {
@@ -76,8 +80,22 @@ export class DealsService {
   }
 
   async update(id: string, dto: UpdateDealDto) {
-    await this.ensureExists(id);
-    return this.prisma.deal.update({ where: { id }, data: dto, include: DEAL_INCLUDE });
+    const existing = await this.prisma.deal.findUnique({ where: { id } });
+    if (!existing) throw new NotFoundException("Negócio não encontrado");
+
+    const deal = await this.prisma.deal.update({ where: { id }, data: dto, include: DEAL_INCLUDE });
+
+    const changes: Record<string, { before: unknown; after: unknown }> = {};
+    for (const field of WATCHED_FIELDS) {
+      if (dto[field] !== undefined && dto[field] !== existing[field]) {
+        changes[field] = { before: existing[field], after: dto[field] };
+      }
+    }
+    if (Object.keys(changes).length > 0) {
+      await this.automations.evaluateFieldChangedRules(id, deal.pipelineId, changes);
+    }
+
+    return deal;
   }
 
   async remove(id: string) {
@@ -116,6 +134,7 @@ export class DealsService {
           stageId: dto.stageId,
           closedAt: targetStage.type === "OPEN" ? null : (deal.closedAt ?? new Date()),
           lossReason: dto.lossReason ?? undefined,
+          stageEnteredAt: deal.stageId !== dto.stageId ? new Date() : undefined,
         },
       }),
       ...orderedIds.map((dealId, index) =>

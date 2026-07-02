@@ -314,3 +314,23 @@ export interface EmailTemplate {
   createdAt: string;
   updatedAt: string;
 }
+
+export type AutomationTriggerType = "STAGE_IDLE_TIME" | "TASK_COMPLETED" | "FIELD_CHANGED";
+
+export type AutomationActionType = "MOVE_STAGE" | "TRIGGER_WEBHOOK";
+
+export interface AutomationRule {
+  id: string;
+  name: string;
+  active: boolean;
+  pipelineId: string | null;
+  pipeline: { id: string; name: string } | null;
+  stageId: string | null;
+  stage: { id: string; name: string } | null;
+  triggerType: AutomationTriggerType;
+  triggerConfig: Record<string, unknown>;
+  actionType: AutomationActionType;
+  actionConfig: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}

@@ -8,11 +8,13 @@ import { cn } from "@/lib/utils";
 import { KanbanBoard } from "@/components/kanban/KanbanBoard";
 import { DealDialog } from "@/components/kanban/DealDialog";
 import { NewPipelineDialog } from "./NewPipelineDialog";
+import { ManagePipelineDialog } from "./ManagePipelineDialog";
 
 export function DealsBoardPage() {
   const queryClient = useQueryClient();
   const [pipelineId, setPipelineId] = useState<string | null>(null);
   const [isNewPipelineOpen, setIsNewPipelineOpen] = useState(false);
+  const [isManagePipelineOpen, setIsManagePipelineOpen] = useState(false);
   const [dealDialog, setDealDialog] = useState<{ stageId: string; deal: Deal | null } | null>(null);
 
   const { data: pipelines, isLoading: isLoadingPipelines } = useQuery({
@@ -52,9 +54,16 @@ export function DealsBoardPage() {
     <div className="flex h-full flex-col space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Funis de vendas</h1>
-        <Button variant="outline" onClick={() => setIsNewPipelineOpen(true)}>
-          Novo funil
-        </Button>
+        <div className="flex gap-2">
+          {pipeline && (
+            <Button variant="outline" onClick={() => setIsManagePipelineOpen(true)}>
+              Gerir funil
+            </Button>
+          )}
+          <Button variant="outline" onClick={() => setIsNewPipelineOpen(true)}>
+            Novo funil
+          </Button>
+        </div>
       </div>
 
       <div className="flex gap-2 border-b border-border">
@@ -99,6 +108,15 @@ export function DealsBoardPage() {
         onClose={() => setIsNewPipelineOpen(false)}
         onCreated={(id) => setPipelineId(id)}
       />
+
+      {pipeline && isManagePipelineOpen && (
+        <ManagePipelineDialog
+          open
+          onClose={() => setIsManagePipelineOpen(false)}
+          pipeline={pipeline}
+          onDeleted={() => setPipelineId(null)}
+        />
+      )}
 
       {dealDialog && pipelineId && (
         <DealDialog

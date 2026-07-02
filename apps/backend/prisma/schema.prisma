@@ -151,22 +151,24 @@ enum StageType {
 }
 
 model Pipeline {
-  id        String   @id @default(uuid())
-  name      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  stages    Stage[]
-  deals     Deal[]
+  id              String           @id @default(uuid())
+  name            String
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  stages          Stage[]
+  deals           Deal[]
+  automationRules AutomationRule[]
 }
 
 model Stage {
-  id         String    @id @default(uuid())
-  name       String
-  order      Int
-  type       StageType @default(OPEN)
-  pipelineId String
-  pipeline   Pipeline  @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
-  deals      Deal[]
+  id              String           @id @default(uuid())
+  name            String
+  order           Int
+  type            StageType        @default(OPEN)
+  pipelineId      String
+  pipeline        Pipeline         @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  deals           Deal[]
+  automationRules AutomationRule[]
 
   @@index([pipelineId])
 }
@@ -184,6 +186,7 @@ model Deal {
   pipeline        Pipeline      @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
   stageId         String
   stage           Stage         @relation(fields: [stageId], references: [id], onDelete: Restrict)
+  stageEnteredAt  DateTime      @default(now())
   contactId       String?
   contact         Contact?      @relation(fields: [contactId], references: [id], onDelete: SetNull)
   companyId       String?
@@ -198,6 +201,37 @@ model Deal {
 
   @@index([pipelineId])
   @@index([stageId])
+}
+
+enum AutomationTriggerType {
+  STAGE_IDLE_TIME
+  TASK_COMPLETED
+  FIELD_CHANGED
+}
+
+enum AutomationActionType {
+  MOVE_STAGE
+  TRIGGER_WEBHOOK
+}
+
+model AutomationRule {
+  id            String                @id @default(uuid())
+  name          String
+  active        Boolean               @default(true)
+  pipelineId    String?
+  pipeline      Pipeline?             @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  stageId       String?
+  stage         Stage?                @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  triggerType   AutomationTriggerType
+  triggerConfig Json
+  actionType    AutomationActionType
+  actionConfig  Json
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+
+  @@index([pipelineId])
+  @@index([stageId])
+  @@index([triggerType, active])
 }
 
 enum TaskStatus {

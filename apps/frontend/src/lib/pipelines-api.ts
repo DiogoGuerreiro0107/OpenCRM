@@ -11,6 +11,11 @@ export async function createPipeline(name: string) {
   return data;
 }
 
+export async function updatePipeline(id: string, name: string) {
+  const { data } = await api.patch<PipelineWithStages>(`/pipelines/${id}`, { name });
+  return data;
+}
+
 export async function deletePipeline(id: string) {
   await api.delete(`/pipelines/${id}`);
 }
