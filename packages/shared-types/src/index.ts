@@ -7,16 +7,20 @@ export interface AuthUser {
   role: Role;
 }
 
-export type ActivityType = "NOTE" | "CALL" | "EMAIL" | "MEETING" | "FILE";
+export type TimelineEventType = "NOTE" | "CALL" | "EMAIL" | "MEETING" | "FILE" | "SYSTEM";
 
-export interface ActivityLog {
+export type TimelineEntityType = "COMPANY" | "CONTACT" | "LEAD" | "DEAL" | "TASK";
+
+export interface TimelineEvent {
   id: string;
-  type: ActivityType;
-  content: string;
-  contactId: string | null;
-  companyId: string | null;
-  authorId: string;
-  author: { id: string; name: string };
+  entityType: TimelineEntityType;
+  entityId: string;
+  type: TimelineEventType;
+  title: string | null;
+  description: string | null;
+  metadata: unknown;
+  userId: string;
+  user: { id: string; name: string };
   createdAt: string;
 }
 
@@ -50,7 +54,6 @@ export interface CompanySummary extends Company {
 
 export interface CompanyDetail extends Company {
   contacts: ContactSummary[];
-  activities: ActivityLog[];
 }
 
 export type PreferredChannel = "TELEFONE" | "EMAIL" | "WHATSAPP" | "PRESENCIAL";
@@ -79,7 +82,6 @@ export interface ContactSummary extends Contact {
 
 export interface ContactDetail extends Contact {
   company: { id: string; name: string } | null;
-  activities: ActivityLog[];
 }
 
 export type StageType = "OPEN" | "WON" | "LOST";

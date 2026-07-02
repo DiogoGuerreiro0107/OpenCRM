@@ -4,7 +4,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { PreferredChannel } from "@opencrm/shared-types";
 import { deleteContact, getContact, updateContact } from "@/lib/contacts-api";
 import { listCompanies } from "@/lib/companies-api";
-import { createActivity } from "@/lib/activity-api";
 import { listUsers } from "@/lib/tasks-api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ActivityTimeline } from "@/components/ActivityTimeline";
+import { TimelineSection } from "@/components/TimelineSection";
 import { EmailSection } from "@/components/email/EmailSection";
 import { CustomFieldsSection } from "@/components/CustomFieldsSection";
 
@@ -90,12 +89,6 @@ export function ContactDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["contacts"] });
       navigate("/contactos");
     },
-  });
-
-  const activityMutation = useMutation({
-    mutationFn: (input: { type: import("@opencrm/shared-types").ActivityType; content: string }) =>
-      createActivity({ ...input, contactId: id }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["contacts", id] }),
   });
 
   function handleChange(field: keyof typeof form) {
@@ -248,11 +241,7 @@ export function ContactDetailPage() {
             <CardTitle>Atividade</CardTitle>
           </CardHeader>
           <CardContent>
-            <ActivityTimeline
-              activities={contact.activities}
-              onAdd={(input) => activityMutation.mutateAsync(input).then(() => undefined)}
-              isSubmitting={activityMutation.isPending}
-            />
+            <TimelineSection entityType="CONTACT" entityId={contact.id} />
           </CardContent>
         </Card>
 

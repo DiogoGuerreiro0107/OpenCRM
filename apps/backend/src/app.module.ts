@@ -5,7 +5,7 @@ import { AuthModule } from "./auth/auth.module";
 import { UsersModule } from "./users/users.module";
 import { CompaniesModule } from "./companies/companies.module";
 import { ContactsModule } from "./contacts/contacts.module";
-import { ActivityLogModule } from "./activity-log/activity-log.module";
+import { TimelineModule } from "./timeline/timeline.module";
 import { PipelinesModule } from "./pipelines/pipelines.module";
 import { DealsModule } from "./deals/deals.module";
 import { TasksModule } from "./tasks/tasks.module";
@@ -24,7 +24,7 @@ import { DashboardModule } from "./dashboard/dashboard.module";
     AuthModule,
     CompaniesModule,
     ContactsModule,
-    ActivityLogModule,
+    TimelineModule,
     PipelinesModule,
     DealsModule,
     TasksModule,

@@ -91,15 +91,18 @@ export class TasksService {
       include: TASK_INCLUDE,
     });
 
-    if (dto.status === "DONE" && existing.status !== "DONE" && (task.contactId || task.companyId)) {
-      await this.prisma.activityLog.create({
-        data: {
-          type: "NOTE",
-          content: `Tarefa concluída: "${task.title}".`,
-          contactId: task.contactId ?? undefined,
-          companyId: task.companyId ?? undefined,
-          authorId: actingUserId,
-        },
+    if (dto.status === "DONE" && existing.status !== "DONE") {
+      const description = `Tarefa concluída: "${task.title}".`;
+      const events: { entityType: "CONTACT" | "COMPANY" | "DEAL" | "LEAD" | "TASK"; entityId: string }[] = [
+        { entityType: "TASK", entityId: task.id },
+      ];
+      if (task.contactId) events.push({ entityType: "CONTACT", entityId: task.contactId });
+      if (task.companyId) events.push({ entityType: "COMPANY", entityId: task.companyId });
+      if (task.dealId) events.push({ entityType: "DEAL", entityId: task.dealId });
+      if (task.leadId) events.push({ entityType: "LEAD", entityId: task.leadId });
+
+      await this.prisma.timelineEvent.createMany({
+        data: events.map((e) => ({ ...e, type: "SYSTEM", description, userId: actingUserId })),
       });
     }
 

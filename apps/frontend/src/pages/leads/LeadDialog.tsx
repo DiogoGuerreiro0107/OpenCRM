@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { CustomFieldsSection } from "@/components/CustomFieldsSection";
+import { TimelineSection } from "@/components/TimelineSection";
 
 const INTEREST_LABELS: Record<BusinessArea, string> = {
   IMPRESSAO: "Impressão",
@@ -216,6 +217,12 @@ export function LeadDialog({ open, onClose, lead }: LeadDialogProps) {
         {lead && (
           <div className="border-t border-border pt-4">
             <CustomFieldsSection entityType="LEAD" entityId={lead.id} />
+          </div>
+        )}
+
+        {lead && (
+          <div className="border-t border-border pt-4">
+            <TimelineSection entityType="LEAD" entityId={lead.id} />
           </div>
         )}
 

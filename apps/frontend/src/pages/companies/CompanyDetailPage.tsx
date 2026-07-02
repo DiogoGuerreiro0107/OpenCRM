@@ -3,7 +3,6 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { CompanySource, CompanyStatus } from "@opencrm/shared-types";
 import { deleteCompany, getCompany, updateCompany } from "@/lib/companies-api";
-import { createActivity } from "@/lib/activity-api";
 import { listUsers } from "@/lib/tasks-api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ActivityTimeline } from "@/components/ActivityTimeline";
+import { TimelineSection } from "@/components/TimelineSection";
 import { EmailSection } from "@/components/email/EmailSection";
 import { CustomFieldsSection } from "@/components/CustomFieldsSection";
 
@@ -101,12 +100,6 @@ export function CompanyDetailPage() {
       queryClient.invalidateQueries({ queryKey: ["companies"] });
       navigate("/empresas");
     },
-  });
-
-  const activityMutation = useMutation({
-    mutationFn: (input: { type: import("@opencrm/shared-types").ActivityType; content: string }) =>
-      createActivity({ ...input, companyId: id }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["companies", id] }),
   });
 
   function handleChange(field: keyof typeof form) {
@@ -274,11 +267,7 @@ export function CompanyDetailPage() {
             <CardTitle>Atividade</CardTitle>
           </CardHeader>
           <CardContent>
-            <ActivityTimeline
-              activities={company.activities}
-              onAdd={(input) => activityMutation.mutateAsync(input).then(() => undefined)}
-              isSubmitting={activityMutation.isPending}
-            />
+            <TimelineSection entityType="COMPANY" entityId={company.id} />
           </CardContent>
         </Card>
 
