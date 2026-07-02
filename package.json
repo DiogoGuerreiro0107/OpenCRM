@@ -6,10 +6,16 @@
     "node": ">=20"
   },
   "scripts": {
+    "dev": "node scripts/dev-setup.mjs && concurrently -n backend,frontend -c blue,green \"pnpm --filter backend dev\" \"pnpm --filter frontend dev\"",
+    "dev:setup": "node scripts/dev-setup.mjs",
     "dev:backend": "pnpm --filter backend dev",
     "dev:frontend": "pnpm --filter frontend dev",
+    "stop": "docker compose stop postgres",
     "build": "pnpm -r build",
     "lint": "pnpm -r lint"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.1"
   },
   "packageManager": "pnpm@11.9.0"
 }

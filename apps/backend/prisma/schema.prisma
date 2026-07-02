@@ -23,6 +23,7 @@ model User {
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
   activityLogs  ActivityLog[]
+  deals         Deal[]
 }
 
 enum ActivityType {
@@ -45,6 +46,7 @@ model Company {
   updatedAt DateTime      @updatedAt
   contacts  Contact[]
   activities ActivityLog[]
+  deals     Deal[]
 }
 
 model Contact {
@@ -59,6 +61,7 @@ model Contact {
   createdAt DateTime      @default(now())
   updatedAt DateTime      @updatedAt
   activities ActivityLog[]
+  deals     Deal[]
 
   @@index([companyId])
 }
@@ -77,4 +80,55 @@ model ActivityLog {
 
   @@index([contactId])
   @@index([companyId])
+}
+
+enum StageType {
+  OPEN
+  WON
+  LOST
+}
+
+model Pipeline {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  stages    Stage[]
+  deals     Deal[]
+}
+
+model Stage {
+  id         String    @id @default(uuid())
+  name       String
+  order      Int
+  type       StageType @default(OPEN)
+  pipelineId String
+  pipeline   Pipeline  @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  deals      Deal[]
+
+  @@index([pipelineId])
+}
+
+model Deal {
+  id          String    @id @default(uuid())
+  title       String
+  value       Float     @default(0)
+  probability Int       @default(0)
+  order       Int       @default(0)
+  pipelineId  String
+  pipeline    Pipeline  @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  stageId     String
+  stage       Stage     @relation(fields: [stageId], references: [id], onDelete: Restrict)
+  contactId   String?
+  contact     Contact?  @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  companyId   String?
+  company     Company?  @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  ownerId     String
+  owner       User      @relation(fields: [ownerId], references: [id])
+  closedAt    DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([pipelineId])
+  @@index([stageId])
 }

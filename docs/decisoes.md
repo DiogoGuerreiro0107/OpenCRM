@@ -19,3 +19,13 @@
 - `ActivityTimeline` é um componente partilhado entre a ficha de Contacto e de Empresa (recebe `activities` + `onAdd`), para não duplicar a UI de registo de atividade.
 - Página de "Novo contacto" aceita `?companyId=` na URL para pré-selecionar a empresa quando se cria o contacto a partir da ficha da empresa.
 - Ainda sem paginação nas listagens (Companies/Contacts) — aceitável para o volume atual, a rever se a lista de contactos crescer muito.
+
+## Fase 2 — Funis de vendas / Kanban (2026-07-01)
+
+- Sem campo `status` redundante no `Deal`. O estado "aberto/ganho/perdido" deriva do `type` da `Stage` onde o negócio está (`StageType`: `OPEN`/`WON`/`LOST`). Mover um negócio para uma fase `WON`/`LOST` define `closedAt` automaticamente no backend (`DealsService.move`/`create`); mover de volta para `OPEN` limpa `closedAt`. Evita ter dois estados (fase + status) que podiam dessincronizar.
+- Cada `Pipeline` novo é criado já com 4 fases por omissão (`Novo`, `Em negociação` — `OPEN`; `Ganho` — `WON`; `Perdido` — `LOST`), tanto no seed como no endpoint `POST /pipelines`.
+- Ordenação (`order`) em `Stage` e `Deal` é normalizada só na coluna de destino ao mover um negócio (`PATCH /deals/:id/move` recebe `{ stageId, index }` e reatribui `order` sequencial nessa coluna); a coluna de origem fica com gaps nos números, o que não afeta a ordenação relativa.
+- Eliminar uma `Stage` com negócios associados é bloqueado (400) — é preciso mover/eliminar os negócios primeiro. Eliminar um `Pipeline` inteiro faz cascade a fases e negócios (ação explícita e destrutiva, âmbito diferente de eliminar só uma fase).
+- Kanban implementado com `@dnd-kit/core` + `@dnd-kit/sortable`, seguindo o padrão "multiple containers" documentado pela biblioteca (um `SortableContext` por coluna, coluna também `useDroppable` para permitir largar em coluna vazia).
+- Diálogo (`components/ui/dialog.tsx`) construído à mão em vez de trazer `@radix-ui/react-dialog`, para não aumentar dependências só por causa de um modal simples.
+- **Nota de teste**: o drag-and-drop foi validado a testar o endpoint `PATCH /deals/:id/move` diretamente (mesma chamada que o `onDragEnd` do Kanban dispara) e confirmando que a UI reflete corretamente o resultado após reload. A simulação de gestos de arrastar via eventos de pointer sintéticos não foi fiável neste ambiente de testing automatizado (browsers restringem `setPointerCapture` a eventos "trusted"/reais), pelo que o gesto de arrastar em si (clique + arrastar com o rato) deve ser confirmado manualmente.
