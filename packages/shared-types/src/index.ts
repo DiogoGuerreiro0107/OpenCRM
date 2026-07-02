@@ -209,3 +209,41 @@ export interface LeadConversionResult {
   contact: { id: string; name: string };
   deal: { id: string; title: string };
 }
+
+export type CustomFieldEntityType = "COMPANY" | "CONTACT" | "LEAD" | "DEAL";
+
+export type CustomFieldType =
+  | "TEXT"
+  | "TEXTAREA"
+  | "NUMBER"
+  | "CURRENCY"
+  | "DATE"
+  | "BOOLEAN"
+  | "SELECT"
+  | "MULTISELECT"
+  | "EMAIL"
+  | "PHONE"
+  | "URL";
+
+export interface CustomField {
+  id: string;
+  entityType: CustomFieldEntityType;
+  sectionName: string | null;
+  fieldName: string;
+  fieldLabel: string;
+  fieldType: CustomFieldType;
+  options: string[] | null;
+  isRequired: boolean;
+  isVisible: boolean;
+  isSearchable: boolean;
+  isFilterable: boolean;
+  isAutomationEnabled: boolean;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CustomFieldValue {
+  customFieldId: string;
+  value: string | number | boolean | string[] | null;
+}

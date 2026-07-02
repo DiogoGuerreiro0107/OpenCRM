@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ActivityTimeline } from "@/components/ActivityTimeline";
 import { EmailSection } from "@/components/email/EmailSection";
+import { CustomFieldsSection } from "@/components/CustomFieldsSection";
 
 export function CompanyDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -121,6 +122,15 @@ export function CompanyDetailPage() {
                 </Button>
               </div>
             </form>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Campos personalizados</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <CustomFieldsSection entityType="COMPANY" entityId={company.id} />
           </CardContent>
         </Card>
 

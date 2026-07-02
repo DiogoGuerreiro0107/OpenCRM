@@ -281,3 +281,64 @@ model Lead {
   @@index([responsavelId])
   @@index([status])
 }
+
+enum CustomFieldEntityType {
+  COMPANY
+  CONTACT
+  LEAD
+  DEAL
+}
+
+enum CustomFieldType {
+  TEXT
+  TEXTAREA
+  NUMBER
+  CURRENCY
+  DATE
+  BOOLEAN
+  SELECT
+  MULTISELECT
+  EMAIL
+  PHONE
+  URL
+}
+
+model CustomField {
+  id                  String                @id @default(uuid())
+  entityType          CustomFieldEntityType
+  sectionName         String?
+  fieldName           String
+  fieldLabel          String
+  fieldType           CustomFieldType
+  options             Json?
+  isRequired          Boolean               @default(false)
+  isVisible           Boolean               @default(true)
+  isSearchable        Boolean               @default(false)
+  isFilterable        Boolean               @default(false)
+  isAutomationEnabled Boolean               @default(false)
+  sortOrder           Int                   @default(0)
+  permissions         Json?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  values              CustomFieldValue[]
+
+  @@unique([entityType, fieldName])
+}
+
+model CustomFieldValue {
+  id            String                @id @default(uuid())
+  customFieldId String
+  customField   CustomField           @relation(fields: [customFieldId], references: [id], onDelete: Cascade)
+  entityType    CustomFieldEntityType
+  entityId      String
+  valueText     String?
+  valueNumber   Float?
+  valueDate     DateTime?
+  valueBoolean  Boolean?
+  valueJson     Json?
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+
+  @@unique([customFieldId, entityId])
+  @@index([entityType, entityId])
+}

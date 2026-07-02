@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
+import { CustomFieldsSection } from "@/components/CustomFieldsSection";
 
 const INTEREST_LABELS: Record<LeadInterest, string> = {
   IMPRESSAO: "Impressão",
@@ -211,6 +212,12 @@ export function LeadDialog({ open, onClose, lead }: LeadDialogProps) {
           <Label htmlFor="notes">Observações</Label>
           <Textarea id="notes" value={form.notes} onChange={handleChange("notes")} />
         </div>
+
+        {lead && (
+          <div className="border-t border-border pt-4">
+            <CustomFieldsSection entityType="LEAD" entityId={lead.id} />
+          </div>
+        )}
 
         {saveMutation.isError && (
           <p className="text-sm text-red-600">Não foi possível guardar o lead. Tenta novamente.</p>
