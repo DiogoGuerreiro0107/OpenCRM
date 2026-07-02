@@ -141,3 +141,34 @@ export interface Task {
   createdAt: string;
   updatedAt: string;
 }
+
+export type EmailDirection = "INBOUND" | "OUTBOUND";
+
+export interface EmailAttachment {
+  id: string;
+  filename: string;
+  mimeType: string;
+  size: number;
+  storageKey: string;
+  createdAt: string;
+}
+
+export interface EmailMessage {
+  id: string;
+  accountId: string;
+  direction: EmailDirection;
+  messageId: string;
+  fromAddress: string;
+  fromName: string | null;
+  toAddresses: string[];
+  subject: string | null;
+  textBody: string | null;
+  htmlBody: string | null;
+  contactId: string | null;
+  contact: { id: string; name: string } | null;
+  companyId: string | null;
+  company: { id: string; name: string } | null;
+  attachments: EmailAttachment[];
+  sentAt: string;
+  createdAt: string;
+}

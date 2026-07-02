@@ -25,12 +25,13 @@ console.log("== OpenCRM: preparar ambiente de desenvolvimento ==");
 ensureEnvFile(rootDir);
 ensureEnvFile(join(rootDir, "apps", "backend"));
 ensureEnvFile(join(rootDir, "apps", "frontend"));
+ensureEnvFile(join(rootDir, "apps", "email-worker"));
 
 try {
-  run("docker compose up -d --wait postgres");
+  run("docker compose up -d --wait postgres minio");
 } catch {
   console.error(
-    "\nNão foi possível arrancar o PostgreSQL via Docker. Verifica se o Docker Desktop está instalado e em execução.",
+    "\nNão foi possível arrancar o PostgreSQL/MinIO via Docker. Verifica se o Docker Desktop está instalado e em execução.",
   );
   process.exit(1);
 }

@@ -166,3 +166,128 @@ Explica cada decisão estrutural à medida que avanças e confirma comigo antes 
 - Como já usas o Bitrix24 atualmente, vale a pena manter uma folha de mapeamento de campos (Bitrix24 → novo CRM) para facilitar uma eventual migração de dados de clientes existentes.
 - O `email-worker` pode nascer mais simples (leitura de uma única caixa partilhada, `info@globaltoner.pt`) e evoluir depois para múltiplas contas por utilizador.
 - Vale a pena documentar decisões de arquitetura num ficheiro `docs/decisoes.md` à medida que o projeto avança, para que o Claude Code mantenha contexto entre sessões longas.
+
+## Revisões a fases já existentes
+
+### Fase 0 — Setup e autenticação (revista)
+Substituir os 3 papéis originais (Admin/Gestor/Comercial) por 6 papéis:
+- Administrador
+- Comercial
+- Técnico
+- Backoffice
+- Financeiro
+- Leitura apenas (read-only, aplicado via guards/policies no NestJS)
+
+Adicionar: fluxo de recuperação de password (token por email, reutilizando o `email-worker`/SMTP já previsto na Fase 4).
+
+### Fase 1 — Empresas e Contactos (revista)
+Empresas — garantir estes campos no schema Prisma:
+`nome_comercial, nome_fiscal, nif, telefone, email, website, morada, codigo_postal, localidade, pais, estado (ativo|potencial|inativo|perdido), origem (site|loja|chamada|campanha|importacao|recomendacao|outro), responsavel_id, observacoes`
+
+Contactos — garantir:
+`empresa_id, nome, cargo, departamento, telefone, telemovel, email, canal_preferencial (telefone|email|whatsapp|presencial), decisor (bool), consentimento_marketing (bool), observacoes, responsavel_id`
+
+Timeline — generalizar o `ActivityLog` já previsto para um modelo único reutilizável por todas as entidades (Empresa, Contacto, Lead, Oportunidade, Tarefa):
+```
+TimelineEvent { entity_type, entity_id, user_id, type, title, description, metadata (Json), created_at }
+```
+Pesquisa e filtros: por nome, NIF, telefone, email, estado, origem, responsável — em ambos os módulos.
+
+### Fase 2 — Pipeline/Oportunidades (revista)
+Adicionar campos ao modelo `Deal`:
+`tipo (impressao|software|informatica|papelaria|pos|assistencia|outro), margem_estimativa, motivo_perda (obrigatório quando fase = perdida)`
+
+Regra de negócio: ao mover a fase para `proposta_enviada`, disparar o webhook de automação da Fase 5 (ver abaixo).
+
+### Fase 3 — Tarefas e Calendário (revista)
+Adicionar ao modelo `Task`:
+`tipo (chamada|email|visita|proposta|cobranca|assistencia|outro), prioridade (baixa|normal|alta|urgente), resultado`
+Views adicionais: tarefas atrasadas, tarefas de hoje, tarefas por cliente.
+Regra: ao concluir uma tarefa, criar automaticamente um `TimelineEvent` na entidade associada.
+
+### Fase 4 — Email (revista)
+Além da integração IMAP/SMTP já prevista, incluir CRUD de **templates de e-mail**:
+`nome, assunto, corpo, categoria, ativo`
+Variáveis suportadas (substituição simples no `email-worker`): `{nome_cliente}, {empresa}, {responsavel}, {telefone}, {email}, {link_proposta}`
+Nesta fase não é necessário disparo automático — apenas gestão dos templates.
+
+### Fase 5 — Automações (revista)
+Confirma-se a abordagem via webhooks para o n8n existente (evita motor de automação próprio). Regras mínimas da primeira versão:
+- Lead criado → webhook n8n cria tarefa de primeiro contacto
+- Oportunidade → fase `proposta_enviada` → webhook n8n agenda tarefa de follow-up (+2 dias úteis)
+- Tarefa concluída → evento na timeline (local, sem precisar do n8n)
+- Empresa criada → evento na timeline (local)
+
+### Fase 6 — Dashboard (revista)
+KPIs mínimos: total de empresas, total de contactos, leads novos, oportunidades abertas/ganhas/perdidas, valor estimado em aberto, tarefas de hoje/atrasadas, propostas enviadas, oportunidades paradas (sem movimento há X dias).
+
+---
+
+## Fases novas (não existiam no roadmap original)
+
+### Fase 1.5 — Módulo de Leads
+Não existia como entidade própria (só havia Empresas/Contactos/Deals). Modelo `Lead`:
+`nome, empresa, telefone, email, origem, interesse (impressao|software|informatica|papelaria|pos|assistencia|outro), estado (novo|contactado|sem_resposta|convertido|perdido), responsavel_id, proxima_acao, observacoes`
+
+Funcionalidades:
+- Conversão de Lead → Empresa + Contacto + Oportunidade (endpoint dedicado que cria as três entidades e liga o `TimelineEvent` de origem)
+- Criação automática de tarefa ao criar lead (local, ou via webhook n8n — decidir na implementação)
+- Listagem e filtros
+
+Sugestão de posição no roadmap: depois da Fase 1 (Empresas/Contactos), antes da Fase 2 (Pipeline).
+
+### Fase 2.5 — Campos Personalizados
+Feature transversal que não estava prevista. Necessária porque se aplica a Empresas, Contactos, Leads e Oportunidades.
+
+Modelos Prisma:
+```
+CustomField {
+  id, entity_type (company|contact|lead|opportunity), section_name,
+  field_name, field_label, field_type, options (Json),
+  is_required, is_visible, is_searchable, is_filterable,
+  is_automation_enabled, sort_order, permissions (Json),
+  created_at, updated_at
+}
+
+CustomFieldValue {
+  id, custom_field_id, entity_type, entity_id,
+  value_text, value_number, value_date, value_boolean, value_json,
+  created_at, updated_at
+}
+```
+
+Tipos de campo: texto curto, texto longo, número, valor monetário, data, sim/não, lista de opções, seleção múltipla, email, telefone, URL.
+
+Interface: página em Configurações > Campos Personalizados (React/shadcn) para criar/editar/desativar campos; renderização dinâmica dos campos na ficha de cada entidade; inclusão nos filtros de pesquisa existentes.
+
+Sugestão de posição: depois da Fase 2 (Pipeline), antes da Fase 3 (Tarefas) — ou mais tarde, se preferires validar primeiro os módulos "core" sem esta complexidade extra.
+
+### Fase 7 — Estrutura de Integrações Futuras
+Criar pasta `apps/backend/src/integrations/` com interfaces/contratos vazios (sem implementação):
+- `BitrixService`
+- `ZadarmaService`
+- `GmailService`
+- `MicrosoftGraphService`
+- `MailProviderService` (abstração para Brevo/Mailgun/SES — a integração de email real da Fase 4 pode já implementar este contrato)
+- `WhatsAppService` (previsivelmente já coberto pelo teu WAHA + n8n existente, mas o contrato fica pronto)
+
+Cada serviço apenas com a assinatura dos métodos esperados (ex.: `syncContact()`, `sendMessage()`, `fetchDeals()`), por implementar quando a integração real avançar.
+
+---
+
+## Roadmap consolidado (ordem sugerida)
+
+| Fase | Objetivo |
+|---|---|
+| 0 | Monorepo, Docker Compose, autenticação com 6 papéis, recuperação de password |
+| 1 | Empresas + Contactos (campos completos) + Timeline genérica |
+| 1.5 | Leads (incl. conversão para Empresa/Contacto/Oportunidade) |
+| 2 | Pipeline/Kanban de Oportunidades (campos completos) |
+| 2.5 | Campos Personalizados (transversal) |
+| 3 | Tarefas e Calendário (campos completos) |
+| 4 | Integração de Email (IMAP/SMTP) + Templates de Email |
+| 5 | Automações via webhooks n8n |
+| 6 | Dashboard e KPIs |
+| 7 | Estrutura de Integrações Futuras (Bitrix24, Zadarma, Gmail, MS Graph, Mail providers) |
+
+Mantém-se a recomendação original: implementar **uma fase de cada vez** com o Claude Code, validando antes de avançar para a seguinte.

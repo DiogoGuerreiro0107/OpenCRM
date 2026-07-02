@@ -11,3 +11,4 @@ apps/backend/generated/
 *.tsbuildinfo
 apps/frontend/vite.config.js
 apps/frontend/vite.config.d.ts
+apps/email-worker/.sync-state.json

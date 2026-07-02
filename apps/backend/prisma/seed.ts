@@ -33,6 +33,25 @@ async function main() {
       },
     });
   }
+
+  if (process.env.EMAIL_ADDRESS && process.env.EMAIL_PASSWORD) {
+    const emailAccountData = {
+      username: process.env.EMAIL_ADDRESS,
+      password: process.env.EMAIL_PASSWORD,
+      imapHost: process.env.IMAP_HOST!,
+      imapPort: Number(process.env.IMAP_PORT ?? 993),
+      imapSecure: process.env.IMAP_SECURE !== "false",
+      smtpHost: process.env.SMTP_HOST!,
+      smtpPort: Number(process.env.SMTP_PORT ?? 465),
+      smtpSecure: process.env.SMTP_SECURE !== "false",
+    };
+
+    await prisma.emailAccount.upsert({
+      where: { email: process.env.EMAIL_ADDRESS },
+      update: emailAccountData,
+      create: { email: process.env.EMAIL_ADDRESS, ...emailAccountData },
+    });
+  }
 }
 
 main()

@@ -49,6 +49,7 @@ model Company {
   activities ActivityLog[]
   deals     Deal[]
   tasks     Task[]
+  emails    EmailMessage[]
 }
 
 model Contact {
@@ -65,6 +66,7 @@ model Contact {
   activities ActivityLog[]
   deals     Deal[]
   tasks     Task[]
+  emails    EmailMessage[]
 
   @@index([companyId])
 }
@@ -174,4 +176,63 @@ model Reminder {
   createdAt DateTime @default(now())
 
   @@index([taskId])
+}
+
+enum EmailDirection {
+  INBOUND
+  OUTBOUND
+}
+
+model EmailAccount {
+  id            String         @id @default(uuid())
+  email         String         @unique
+  imapHost      String
+  imapPort      Int
+  imapSecure    Boolean        @default(true)
+  smtpHost      String
+  smtpPort      Int
+  smtpSecure    Boolean        @default(true)
+  username      String
+  password      String
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  messages      EmailMessage[]
+}
+
+model EmailMessage {
+  id          String         @id @default(uuid())
+  accountId   String
+  account     EmailAccount   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  direction   EmailDirection
+  messageId   String         @unique
+  fromAddress String
+  fromName    String?
+  toAddresses String[]
+  subject     String?
+  textBody    String?
+  htmlBody    String?
+  contactId   String?
+  contact     Contact?       @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  companyId   String?
+  company     Company?       @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  attachments Attachment[]
+  sentAt      DateTime
+  createdAt   DateTime       @default(now())
+
+  @@index([accountId])
+  @@index([contactId])
+  @@index([companyId])
+}
+
+model Attachment {
+  id         String       @id @default(uuid())
+  messageId  String
+  message    EmailMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  filename   String
+  mimeType   String
+  size       Int
+  storageKey String
+  createdAt  DateTime     @default(now())
+
+  @@index([messageId])
 }
