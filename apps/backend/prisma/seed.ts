@@ -16,6 +16,23 @@ async function main() {
       role: "ADMIN",
     },
   });
+
+  const pipelineExists = await prisma.pipeline.findFirst();
+  if (!pipelineExists) {
+    await prisma.pipeline.create({
+      data: {
+        name: "Vendas",
+        stages: {
+          create: [
+            { name: "Novo", type: "OPEN", order: 0 },
+            { name: "Em negociação", type: "OPEN", order: 1 },
+            { name: "Ganho", type: "WON", order: 2 },
+            { name: "Perdido", type: "LOST", order: 3 },
+          ],
+        },
+      },
+    });
+  }
 }
 
 main()

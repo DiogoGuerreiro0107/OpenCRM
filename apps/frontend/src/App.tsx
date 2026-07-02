@@ -8,6 +8,7 @@ import { CompanyDetailPage } from "@/pages/companies/CompanyDetailPage";
 import { ContactsListPage } from "@/pages/contacts/ContactsListPage";
 import { NewContactPage } from "@/pages/contacts/NewContactPage";
 import { ContactDetailPage } from "@/pages/contacts/ContactDetailPage";
+import { DealsBoardPage } from "@/pages/deals/DealsBoardPage";
 
 export default function App() {
   return (
@@ -23,6 +24,7 @@ export default function App() {
           <Route path="/contactos" element={<ContactsListPage />} />
           <Route path="/contactos/novo" element={<NewContactPage />} />
           <Route path="/contactos/:id" element={<ContactDetailPage />} />
+          <Route path="/funis" element={<DealsBoardPage />} />
         </Route>
       </Route>
 

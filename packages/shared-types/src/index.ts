@@ -61,3 +61,47 @@ export interface ContactDetail extends Contact {
   company: { id: string; name: string } | null;
   activities: ActivityLog[];
 }
+
+export type StageType = "OPEN" | "WON" | "LOST";
+
+export interface Stage {
+  id: string;
+  name: string;
+  order: number;
+  type: StageType;
+  pipelineId: string;
+}
+
+export interface StageWithCount extends Stage {
+  _count: { deals: number };
+}
+
+export interface Pipeline {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PipelineWithStages extends Pipeline {
+  stages: StageWithCount[];
+}
+
+export interface Deal {
+  id: string;
+  title: string;
+  value: number;
+  probability: number;
+  order: number;
+  pipelineId: string;
+  stageId: string;
+  contactId: string | null;
+  contact: { id: string; name: string } | null;
+  companyId: string | null;
+  company: { id: string; name: string } | null;
+  ownerId: string;
+  owner: { id: string; name: string };
+  closedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
