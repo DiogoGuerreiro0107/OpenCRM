@@ -334,3 +334,28 @@ export interface AutomationRule {
   createdAt: string;
   updatedAt: string;
 }
+
+export interface ZadarmaAccount {
+  id: string;
+  callerExtension: string | null;
+  active: boolean;
+  lastSyncAt: string | null;
+  hasCredentials: true;
+}
+
+export type CallDirection = "INBOUND" | "OUTBOUND";
+
+export interface CallRecord {
+  id: string;
+  externalId: string;
+  direction: CallDirection;
+  fromNumber: string;
+  toNumber: string;
+  duration: number;
+  disposition: string | null;
+  recordingUrl: string | null;
+  contactId: string | null;
+  companyId: string | null;
+  startedAt: string;
+  createdAt: string;
+}

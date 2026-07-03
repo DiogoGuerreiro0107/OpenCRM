@@ -13,6 +13,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TimelineSection } from "@/components/TimelineSection";
 import { EmailSection } from "@/components/email/EmailSection";
 import { CustomFieldsSection } from "@/components/CustomFieldsSection";
+import { CallButton } from "@/components/CallButton";
+import { CallHistorySection } from "@/components/CallHistorySection";
 
 const STATUS_LABELS: Record<CompanyStatus, string> = {
   ATIVO: "Ativo",
@@ -146,7 +148,10 @@ export function CompanyDetailPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label htmlFor="phone">Telefone</Label>
-                  <Input id="phone" value={form.phone} onChange={handleChange("phone")} />
+                  <div className="flex items-center gap-2">
+                    <Input id="phone" value={form.phone} onChange={handleChange("phone")} />
+                    <CallButton phoneNumber={form.phone} companyId={company.id} />
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="email">Email</Label>
@@ -277,6 +282,15 @@ export function CompanyDetailPage() {
           </CardHeader>
           <CardContent>
             <EmailSection companyId={company.id} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Chamadas</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <CallHistorySection companyId={company.id} />
           </CardContent>
         </Card>
       </div>

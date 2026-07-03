@@ -42,7 +42,7 @@ Utilizador inicial criado pelo seed: `admin@globaltoner.local` / `admin123` (pap
 ```
 apps/
   backend/         NestJS API (auth JWT+refresh, RBAC, Prisma)
-                    módulos: users, companies, contacts, timeline, pipelines, deals, tasks, email, email-templates, leads, custom-fields, webhooks, automations, dashboard, integrations (só contratos)
+                    módulos: users, companies, contacts, timeline, pipelines, deals, tasks, email, email-templates, leads, custom-fields, webhooks, automations, dashboard, zadarma, integrations (só contratos)
   frontend/        React + Vite + Tailwind + shadcn/ui
                     páginas: login, dashboard, leads, empresas, contactos, funis (kanban), tarefas (lista + calendário), email, configurações
   email-worker/    Sincronização IMAP (imapflow + mailparser), fala com o backend por HTTP
@@ -77,5 +77,6 @@ Estado atual: **todas as fases do roadmap consolidado e a revisão final conclu�
 - [x] **Pós-revisão** — pedidos adicionais fora do `CLAUDE.md`
   - [x] Gestão de funis/fases (editar/eliminar funil; adicionar/editar/eliminar/reordenar fases)
   - [x] Motor de automações (mover negócios entre fases/funis por tempo parado, tarefas concluídas ou campo alterado; disparo de webhook n8n)
+  - [x] Integração Zadarma (click-to-call, histórico de chamadas/gravações por polling periódico — estrutura pronta, por validar com credenciais reais quando existirem)
 
 Decisões de arquitetura de cada fase em [docs/decisoes.md](docs/decisoes.md).
