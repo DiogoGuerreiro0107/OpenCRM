@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { TimelineEntityType, TimelineEventType } from "@opencrm/shared-types";
-import { createTimelineEvent, listTimeline } from "@/lib/timeline-api";
+import { Pencil, Trash2 } from "lucide-react";
+import type { TimelineEntityType, TimelineEvent, TimelineEventType } from "@opencrm/shared-types";
+import { createTimelineEvent, deleteTimelineEvent, listTimeline, updateTimelineEvent } from "@/lib/timeline-api";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
@@ -19,6 +20,96 @@ const EVENT_LABELS: Record<TimelineEventType, string> = {
 interface TimelineSectionProps {
   entityType: TimelineEntityType;
   entityId: string;
+}
+
+function TimelineEntry({
+  event,
+  entityType,
+  entityId,
+}: {
+  event: TimelineEvent;
+  entityType: TimelineEntityType;
+  entityId: string;
+}) {
+  const queryClient = useQueryClient();
+  const [isEditing, setIsEditing] = useState(false);
+  const [editText, setEditText] = useState(event.description ?? "");
+
+  function invalidate() {
+    queryClient.invalidateQueries({ queryKey: ["timeline", entityType, entityId] });
+  }
+
+  const updateMutation = useMutation({
+    mutationFn: () => updateTimelineEvent(event.id, { description: editText.trim() }),
+    onSuccess: () => {
+      invalidate();
+      setIsEditing(false);
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteTimelineEvent(event.id),
+    onSuccess: invalidate,
+  });
+
+  const canEdit = event.type !== "SYSTEM";
+
+  return (
+    <div className="rounded-md border border-border p-3">
+      <div className="mb-1 flex items-center justify-between">
+        <Badge>{EVENT_LABELS[event.type]}</Badge>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">
+            {new Date(event.createdAt).toLocaleString("pt-PT")} · {event.user.name}
+          </span>
+          {canEdit && !isEditing && (
+            <div className="flex gap-1">
+              <button
+                type="button"
+                className="text-muted-foreground hover:text-foreground"
+                onClick={() => {
+                  setEditText(event.description ?? "");
+                  setIsEditing(true);
+                }}
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                className="text-muted-foreground hover:text-red-600"
+                onClick={() => {
+                  if (confirm("Eliminar este evento?")) deleteMutation.mutate();
+                }}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {isEditing ? (
+        <div className="space-y-2">
+          <Textarea value={editText} onChange={(e) => setEditText(e.target.value)} className="min-h-[60px]" />
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" size="sm" onClick={() => setIsEditing(false)}>
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              disabled={updateMutation.isPending || !editText.trim()}
+              onClick={() => updateMutation.mutate()}
+            >
+              Guardar
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <p className="whitespace-pre-wrap text-sm">{event.description}</p>
+      )}
+    </div>
+  );
 }
 
 export function TimelineSection({ entityType, entityId }: TimelineSectionProps) {
@@ -81,15 +172,7 @@ export function TimelineSection({ entityType, entityId }: TimelineSectionProps) 
       <div className="space-y-3">
         {events?.length === 0 && <p className="text-sm text-muted-foreground">Ainda sem atividade registada.</p>}
         {events?.map((event) => (
-          <div key={event.id} className="rounded-md border border-border p-3">
-            <div className="mb-1 flex items-center justify-between">
-              <Badge>{EVENT_LABELS[event.type]}</Badge>
-              <span className="text-xs text-muted-foreground">
-                {new Date(event.createdAt).toLocaleString("pt-PT")} · {event.user.name}
-              </span>
-            </div>
-            <p className="whitespace-pre-wrap text-sm">{event.description}</p>
-          </div>
+          <TimelineEntry key={event.id} event={event} entityType={entityType} entityId={entityId} />
         ))}
       </div>
     </div>
