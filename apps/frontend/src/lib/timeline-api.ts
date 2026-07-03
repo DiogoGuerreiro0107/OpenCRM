@@ -17,3 +17,12 @@ export async function createTimelineEvent(input: CreateTimelineEventInput) {
   const { data } = await api.post<TimelineEvent>("/timeline", input);
   return data;
 }
+
+export async function updateTimelineEvent(id: string, input: { type?: TimelineEventType; description?: string }) {
+  const { data } = await api.patch<TimelineEvent>(`/timeline/${id}`, input);
+  return data;
+}
+
+export async function deleteTimelineEvent(id: string) {
+  await api.delete(`/timeline/${id}`);
+}

@@ -1,8 +1,9 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from "@nestjs/common";
+import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { TimelineService } from "./timeline.service";
 import { CreateTimelineEventDto } from "./dto/create-timeline-event.dto";
+import { UpdateTimelineEventDto } from "./dto/update-timeline-event.dto";
 import { QueryTimelineDto } from "./dto/query-timeline.dto";
 
 @UseGuards(JwtAuthGuard)
@@ -18,5 +19,16 @@ export class TimelineController {
   @Post()
   create(@Body() dto: CreateTimelineEventDto, @CurrentUser() user: { userId: string }) {
     return this.timelineService.create(dto, user.userId);
+  }
+
+  @Patch(":id")
+  update(@Param("id") id: string, @Body() dto: UpdateTimelineEventDto) {
+    return this.timelineService.update(id, dto);
+  }
+
+  @Delete(":id")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  remove(@Param("id") id: string) {
+    return this.timelineService.remove(id);
   }
 }
