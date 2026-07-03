@@ -54,13 +54,10 @@ export function CustomFieldsSection({ entityType, entityId }: CustomFieldsSectio
   }
 
   return (
-    <form
-      className="space-y-4"
-      onSubmit={(e) => {
-        e.preventDefault();
-        saveMutation.mutate();
-      }}
-    >
+    // Não é um <form> propositadamente — este componente é usado dentro de outros
+    // formulários (ex: LeadDialog, DealDialog), e <form> aninhados são inválidos em
+    // HTML: o browser associa o botão de submit ao formulário exterior em vez deste.
+    <div className="space-y-4">
       {visibleFields.map((field) => {
         const value = form[field.id];
         return (
@@ -156,9 +153,9 @@ export function CustomFieldsSection({ entityType, entityId }: CustomFieldsSectio
         );
       })}
 
-      <Button type="submit" size="sm" disabled={saveMutation.isPending}>
+      <Button type="button" size="sm" disabled={saveMutation.isPending} onClick={() => saveMutation.mutate()}>
         {saveMutation.isPending ? "A guardar..." : "Guardar campos"}
       </Button>
-    </form>
+    </div>
   );
 }

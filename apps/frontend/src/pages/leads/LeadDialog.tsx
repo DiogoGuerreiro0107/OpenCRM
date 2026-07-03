@@ -257,7 +257,7 @@ export function LeadDialog({ open, onClose, lead }: LeadDialogProps) {
               </Button>
             )}
           </div>
-          <Button type="submit" disabled={saveMutation.isPending || !form.name.trim() || isConverted}>
+          <Button type="submit" disabled={saveMutation.isPending || !form.name.trim()}>
             {saveMutation.isPending ? "A guardar..." : "Guardar"}
           </Button>
         </div>

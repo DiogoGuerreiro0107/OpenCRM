@@ -41,14 +41,10 @@ export function TimelineSection({ entityType, entityId }: TimelineSectionProps) 
 
   return (
     <div className="space-y-4">
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (!description.trim()) return;
-          addMutation.mutate();
-        }}
-        className="space-y-2"
-      >
+      {/* Não é um <form> propositadamente — este componente é usado dentro de outros
+          formulários (ex: LeadDialog), e <form> aninhados são inválidos em HTML: o
+          browser associa o botão de submit ao formulário exterior em vez deste. */}
+      <div className="space-y-2">
         <div className="flex gap-2">
           <Select value={type} onChange={(e) => setType(e.target.value as TimelineEventType)} className="w-40">
             {Object.entries(EVENT_LABELS)
@@ -68,11 +64,19 @@ export function TimelineSection({ entityType, entityId }: TimelineSectionProps) 
           />
         </div>
         <div className="flex justify-end">
-          <Button type="submit" size="sm" disabled={addMutation.isPending || !description.trim()}>
+          <Button
+            type="button"
+            size="sm"
+            disabled={addMutation.isPending || !description.trim()}
+            onClick={() => {
+              if (!description.trim()) return;
+              addMutation.mutate();
+            }}
+          >
             Adicionar
           </Button>
         </div>
-      </form>
+      </div>
 
       <div className="space-y-3">
         {events?.length === 0 && <p className="text-sm text-muted-foreground">Ainda sem atividade registada.</p>}
