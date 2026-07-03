@@ -14,6 +14,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TimelineSection } from "@/components/TimelineSection";
 import { EmailSection } from "@/components/email/EmailSection";
 import { CustomFieldsSection } from "@/components/CustomFieldsSection";
+import { CallButton } from "@/components/CallButton";
+import { CallHistorySection } from "@/components/CallHistorySection";
 
 const CHANNEL_LABELS: Record<PreferredChannel, string> = {
   TELEFONE: "Telefone",
@@ -155,11 +157,21 @@ export function ContactDetailPage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
                 <Label htmlFor="phone">Telefone</Label>
-                <Input id="phone" value={form.phone} onChange={handleChange("phone")} />
+                <div className="flex items-center gap-2">
+                  <Input id="phone" value={form.phone} onChange={handleChange("phone")} />
+                  <CallButton phoneNumber={form.phone} contactId={contact.id} companyId={contact.companyId ?? undefined} />
+                </div>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="mobilePhone">Telemóvel</Label>
-                <Input id="mobilePhone" value={form.mobilePhone} onChange={handleChange("mobilePhone")} />
+                <div className="flex items-center gap-2">
+                  <Input id="mobilePhone" value={form.mobilePhone} onChange={handleChange("mobilePhone")} />
+                  <CallButton
+                    phoneNumber={form.mobilePhone}
+                    contactId={contact.id}
+                    companyId={contact.companyId ?? undefined}
+                  />
+                </div>
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -251,6 +263,15 @@ export function ContactDetailPage() {
           </CardHeader>
           <CardContent>
             <EmailSection contactId={contact.id} defaultTo={contact.email ?? undefined} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Chamadas</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <CallHistorySection contactId={contact.id} />
           </CardContent>
         </Card>
       </div>

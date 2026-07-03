@@ -17,6 +17,7 @@ import { LeadsListPage } from "@/pages/leads/LeadsListPage";
 import { CustomFieldsSettingsPage } from "@/pages/settings/CustomFieldsSettingsPage";
 import { EmailTemplatesSettingsPage } from "@/pages/settings/EmailTemplatesSettingsPage";
 import { AutomationsSettingsPage } from "@/pages/settings/AutomationsSettingsPage";
+import { ZadarmaSettingsPage } from "@/pages/settings/ZadarmaSettingsPage";
 import { DashboardPage } from "@/pages/dashboard/DashboardPage";
 
 export default function App() {
@@ -43,6 +44,7 @@ export default function App() {
           <Route path="/configuracoes/campos-personalizados" element={<CustomFieldsSettingsPage />} />
           <Route path="/configuracoes/templates-email" element={<EmailTemplatesSettingsPage />} />
           <Route path="/configuracoes/automacoes" element={<AutomationsSettingsPage />} />
+          <Route path="/configuracoes/zadarma" element={<ZadarmaSettingsPage />} />
         </Route>
       </Route>
 

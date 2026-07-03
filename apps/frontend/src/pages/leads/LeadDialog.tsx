@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { CustomFieldsSection } from "@/components/CustomFieldsSection";
 import { TimelineSection } from "@/components/TimelineSection";
+import { CallButton } from "@/components/CallButton";
 
 const INTEREST_LABELS: Record<BusinessArea, string> = {
   IMPRESSAO: "Impressão",
@@ -153,7 +154,10 @@ export function LeadDialog({ open, onClose, lead }: LeadDialogProps) {
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-2">
             <Label htmlFor="phone">Telefone</Label>
-            <Input id="phone" value={form.phone} onChange={handleChange("phone")} disabled={isConverted} />
+            <div className="flex items-center gap-2">
+              <Input id="phone" value={form.phone} onChange={handleChange("phone")} disabled={isConverted} />
+              {lead && <CallButton phoneNumber={form.phone} dealId={lead.convertedDeal?.id} />}
+            </div>
           </div>
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>

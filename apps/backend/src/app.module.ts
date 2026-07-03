@@ -17,6 +17,7 @@ import { CustomFieldsModule } from "./custom-fields/custom-fields.module";
 import { WebhooksModule } from "./webhooks/webhooks.module";
 import { DashboardModule } from "./dashboard/dashboard.module";
 import { AutomationsModule } from "./automations/automations.module";
+import { ZadarmaModule } from "./zadarma/zadarma.module";
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { AutomationsModule } from "./automations/automations.module";
     CustomFieldsModule,
     DashboardModule,
     AutomationsModule,
+    ZadarmaModule,
   ],
 })
 export class AppModule {}

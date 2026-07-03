@@ -92,28 +92,29 @@ enum PreferredChannel {
 }
 
 model Company {
-  id         String         @id @default(uuid())
-  name       String
-  legalName  String?
-  taxId      String?
-  website    String?
-  phone      String?
-  email      String?
-  address    String?
-  postalCode String?
-  city       String?
-  country    String?
-  status     CompanyStatus  @default(POTENCIAL)
-  source     CompanySource?
-  ownerId    String?
-  owner      User?          @relation(fields: [ownerId], references: [id], onDelete: SetNull)
-  notes      String?
-  createdAt  DateTime       @default(now())
-  updatedAt  DateTime       @updatedAt
-  contacts   Contact[]
-  deals      Deal[]
-  tasks      Task[]
-  emails     EmailMessage[]
+  id          String         @id @default(uuid())
+  name        String
+  legalName   String?
+  taxId       String?
+  website     String?
+  phone       String?
+  email       String?
+  address     String?
+  postalCode  String?
+  city        String?
+  country     String?
+  status      CompanyStatus  @default(POTENCIAL)
+  source      CompanySource?
+  ownerId     String?
+  owner       User?          @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  notes       String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  contacts    Contact[]
+  deals       Deal[]
+  tasks       Task[]
+  emails      EmailMessage[]
+  callRecords CallRecord[]
 
   @@index([ownerId])
 }
@@ -139,6 +140,7 @@ model Contact {
   deals            Deal[]
   tasks            Task[]
   emails           EmailMessage[]
+  callRecords      CallRecord[]
 
   @@index([companyId])
   @@index([ownerId])
@@ -363,6 +365,43 @@ model EmailTemplate {
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model ZadarmaAccount {
+  id              String    @id @default(uuid())
+  apiKey          String
+  apiSecret       String
+  callerExtension String?
+  active          Boolean   @default(true)
+  lastSyncAt      DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+enum CallDirection {
+  INBOUND
+  OUTBOUND
+}
+
+model CallRecord {
+  id           String        @id @default(uuid())
+  externalId   String        @unique
+  direction    CallDirection
+  fromNumber   String
+  toNumber     String
+  duration     Int           @default(0)
+  disposition  String?
+  recordingUrl String?
+  contactId    String?
+  contact      Contact?      @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  companyId    String?
+  company      Company?      @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  startedAt    DateTime
+  createdAt    DateTime      @default(now())
+
+  @@index([contactId])
+  @@index([companyId])
+  @@index([startedAt])
 }
 
 enum BusinessArea {
