@@ -1,7 +1,9 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import type { AuthUser } from "@opencrm/shared-types";
 import { clearTokens, getAccessToken, setTokens } from "./api";
 import { fetchCurrentUser, login as loginRequest, logoutRequest } from "./auth-api";
+import { startRealtime } from "./realtime";
 
 interface AuthContextValue {
   user: AuthUser | null;
@@ -15,6 +17,14 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const queryClient = useQueryClient();
+
+  // Atualizações ao vivo enquanto houver sessão iniciada (ver lib/realtime.ts).
+  const userId = user?.id;
+  useEffect(() => {
+    if (!userId) return;
+    return startRealtime(queryClient);
+  }, [userId, queryClient]);
 
   useEffect(() => {
     if (!getAccessToken()) {

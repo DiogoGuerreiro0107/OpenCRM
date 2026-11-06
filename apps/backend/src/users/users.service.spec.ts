@@ -14,7 +14,8 @@ function build(target: UserRow | null, otherActiveAdmins = 1) {
       update: jest.fn().mockImplementation(async ({ data }) => ({ id: "x", ...data })),
     },
   };
-  return { service: new UsersService(prisma as never), prisma };
+  const realtime = { disconnectUser: jest.fn() };
+  return { service: new UsersService(prisma as never, realtime as never), prisma, realtime };
 }
 
 describe("UsersService.createUser", () => {
@@ -94,6 +95,22 @@ describe("UsersService.updateUser — proteções", () => {
     const { service, prisma } = build({ id: "alvo", role: "COMERCIAL", active: true }, 0);
     await service.updateUser("admin", "alvo", { active: false });
     expect(prisma.user.count).not.toHaveBeenCalled();
+  });
+
+  it("desativar fecha as ligações em tempo real do utilizador; reativar não", async () => {
+    const off = build({ id: "alvo", role: "COMERCIAL", active: true });
+    await off.service.updateUser("admin", "alvo", { active: false });
+    expect(off.realtime.disconnectUser).toHaveBeenCalledWith("alvo");
+
+    const on = build({ id: "alvo", role: "COMERCIAL", active: false });
+    await on.service.updateUser("admin", "alvo", { active: true });
+    expect(on.realtime.disconnectUser).not.toHaveBeenCalled();
+  });
+
+  it("um pedido recusado não fecha ligação nenhuma", async () => {
+    const { service, realtime } = build({ id: "eu", role: "ADMINISTRADOR", active: true });
+    await expect(service.updateUser("eu", "eu", { active: false })).rejects.toBeInstanceOf(BadRequestException);
+    expect(realtime.disconnectUser).not.toHaveBeenCalled();
   });
 
   it("desativar termina a sessão (apaga o refresh token); reativar não mexe nele", async () => {
