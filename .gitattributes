@@ -1,0 +1,3 @@
+# Scripts de shell correm dentro de contentores Linux: têm de ter sempre fins de linha LF,
+# mesmo quando o Git no Windows converteria para CRLF (o que os partiria com "not found"/"\r").
+*.sh text eol=lf

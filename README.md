@@ -52,6 +52,30 @@ scripts/
   dev-setup.mjs    Usado por 'pnpm dev' — ver secção de arranque rápido
 ```
 
+## Cópias de segurança e restauro
+
+O `docker compose up -d` arranca também o serviço `backup`: faz uma cópia ao arrancar e depois a cada 24 h, para a pasta `./backups/` do servidor — `db/opencrm-AAAAMMDD-HHMMSS.dump` (base de dados) e `files/minio-AAAAMMDD-HHMMSS.tar.gz` (anexos dos emails). Mantém 14 dias e verifica cada cópia depois de a fazer (uma cópia ilegível é descartada e o erro fica nos logs). Configurável no `.env`: `BACKUP_DIR`, `BACKUP_INTERVAL_HOURS`, `BACKUP_KEEP_DAYS`.
+
+```bash
+docker compose run --rm backup list                      # cópias existentes
+docker compose run --rm backup once                      # fazer uma cópia agora
+```
+
+**Restaurar** (substitui os dados atuais — o comando recusa-se a avançar sem `--yes`):
+
+```bash
+docker compose stop backend email-worker
+docker compose run --rm backup restore opencrm-20261106-120000.dump --yes
+docker compose up -d
+```
+
+Para restaurar também os anexos, pára o MinIO (`docker compose stop minio`) e junta `--files minio-20261106-120000.tar.gz` (usa o ficheiro do mesmo carimbo). Um ficheiro corrompido é recusado **antes** de tocar em qualquer dado, e se o restauro falhar a meio a base de dados atual fica como estava.
+
+Três coisas que tens de saber:
+- **Uma cópia no mesmo disco não protege de uma avaria desse disco.** Aponta `BACKUP_DIR` a outro disco ou a uma partilha de rede.
+- As cópias **não são cifradas** e contêm dados pessoais e hashes de passwords: protege a pasta. Também **não incluem o `.env`** (tem os segredos) — guarda-o à parte, por exemplo num gestor de passwords; sem ele não consegues pôr a aplicação a funcionar a partir das cópias.
+- Uma cópia que nunca foi restaurada é uma esperança, não uma cópia: experimenta o restauro de vez em quando num servidor de teste.
+
 ## Testes
 
 ```bash

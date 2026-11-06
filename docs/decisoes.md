@@ -292,3 +292,23 @@ Plano em [plano-gestao-utilizadores.md](plano-gestao-utilizadores.md). Até aqui
 - **Defeito de UX apanhado a validar:** o diálogo de edição não tinha botão "Cancelar" (só se fechava clicando fora) — corrigido.
 
 **Fora de âmbito / backlog:** eliminar utilizadores definitivamente, convites por email, política de passwords mais exigente, 2FA, registo de auditoria (quem mudou o quê). Nota: não há limite de tentativas *por conta* no login (só por IP).
+
+
+## Cópias de segurança e restauro (2026-11-06)
+
+Plano em [plano-backups.md](plano-backups.md). Antes disto os dados viviam em dois volumes Docker sem nenhuma cópia: uma avaria de disco ou um `docker compose down -v` por engano perdia clientes, negócios, notas e anexos.
+
+- **Serviço `backup` no compose** (imagem `postgres:16-alpine`, que já traz `pg_dump`/`pg_restore`; sem imagem nova): uma cópia ao arrancar e depois a cada `BACKUP_INTERVAL_HOURS` (24), para `./backups` (ou `BACKUP_DIR`, que deve apontar a **outro disco**). Cada cópia = `pg_dump -Fc` + `tar.gz` do volume do MinIO. Scripts POSIX `sh` em `scripts/backup/` (`backup.sh`: `loop|once|list|restore`; `restore.sh`), montados só de leitura. `.gitattributes` força LF nos `*.sh` (senão o Git no Windows convertia para CRLF e partia os scripts no contentor — verificado: 0 CRLF dentro do contentor). `backups/` está no `.gitignore` e no `.dockerignore`.
+- **Integridade:** a cópia escreve para um `.partial` e só é renomeada depois de `pg_restore --list` a conseguir ler; se falhar, é descartada e o ciclo termina com erro (visível em `docker compose ps`; o Docker repete). Nos anexos, o que decide é o arquivo ser legível até ao fim (`tar tzf`), não o código de saída do `tar` (que sai com 1 por "ficheiro mudou durante a leitura" sem o arquivo estar mau).
+- **Restauro seguro:** valida o ficheiro **antes** de tocar em dados; exige `--yes` (sem ele mostra o que seria substituído e sai com código 2); corre numa única transação (`--single-transaction --exit-on-error`), por isso se falhar a meio a base atual fica intacta; para os anexos recusa-se a avançar com o MinIO a correr (substituir o volume dele em execução corrompia-o). Pede-se sempre o dump, mesmo para restaurar só anexos — são um par com o mesmo carimbo.
+- **O que NÃO fazem (assumido):** não incluem o `.env` (tem os segredos; espalhá-los pelas cópias seria pior), não cifram (exigiria uma chave, outro segredo a perder), não protegem de roubo/incêndio se `BACKUP_DIR` for no mesmo disco, nem são incrementais (granularidade diária). O MinIO é copiado sem o parar (objetos imutáveis; no pior caso um anexo a meio entra na cópia seguinte).
+
+**Validação — restaurar de facto, numa stack isolada** (projeto compose à parte, segredos aleatórios temporários, volumes e portas novos; tudo apagado no fim):
+- Dados reconhecíveis (utilizador do seed + uma empresa + um ficheiro no MinIO) → cópia automática ao arrancar (dump 54 KB + anexos) → **desastre simulado** (empresa apagada, hash da password do admin estragado, anexo apagado) → restauro → **voltaram**: a empresa, o hash do admin **idêntico ao original**, as 15 migrações na base, e o anexo.
+- Recusas, todas sem alterar a base: sem `--yes` (exit 2), ficheiro inexistente (exit 1), dump corrompido (truncado; exit 1), restaurar anexos com o MinIO a correr (exit 1).
+- Falha real: `pg_dump` com password errada → exit 1, **nenhuma cópia nem `.partial`** deixados.
+- Retenção com `KEEP_DAYS=14`: cópia de 21 dias removida, de 5 dias mantida, a nova criada.
+- **Erros meus a validar, para registo:** dois dos testes de retenção foram mal montados à primeira (o `touch -d "30 days ago"` não existe no busybox; um glob no `cp` apanhou ficheiros a mais; o Git Bash converteu `/backups/rettest` num caminho do Windows). Foram repetidos corretamente — as conclusões acima são das repetições. Para quem usar o Git Bash no Windows: `MSYS_NO_PATHCONV=1` evita essa conversão ao passar caminhos a `docker`.
+- **Não validado:** o ciclo `loop` de 24 h em tempo real (só a cópia ao arrancar e o `once`), o comportamento com `BACKUP_DIR` num disco de rede, e a proteção "nunca apagar a mais recente" da função `prune` isoladamente — é defensiva, porque a limpeza só corre depois de criar uma cópia nova, que é sempre a mais recente.
+
+**Backlog:** cópia fora do local (S3/rclone), cifra, alertas se uma cópia falhar (hoje só se vê nos logs/estado do contentor), restauro só dos anexos sem tocar na base, e testar o restauro automaticamente no CI.
