@@ -1,12 +1,16 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { RolesGuard } from "../auth/guards/roles.guard";
+import { WriteRoles } from "../auth/decorators/roles.decorator";
+import { WRITE_ACCESS } from "../auth/permissions";
 import { CustomFieldsService } from "./custom-fields.service";
 import { CreateCustomFieldDto } from "./dto/create-custom-field.dto";
 import { UpdateCustomFieldDto } from "./dto/update-custom-field.dto";
 import { QueryCustomFieldsDto } from "./dto/query-custom-fields.dto";
 import { UpsertCustomFieldValuesDto } from "./dto/upsert-custom-field-values.dto";
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@WriteRoles(...WRITE_ACCESS.adminOnly)
 @Controller("custom-fields")
 export class CustomFieldsController {
   constructor(private readonly customFieldsService: CustomFieldsService) {}
@@ -36,6 +40,8 @@ export class CustomFieldsController {
     return this.customFieldsService.getValues(entityType, entityId);
   }
 
+  // Preencher valores numa ficha é trabalho normal; só a DEFINIÇÃO dos campos é do Administrador.
+  @WriteRoles(...WRITE_ACCESS.dailyWork)
   @Post("values")
   upsertValues(@Body() dto: UpsertCustomFieldValuesDto) {
     return this.customFieldsService.upsertValues(dto);

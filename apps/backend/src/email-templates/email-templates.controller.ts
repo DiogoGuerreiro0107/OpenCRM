@@ -1,10 +1,14 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, UseGuards } from "@nestjs/common";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { RolesGuard } from "../auth/guards/roles.guard";
+import { WriteRoles } from "../auth/decorators/roles.decorator";
+import { WRITE_ACCESS } from "../auth/permissions";
 import { EmailTemplatesService } from "./email-templates.service";
 import { CreateEmailTemplateDto } from "./dto/create-email-template.dto";
 import { UpdateEmailTemplateDto } from "./dto/update-email-template.dto";
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@WriteRoles(...WRITE_ACCESS.emailTemplates)
 @Controller("email-templates")
 export class EmailTemplatesController {
   constructor(private readonly emailTemplatesService: EmailTemplatesService) {}

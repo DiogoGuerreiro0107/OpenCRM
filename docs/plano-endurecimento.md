@@ -93,6 +93,6 @@ Matriz de escrita proposta (ajustável num único ficheiro, `auth/permissions.ts
 _(preenchido à medida que cada pacote é concluído)_
 
 - [x] A — Dependências e segurança HTTP (0 críticas/altas; 5 moderadas que exigem saltar de major — ver decisoes.md)
-- [ ] B — Permissões por papel
+- [x] B — Permissões por papel (matriz em auth/permissions.ts; 132/132 verificações)
 - [ ] C — Testes e CI
 - [ ] PR aberto para revisão

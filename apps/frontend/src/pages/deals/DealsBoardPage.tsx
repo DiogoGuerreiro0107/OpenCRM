@@ -5,6 +5,8 @@ import { listPipelines } from "@/lib/pipelines-api";
 import { listDeals, moveDeal } from "@/lib/deals-api";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/lib/AuthContext";
+import { ADMIN_ONLY, hasRole } from "@/lib/permissions";
 import { KanbanBoard } from "@/components/kanban/KanbanBoard";
 import { DealDialog } from "@/components/kanban/DealDialog";
 import { NewPipelineDialog } from "./NewPipelineDialog";
@@ -12,6 +14,9 @@ import { ManagePipelineDialog } from "./ManagePipelineDialog";
 
 export function DealsBoardPage() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  // Só o Administrador altera a estrutura dos funis (o backend também o exige).
+  const canManagePipelines = hasRole(user?.role, ADMIN_ONLY);
   const [pipelineId, setPipelineId] = useState<string | null>(null);
   const [isNewPipelineOpen, setIsNewPipelineOpen] = useState(false);
   const [isManagePipelineOpen, setIsManagePipelineOpen] = useState(false);
@@ -54,16 +59,18 @@ export function DealsBoardPage() {
     <div className="flex h-full flex-col space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Funis de vendas</h1>
-        <div className="flex gap-2">
-          {pipeline && (
-            <Button variant="outline" onClick={() => setIsManagePipelineOpen(true)}>
-              Gerir funil
+        {canManagePipelines && (
+          <div className="flex gap-2">
+            {pipeline && (
+              <Button variant="outline" onClick={() => setIsManagePipelineOpen(true)}>
+                Gerir funil
+              </Button>
+            )}
+            <Button variant="outline" onClick={() => setIsNewPipelineOpen(true)}>
+              Novo funil
             </Button>
-          )}
-          <Button variant="outline" onClick={() => setIsNewPipelineOpen(true)}>
-            Novo funil
-          </Button>
-        </div>
+          </div>
+        )}
       </div>
 
       <div className="flex gap-2 border-b border-border">

@@ -3,6 +3,7 @@ import { Building2, CheckSquare, FileText, KanbanSquare, LayoutDashboard, Mail, 
 import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { ADMIN_ONLY, EMAIL_TEMPLATE_MANAGERS, hasRole } from "@/lib/permissions";
 
 const navItems = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -14,15 +15,17 @@ const navItems = [
   { to: "/contactos", label: "Contactos", icon: Users },
 ];
 
+// `roles`: papéis que veem o item (têm de coincidir com as <RequireRole> em App.tsx e com o backend).
 const settingsItems = [
-  { to: "/configuracoes/campos-personalizados", label: "Campos Personalizados", icon: Settings },
-  { to: "/configuracoes/templates-email", label: "Templates de Email", icon: FileText },
-  { to: "/configuracoes/automacoes", label: "Automações", icon: Zap },
-  { to: "/configuracoes/zadarma", label: "Zadarma", icon: Phone },
+  { to: "/configuracoes/campos-personalizados", label: "Campos Personalizados", icon: Settings, roles: ADMIN_ONLY },
+  { to: "/configuracoes/templates-email", label: "Templates de Email", icon: FileText, roles: EMAIL_TEMPLATE_MANAGERS },
+  { to: "/configuracoes/automacoes", label: "Automações", icon: Zap, roles: ADMIN_ONLY },
+  { to: "/configuracoes/zadarma", label: "Zadarma", icon: Phone, roles: ADMIN_ONLY },
 ];
 
 export function AppShell() {
   const { user, logout } = useAuth();
+  const visibleSettingsItems = settingsItems.filter((item) => hasRole(user?.role, item.roles));
 
   return (
     <div className="flex min-h-screen">
@@ -46,8 +49,8 @@ export function AppShell() {
               {label}
             </NavLink>
           ))}
-          <div className="my-2 border-t border-border" />
-          {settingsItems.map(({ to, label, icon: Icon }) => (
+          {visibleSettingsItems.length > 0 && <div className="my-2 border-t border-border" />}
+          {visibleSettingsItems.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
               to={to}
