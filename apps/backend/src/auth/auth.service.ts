@@ -21,7 +21,8 @@ export class AuthService {
 
   async login(email: string, password: string) {
     const user = await this.usersService.findByEmail(email);
-    if (!user) throw new UnauthorizedException("Credenciais inválidas");
+    // Desativado = mesma resposta que credenciais erradas (não revela que a conta existe).
+    if (!user || !user.active) throw new UnauthorizedException("Credenciais inválidas");
 
     const passwordMatches = await bcrypt.compare(password, user.passwordHash);
     if (!passwordMatches) throw new UnauthorizedException("Credenciais inválidas");
@@ -37,7 +38,7 @@ export class AuthService {
 
   async refresh(userId: string, refreshToken: string) {
     const user = await this.usersService.findById(userId);
-    if (!user?.refreshToken) throw new ForbiddenException("Acesso negado");
+    if (!user?.refreshToken || !user.active) throw new ForbiddenException("Acesso negado");
 
     const matches = await bcrypt.compare(refreshToken, user.refreshToken);
     if (!matches) throw new ForbiddenException("Acesso negado");
@@ -53,7 +54,7 @@ export class AuthService {
 
   async forgotPassword(email: string) {
     const user = await this.usersService.findByEmail(email);
-    if (user) {
+    if (user?.active) {
       const token = crypto.randomBytes(32).toString("hex");
       const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS);
       await this.usersService.setResetToken(user.id, token, expiresAt);
@@ -83,6 +84,19 @@ export class AuthService {
     const passwordHash = await bcrypt.hash(newPassword, 10);
     await this.usersService.updatePassword(user.id, passwordHash);
     return { message: "Password redefinida com sucesso" };
+  }
+
+  async changePassword(userId: string, currentPassword: string, newPassword: string) {
+    const user = await this.usersService.findById(userId);
+    if (!user || !(await bcrypt.compare(currentPassword, user.passwordHash))) {
+      throw new BadRequestException("A password atual está incorreta");
+    }
+    // updatePassword apaga o refresh token (termina as OUTRAS sessões); emitimos tokens novos para que a sessão
+    // atual, de quem acabou de alterar a password, continue.
+    await this.usersService.updatePassword(userId, await bcrypt.hash(newPassword, 10));
+    const tokens = await this.issueTokens(user.id, user.email, user.role);
+    await this.usersService.setRefreshToken(user.id, await bcrypt.hash(tokens.refreshToken, 10));
+    return tokens;
   }
 
   private async issueTokens(userId: string, email: string, role: string) {

@@ -59,8 +59,8 @@ Eliminar utilizadores definitivamente, convites por email, política de password
 
 ## 8. Registo de execução
 
-- [ ] Backend (schema + migração, serviço, rotas, JwtStrategy)
-- [ ] Testes unitários e e2e
-- [ ] Frontend
-- [ ] Validação no browser
+- [x] Backend (schema + migração, serviço, rotas, JwtStrategy)
+- [x] Testes unitários e e2e (90 + 181)
+- [x] Frontend
+- [x] Validação no browser
 - [ ] PR

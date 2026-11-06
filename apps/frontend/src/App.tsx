@@ -20,6 +20,7 @@ import { CustomFieldsSettingsPage } from "@/pages/settings/CustomFieldsSettingsP
 import { EmailTemplatesSettingsPage } from "@/pages/settings/EmailTemplatesSettingsPage";
 import { AutomationsSettingsPage } from "@/pages/settings/AutomationsSettingsPage";
 import { ZadarmaSettingsPage } from "@/pages/settings/ZadarmaSettingsPage";
+import { UsersSettingsPage } from "@/pages/settings/UsersSettingsPage";
 import { DashboardPage } from "@/pages/dashboard/DashboardPage";
 
 export default function App() {
@@ -46,6 +47,14 @@ export default function App() {
           <Route path="/configuracoes/campos-personalizados" element={<RequireRole roles={ADMIN_ONLY}><CustomFieldsSettingsPage /></RequireRole>} />
           <Route path="/configuracoes/templates-email" element={<RequireRole roles={EMAIL_TEMPLATE_MANAGERS}><EmailTemplatesSettingsPage /></RequireRole>} />
           <Route path="/configuracoes/automacoes" element={<RequireRole roles={ADMIN_ONLY}><AutomationsSettingsPage /></RequireRole>} />
+          <Route
+            path="/configuracoes/utilizadores"
+            element={
+              <RequireRole roles={ADMIN_ONLY}>
+                <UsersSettingsPage />
+              </RequireRole>
+            }
+          />
           <Route path="/configuracoes/zadarma" element={<RequireRole roles={ADMIN_ONLY}><ZadarmaSettingsPage /></RequireRole>} />
         </Route>
       </Route>
