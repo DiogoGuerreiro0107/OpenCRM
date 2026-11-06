@@ -63,6 +63,24 @@ Os testes e2e usam uma base de dados **separada**, `opencrm_test`, que criam e m
 
 O CI (GitHub Actions, `.github/workflows/ci.yml`) corre build + unitários + e2e + auditoria de dependências em cada PR.
 
+## Arranque em produção (Docker)
+
+Corre tudo (Postgres, MinIO, migrações, backend, email-worker e frontend) em contentores, sem `pnpm` instalado no servidor:
+
+```bash
+cp .env.example .env     # e edita-o (ver abaixo)
+docker compose up -d --build
+docker compose run --rm -e SEED_ADMIN_PASSWORD="<uma password forte>" migrate pnpm --filter backend prisma:seed   # só na 1.ª vez
+```
+
+No `.env` tens de definir, antes de arrancar:
+
+- **Segredos novos** (`JWT_SECRET`, `JWT_REFRESH_SECRET`, `INTERNAL_API_KEY`, `MINIO_SECRET_KEY`, `POSTGRES_PASSWORD`). O backend corre com `NODE_ENV=production` e **recusa arrancar** se ainda tiverem o valor `changeme_*` de exemplo.
+- **O endereço do servidor visto pelos browsers**, nunca `localhost` se outros computadores acedem: `VITE_API_URL` (ex.: `http://192.168.50.10:3000`), `MINIO_PUBLIC_URL` (`http://192.168.50.10:9000`, usado nos links de download de anexos) e `FRONTEND_URL` (links do email de recuperação de password). **`VITE_API_URL` é embutido no frontend na compilação**: se o mudares, volta a correr `docker compose up -d --build`.
+- As credenciais de email (`EMAIL_*`, `IMAP_*`, `SMTP_*`) se quiseres a caixa de email.
+
+O `migrate` corre sozinho em cada arranque e aplica as migrações pendentes antes do backend subir. Depois de atualizar o código: `git pull && docker compose up -d --build`. A base de dados (`127.0.0.1:5432`) e a consola do MinIO (`127.0.0.1:9001`) só são acessíveis a partir do próprio servidor; o frontend (5173), a API (3000) e o MinIO (9000) ficam na rede local.
+
 ## Roadmap
 
 Ver secção 7 de [CLAUDE.md](./CLAUDE.md) para a descrição original de cada fase, e "Roadmap consolidado" no mesmo ficheiro para a versão revista (mais papéis, mais campos, Leads, Campos Personalizados, timeline genérica, etc.).

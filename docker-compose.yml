@@ -7,7 +7,8 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
     ports:
-      - "5432:5432"
+      # Só acessível a partir deste computador (pnpm dev, ferramentas locais); a rede local não vê a base de dados.
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -24,8 +25,9 @@ services:
       MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
       MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      # A 9000 tem de ser alcançável pelo browser (links de download de anexos); a consola de administração não.
+      - "${MINIO_HOST_PORT:-9000}:9000"
+      - "127.0.0.1:${MINIO_CONSOLE_HOST_PORT:-9001}:9001"
     volumes:
       - minio_data:/data
     healthcheck:
@@ -34,12 +36,37 @@ services:
       timeout: 5s
       retries: 10
 
+  # Corre uma vez e termina: aplica as migrações Prisma. O backend só arranca depois de isto concluir com sucesso.
+  # Também serve para o utilizador inicial:  docker compose run --rm migrate pnpm --filter backend prisma:seed
+  migrate:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+      target: build
+    working_dir: /app
+    command: ["pnpm", "--filter", "backend", "exec", "prisma", "migrate", "deploy"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+      EMAIL_ADDRESS: ${EMAIL_ADDRESS:-}
+      EMAIL_PASSWORD: ${EMAIL_PASSWORD:-}
+      IMAP_HOST: ${IMAP_HOST:-}
+      IMAP_PORT: ${IMAP_PORT:-993}
+      IMAP_SECURE: ${IMAP_SECURE:-true}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-465}
+      SMTP_SECURE: ${SMTP_SECURE:-true}
+
   backend:
     build:
       context: .
       dockerfile: apps/backend/Dockerfile
     restart: unless-stopped
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       postgres:
         condition: service_healthy
       minio:
@@ -50,7 +77,9 @@ services:
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
       JWT_ACCESS_EXPIRES: ${JWT_ACCESS_EXPIRES}
       JWT_REFRESH_EXPIRES: ${JWT_REFRESH_EXPIRES}
-      PORT: ${BACKEND_PORT}
+      # Dentro do contentor o backend escuta SEMPRE na 3000 (o email-worker usa http://backend:3000);
+      # BACKEND_PORT só escolhe a porta publicada no anfitrião (mapeamento abaixo).
+      PORT: "3000"
       INTERNAL_API_KEY: ${INTERNAL_API_KEY}
       CORS_ORIGINS: ${CORS_ORIGINS:-}
       EMAIL_ADDRESS: ${EMAIL_ADDRESS}
@@ -67,6 +96,11 @@ services:
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
       MINIO_BUCKET: ${MINIO_BUCKET}
       MINIO_USE_SSL: "false"
+      # Endereço do MinIO visto pelo BROWSER (os links de download de anexos são assinados com ele).
+      MINIO_PUBLIC_URL: ${MINIO_PUBLIC_URL:-}
+      N8N_WEBHOOK_URL: ${N8N_WEBHOOK_URL:-}
+      # Usado nos links do email de recuperação de password.
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
     ports:
       - "${BACKEND_PORT}:3000"
 
@@ -98,11 +132,12 @@ services:
     build:
       context: .
       dockerfile: apps/frontend/Dockerfile
+      args:
+        # Embutido no JavaScript na compilação: tem de ser o endereço do backend visto a partir do browser.
+        VITE_API_URL: ${VITE_API_URL}
     restart: unless-stopped
     depends_on:
       - backend
-    environment:
-      VITE_API_URL: ${VITE_API_URL}
     ports:
       - "${FRONTEND_PORT}:5173"
 

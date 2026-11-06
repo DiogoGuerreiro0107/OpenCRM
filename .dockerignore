@@ -1,0 +1,15 @@
+# Nunca entra na imagem: segredos, dependências/artefactos do SO anfitrião, git, testes e documentação.
+.git
+.github
+.claude
+**/node_modules
+**/dist
+**/*.tsbuildinfo
+**/.env
+**/.env.*
+!**/.env.example
+**/.sync-state.json
+apps/backend/test
+**/*.spec.ts
+docs
+*.md
