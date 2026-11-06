@@ -1,7 +1,7 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { ScheduleModule } from "@nestjs/schedule";
-import { APP_GUARD } from "@nestjs/core";
+import { APP_GUARD, APP_INTERCEPTOR } from "@nestjs/core";
 import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 import { PrismaModule } from "./prisma/prisma.module";
 import { AuthModule } from "./auth/auth.module";
@@ -20,6 +20,8 @@ import { WebhooksModule } from "./webhooks/webhooks.module";
 import { DashboardModule } from "./dashboard/dashboard.module";
 import { AutomationsModule } from "./automations/automations.module";
 import { ZadarmaModule } from "./zadarma/zadarma.module";
+import { RealtimeModule } from "./realtime/realtime.module";
+import { RealtimeInterceptor } from "./realtime/realtime.interceptor";
 
 @Module({
   imports: [
@@ -45,7 +47,12 @@ import { ZadarmaModule } from "./zadarma/zadarma.module";
     DashboardModule,
     AutomationsModule,
     ZadarmaModule,
+    RealtimeModule,
   ],
-  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
+  providers: [
+    { provide: APP_GUARD, useClass: ThrottlerGuard },
+    // Avisa os browsers ligados depois de qualquer escrita bem-sucedida (ver realtime/).
+    { provide: APP_INTERCEPTOR, useClass: RealtimeInterceptor },
+  ],
 })
 export class AppModule {}

@@ -3,6 +3,7 @@ import { Cron, CronExpression } from "@nestjs/schedule";
 import { AutomationRule, Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { WebhooksService } from "../webhooks/webhooks.service";
+import { RealtimeService } from "../realtime/realtime.service";
 import { CreateAutomationRuleDto } from "./dto/create-automation-rule.dto";
 import { UpdateAutomationRuleDto } from "./dto/update-automation-rule.dto";
 
@@ -18,6 +19,7 @@ export class AutomationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly webhooks: WebhooksService,
+    private readonly realtime: RealtimeService,
   ) {}
 
   findAll() {
@@ -166,6 +168,8 @@ export class AutomationsService {
           },
         });
 
+        // Movido fora de um pedido HTTP (cron/gatilhos): o interceptor global não o vê, por isso avisa-se aqui.
+        this.realtime.emit("deals", "AUTOMATION");
         this.webhooks.trigger("automation.deal_moved", {
           dealId,
           ruleId: rule.id,

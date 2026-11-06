@@ -47,8 +47,8 @@ Notificações push/sonoras, presença ("quem está a ver este negócio"), ediç
 
 ## 6. Registo de execução
 
-- [ ] Backend (gateway, serviço, interceptor, emissão nas automações)
-- [ ] Testes e2e
-- [ ] Frontend (ligação, invalidação, Kanban)
-- [ ] Validação no browser com duas sessões
+- [x] Backend (gateway, serviço, interceptor, emissão nas automações)
+- [x] Testes e2e
+- [x] Frontend (ligação, invalidação, Kanban)
+- [x] Validação no browser (uma sessão + a API; duas pessoas em simultâneo não testado)
 - [ ] PR

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -40,7 +40,15 @@ export function KanbanBoard({ stages, deals, onAddDeal, onDealClick, onMove, rea
   const [columns, setColumns] = useState<Columns>(() => buildColumns(stages, deals));
   const [activeId, setActiveId] = useState<string | null>(null);
 
+  // Lido dentro do efeito sem ser dependência: pô-lo nas dependências reconstruiria as colunas ao largar o cartão,
+  // a partir de dados ainda antigos (o cartão saltaria para trás até chegar o refetch).
+  const activeIdRef = useRef<string | null>(null);
+  activeIdRef.current = activeId;
+
   useEffect(() => {
+    // Não reconstruir as colunas a meio de um arrasto: um aviso em tempo real a chegar desfazia o gesto.
+    // O arrasto termina com um pedido (onMove) que traz sempre os dados atualizados.
+    if (activeIdRef.current !== null) return;
     setColumns(buildColumns(stages, deals));
   }, [stages, deals]);
 

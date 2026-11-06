@@ -4,6 +4,7 @@ import * as bcrypt from "bcrypt";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateUserDto } from "./dto/create-user.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
+import { RealtimeService } from "../realtime/realtime.service";
 
 /** Campos que podem sair para a API. NUNCA passwordHash, refreshToken nem resetToken. */
 const MANAGED_USER_SELECT = {
@@ -19,7 +20,10 @@ const normalizeEmail = (email: string) => email.trim().toLowerCase();
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly realtime: RealtimeService,
+  ) {}
 
   findByEmail(email: string) {
     return this.prisma.user.findUnique({ where: { email: normalizeEmail(email) } });
@@ -87,7 +91,7 @@ export class UsersService {
       }
     }
 
-    return this.prisma.user.update({
+    const updated = await this.prisma.user.update({
       where: { id },
       data: {
         name: dto.name?.trim(),
@@ -98,6 +102,10 @@ export class UsersService {
       },
       select: MANAGED_USER_SELECT,
     });
+
+    // Um utilizador desativado deixa de receber eventos em tempo real: fecha-lhe as ligações abertas.
+    if (deactivating) this.realtime.disconnectUser(id);
+    return updated;
   }
 
   /** O Administrador define uma password nova a outro utilizador; as sessões desse utilizador terminam. */
