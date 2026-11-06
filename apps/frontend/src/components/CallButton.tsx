@@ -2,6 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 import { Phone } from "lucide-react";
 import { makeZadarmaCall } from "@/lib/zadarma-api";
 import { useCanWrite } from "@/lib/useCanWrite";
+import { useModuleEnabled } from "@/lib/useModules";
 
 interface CallButtonProps {
   phoneNumber: string;
@@ -12,11 +13,12 @@ interface CallButtonProps {
 
 export function CallButton({ phoneNumber, contactId, companyId, dealId }: CallButtonProps) {
   const canCall = useCanWrite("makeCall");
+  const telephonyOn = useModuleEnabled("zadarma");
   const callMutation = useMutation({
     mutationFn: () => makeZadarmaCall(phoneNumber, { contactId, companyId, dealId }),
   });
 
-  if (!canCall || !phoneNumber.trim()) return null;
+  if (!telephonyOn || !canCall || !phoneNumber.trim()) return null;
 
   function call() {
     if (callMutation.isPending) return;

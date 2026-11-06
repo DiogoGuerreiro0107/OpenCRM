@@ -7,6 +7,7 @@ import { SaveZadarmaAccountDto } from "./dto/save-zadarma-account.dto";
 import { MakeCallDto } from "./dto/make-call.dto";
 import { QueryCallRecordsDto } from "./dto/query-call-records.dto";
 import { normalizePhone, signZadarmaRequest } from "./zadarma.utils";
+import { ModulesService } from "../modules/modules.service";
 
 const ZADARMA_API_BASE = "https://api.zadarma.com";
 
@@ -14,7 +15,10 @@ const ZADARMA_API_BASE = "https://api.zadarma.com";
 export class ZadarmaService {
   private readonly logger = new Logger(ZadarmaService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly modules: ModulesService,
+  ) {}
 
   /** Nunca devolve apiKey/apiSecret — só o suficiente para a UI saber se já
    * está configurado e mostrar a extensão/estado. */
@@ -79,6 +83,7 @@ export class ZadarmaService {
   /** Sincroniza o histórico de chamadas da Zadarma (polling periódico). */
   @Cron(CronExpression.EVERY_10_MINUTES)
   async syncCallHistory() {
+    if (!this.modules.isEnabled("zadarma")) return;
     const account = await this.prisma.zadarmaAccount.findFirst({ where: { active: true } });
     if (!account) return;
 
