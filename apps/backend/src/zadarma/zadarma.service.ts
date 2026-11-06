@@ -1,26 +1,14 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { Cron, CronExpression } from "@nestjs/schedule";
-import * as crypto from "crypto";
 import axios from "axios";
 import { CallDirection, ZadarmaAccount } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { SaveZadarmaAccountDto } from "./dto/save-zadarma-account.dto";
 import { MakeCallDto } from "./dto/make-call.dto";
 import { QueryCallRecordsDto } from "./dto/query-call-records.dto";
+import { normalizePhone, signZadarmaRequest } from "./zadarma.utils";
 
 const ZADARMA_API_BASE = "https://api.zadarma.com";
-
-/**
- * Número de dígitos finais usados para comparar números de telefone com os
- * guardados em Contact/Company — evita falhar por diferenças de formatação
- * (indicativo do país, espaços, "+"), sem precisar de uma biblioteca de
- * normalização de números completa.
- */
-const PHONE_MATCH_DIGITS = 9;
-
-function normalizePhone(phone: string) {
-  return phone.replace(/\D/g, "").slice(-PHONE_MATCH_DIGITS);
-}
 
 @Injectable()
 export class ZadarmaService {
@@ -179,29 +167,14 @@ export class ZadarmaService {
     return date.toISOString().slice(0, 19).replace("T", " ");
   }
 
-  /**
-   * Assinatura da API da Zadarma (HMAC), conforme a documentação pública:
-   * https://zadarma.com/en/support/api/
-   *   1. ordenar os parâmetros alfabeticamente e montar uma query string
-   *   2. md5_params = md5(query string)
-   *   3. assinatura = base64(hmac_sha1(caminho + query_string + md5_params, apiSecret))
-   *   4. header Authorization: "{apiKey}:{assinatura}"
-   *
-   * NOTA: implementado a partir da documentação pública, sem uma conta real
-   * para testar em produção — a confirmar/ajustar quando houver credenciais.
-   */
+  /** Pedido assinado à API da Zadarma (algoritmo de assinatura em zadarma.utils.ts). */
   private async request(
     account: ZadarmaAccount,
     method: "GET" | "POST",
     path: string,
     params: Record<string, string>,
   ) {
-    const sortedKeys = Object.keys(params).sort();
-    const queryString = sortedKeys.map((key) => `${key}=${encodeURIComponent(params[key])}`).join("&");
-    const md5Params = crypto.createHash("md5").update(queryString).digest("hex");
-    const stringToSign = `${path}${queryString}${md5Params}`;
-    const signature = crypto.createHmac("sha1", account.apiSecret).update(stringToSign).digest("base64");
-    const authorization = `${account.apiKey}:${signature}`;
+    const { queryString, authorization } = signZadarmaRequest(account.apiKey, account.apiSecret, path, params);
 
     const url = `${ZADARMA_API_BASE}${path}${queryString ? `?${queryString}` : ""}`;
     const response = await axios.request({

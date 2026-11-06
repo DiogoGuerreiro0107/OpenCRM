@@ -52,6 +52,17 @@ scripts/
   dev-setup.mjs    Usado por 'pnpm dev' — ver secção de arranque rápido
 ```
 
+## Testes
+
+```bash
+pnpm test        # unitários (Jest, sem base de dados) — guards, permissões, segurança HTTP, assinatura Zadarma
+pnpm test:e2e    # e2e (Jest + supertest) contra um Postgres real; precisa do PostgreSQL a correr (pnpm dev:setup)
+```
+
+Os testes e2e usam uma base de dados **separada**, `opencrm_test`, que criam e migram sozinhos no mesmo servidor Postgres (podes mudar com `TEST_DATABASE_URL`). **Apagam todos os dados dessa base entre cenários, por isso recusam correr contra qualquer base cujo nome não contenha "test"** — os teus dados reais nunca são tocados. Cobrem: login e limite anti força-bruta, cabeçalhos/CORS, a matriz de permissões por papel (6 papéis × todas as rotas de escrita), conversão de leads, motor de automações e proteção dos eventos de sistema na timeline.
+
+O CI (GitHub Actions, `.github/workflows/ci.yml`) corre build + unitários + e2e + auditoria de dependências em cada PR.
+
 ## Roadmap
 
 Ver secção 7 de [CLAUDE.md](./CLAUDE.md) para a descrição original de cada fase, e "Roadmap consolidado" no mesmo ficheiro para a versão revista (mais papéis, mais campos, Leads, Campos Personalizados, timeline genérica, etc.).
@@ -78,5 +89,6 @@ Estado atual: **todas as fases do roadmap consolidado e a revisão final conclu�
   - [x] Gestão de funis/fases (editar/eliminar funil; adicionar/editar/eliminar/reordenar fases)
   - [x] Motor de automações (mover negócios entre fases/funis por tempo parado, tarefas concluídas ou campo alterado; disparo de webhook n8n)
   - [x] Integração Zadarma (click-to-call, histórico de chamadas/gravações por polling periódico — estrutura pronta, por validar com credenciais reais quando existirem)
+  - [x] Endurecimento: dependências sem vulnerabilidades altas/críticas, helmet + rate limiting + CORS restrito à rede local, permissões de escrita por papel, testes automáticos (unitários + e2e) e CI — ver [docs/plano-endurecimento.md](docs/plano-endurecimento.md)
 
 Decisões de arquitetura de cada fase em [docs/decisoes.md](docs/decisoes.md).

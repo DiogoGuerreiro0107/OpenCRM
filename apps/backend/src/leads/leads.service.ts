@@ -90,48 +90,52 @@ export class LeadsService {
     }
     const firstOpenStage = pipeline.stages.find((s) => s.type === "OPEN") ?? pipeline.stages[0];
 
-    const company = lead.companyName
-      ? await this.prisma.company.create({ data: { name: lead.companyName } })
-      : null;
+    // Tudo ou nada: sem transação, uma falha a meio deixava empresa/contacto órfãos e o lead por converter
+    // (e uma nova tentativa duplicava os registos).
+    return this.prisma.$transaction(async (tx) => {
+      const company = lead.companyName
+        ? await tx.company.create({ data: { name: lead.companyName } })
+        : null;
 
-    const contact = await this.prisma.contact.create({
-      data: {
-        name: lead.name,
-        email: lead.email,
-        phone: lead.phone,
-        companyId: company?.id,
-      },
+      const contact = await tx.contact.create({
+        data: {
+          name: lead.name,
+          email: lead.email,
+          phone: lead.phone,
+          companyId: company?.id,
+        },
+      });
+
+      const deal = await tx.deal.create({
+        data: {
+          title: lead.companyName ? `Oportunidade — ${lead.companyName}` : `Oportunidade — ${lead.name}`,
+          pipelineId: pipeline.id,
+          stageId: firstOpenStage.id,
+          contactId: contact.id,
+          companyId: company?.id,
+          ownerId: lead.responsavelId ?? actingUserId,
+        },
+      });
+
+      const noteContent = `Convertido a partir do lead "${lead.name}"${lead.source ? ` (origem: ${lead.source})` : ""}.`;
+      await tx.timelineEvent.createMany({
+        data: [
+          { entityType: "CONTACT", entityId: contact.id, type: "SYSTEM", description: noteContent, userId: actingUserId },
+          ...(company
+            ? [{ entityType: "COMPANY" as const, entityId: company.id, type: "SYSTEM" as const, description: noteContent, userId: actingUserId }]
+            : []),
+          { entityType: "LEAD", entityId: lead.id, type: "SYSTEM", description: `Convertido para contacto "${contact.name}".`, userId: actingUserId },
+        ],
+      });
+
+      const updatedLead = await tx.lead.update({
+        where: { id },
+        data: { status: "CONVERTIDO", convertedDealId: deal.id },
+        include: LEAD_INCLUDE,
+      });
+
+      return { lead: updatedLead, company, contact, deal };
     });
-
-    const deal = await this.prisma.deal.create({
-      data: {
-        title: lead.companyName ? `Oportunidade — ${lead.companyName}` : `Oportunidade — ${lead.name}`,
-        pipelineId: pipeline.id,
-        stageId: firstOpenStage.id,
-        contactId: contact.id,
-        companyId: company?.id,
-        ownerId: lead.responsavelId ?? actingUserId,
-      },
-    });
-
-    const noteContent = `Convertido a partir do lead "${lead.name}"${lead.source ? ` (origem: ${lead.source})` : ""}.`;
-    await this.prisma.timelineEvent.createMany({
-      data: [
-        { entityType: "CONTACT", entityId: contact.id, type: "SYSTEM", description: noteContent, userId: actingUserId },
-        ...(company
-          ? [{ entityType: "COMPANY" as const, entityId: company.id, type: "SYSTEM" as const, description: noteContent, userId: actingUserId }]
-          : []),
-        { entityType: "LEAD", entityId: lead.id, type: "SYSTEM", description: `Convertido para contacto "${contact.name}".`, userId: actingUserId },
-      ],
-    });
-
-    const updatedLead = await this.prisma.lead.update({
-      where: { id },
-      data: { status: "CONVERTIDO", convertedDealId: deal.id },
-      include: LEAD_INCLUDE,
-    });
-
-    return { lead: updatedLead, company, contact, deal };
   }
 
   private async ensureExists(id: string) {
