@@ -18,10 +18,12 @@ interface StageColumnProps {
   stage: StageWithCount;
   deals: Deal[];
   onAddDeal: () => void;
+  /** Sem permissão para criar negócios, o botão "+ Negócio" não aparece. */
+  canAddDeal?: boolean;
   onDealClick: (deal: Deal) => void;
 }
 
-export function StageColumn({ stage, deals, onAddDeal, onDealClick }: StageColumnProps) {
+export function StageColumn({ stage, deals, onAddDeal, onDealClick, canAddDeal = true }: StageColumnProps) {
   const { setNodeRef } = useDroppable({ id: stage.id });
   const total = deals.reduce((sum, deal) => sum + deal.value, 0);
 
@@ -45,11 +47,13 @@ export function StageColumn({ stage, deals, onAddDeal, onDealClick }: StageColum
         </SortableContext>
       </div>
 
-      <div className="p-2">
-        <Button variant="outline" size="sm" className="w-full" onClick={onAddDeal}>
-          + Negócio
-        </Button>
-      </div>
+      {canAddDeal && (
+        <div className="p-2">
+          <Button variant="outline" size="sm" className="w-full" onClick={onAddDeal}>
+            + Negócio
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

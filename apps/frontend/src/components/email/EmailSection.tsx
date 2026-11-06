@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import type { EmailMessage } from "@opencrm/shared-types";
 import { listEmailMessages } from "@/lib/email-api";
 import { Button } from "@/components/ui/button";
+import { useCanWrite } from "@/lib/useCanWrite";
 import { Dialog, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { EmailMessageList } from "./EmailMessageList";
 import { EmailMessageDetail } from "./EmailMessageDetail";
@@ -15,6 +16,7 @@ interface EmailSectionProps {
 }
 
 export function EmailSection({ contactId, companyId, defaultTo }: EmailSectionProps) {
+  const canSend = useCanWrite("sendEmail");
   const [selected, setSelected] = useState<EmailMessage | null>(null);
   const [isComposeOpen, setIsComposeOpen] = useState(false);
 
@@ -25,11 +27,13 @@ export function EmailSection({ contactId, companyId, defaultTo }: EmailSectionPr
 
   return (
     <div className="space-y-3">
-      <div className="flex justify-end">
-        <Button variant="outline" size="sm" onClick={() => setIsComposeOpen(true)}>
-          Novo email
-        </Button>
-      </div>
+      {canSend && (
+        <div className="flex justify-end">
+          <Button variant="outline" size="sm" onClick={() => setIsComposeOpen(true)}>
+            Novo email
+          </Button>
+        </div>
+      )}
 
       {isLoading ? (
         <p className="text-sm text-muted-foreground">A carregar...</p>

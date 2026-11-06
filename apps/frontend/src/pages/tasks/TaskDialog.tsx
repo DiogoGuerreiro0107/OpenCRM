@@ -6,6 +6,8 @@ import { listCompanies } from "@/lib/companies-api";
 import { listContacts } from "@/lib/contacts-api";
 import { Dialog, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { useCanWrite } from "@/lib/useCanWrite";
+import { ReadOnlyFieldset } from "@/components/ReadOnly";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -56,6 +58,7 @@ function toDateTimeLocal(iso: string | null | undefined) {
 
 export function TaskDialog({ open, onClose, task, defaultDueDate }: TaskDialogProps) {
   const queryClient = useQueryClient();
+  const readOnly = !useCanWrite("dailyWork");
   const { data: users } = useQuery({ queryKey: ["users"], queryFn: listUsers, enabled: open });
   const { data: companies } = useQuery({
     queryKey: ["companies"],
@@ -159,6 +162,7 @@ export function TaskDialog({ open, onClose, task, defaultDueDate }: TaskDialogPr
           saveMutation.mutate();
         }}
       >
+<ReadOnlyFieldset disabled={readOnly}>
         <div className="space-y-2">
           <Label htmlFor="title">Título *</Label>
           <Input id="title" value={form.title} onChange={handleChange("title")} required />
@@ -289,10 +293,19 @@ export function TaskDialog({ open, onClose, task, defaultDueDate }: TaskDialogPr
           ))}
         </div>
 
+        </ReadOnlyFieldset>
+
         {saveMutation.isError && (
           <p className="text-sm text-red-600">Não foi possível guardar a tarefa. Tenta novamente.</p>
         )}
 
+        {readOnly ? (
+          <div className="flex justify-end pt-2">
+            <Button type="button" onClick={onClose}>
+              Fechar
+            </Button>
+          </div>
+        ) : (
         <div className="flex justify-between pt-2">
           {task ? (
             <Button
@@ -313,6 +326,7 @@ export function TaskDialog({ open, onClose, task, defaultDueDate }: TaskDialogPr
             {saveMutation.isPending ? "A guardar..." : "Guardar"}
           </Button>
         </div>
+        )}
       </form>
     </Dialog>
   );

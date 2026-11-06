@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { useCanWrite } from "@/lib/useCanWrite";
 import { LeadDialog } from "./LeadDialog";
 
 const STATUS_TABS: { value: LeadStatus | "ALL"; label: string }[] = [
@@ -34,6 +35,7 @@ const STATUS_LABELS: Record<LeadStatus, string> = {
 };
 
 export function LeadsListPage() {
+  const canCreate = useCanWrite("leads");
   const [statusFilter, setStatusFilter] = useState<LeadStatus | "ALL">("ALL");
   const [search, setSearch] = useState("");
   const [dialogState, setDialogState] = useState<{ lead: Lead | null } | null>(null);
@@ -51,7 +53,7 @@ export function LeadsListPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Leads</h1>
-        <Button onClick={() => setDialogState({ lead: null })}>Novo lead</Button>
+        {canCreate && <Button onClick={() => setDialogState({ lead: null })}>Novo lead</Button>}
       </div>
 
       <Input

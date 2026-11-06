@@ -5,6 +5,7 @@ import { listTasks } from "@/lib/tasks-api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { useCanWrite } from "@/lib/useCanWrite";
 import { MonthCalendar } from "@/components/calendar/MonthCalendar";
 import { TaskDialog } from "./TaskDialog";
 
@@ -51,6 +52,7 @@ function formatDate(iso: string | null) {
 }
 
 export function TasksListPage() {
+  const canCreate = useCanWrite("dailyWork");
   const [statusFilter, setStatusFilter] = useState<TabValue>("ALL");
   const [view, setView] = useState<"list" | "calendar">("list");
   const [month, setMonth] = useState(() => new Date());
@@ -77,7 +79,7 @@ export function TasksListPage() {
           >
             {view === "list" ? "Ver calendário" : "Ver lista"}
           </Button>
-          <Button onClick={() => setDialogState({ task: null })}>Nova tarefa</Button>
+          {canCreate && <Button onClick={() => setDialogState({ task: null })}>Nova tarefa</Button>}
         </div>
       </div>
 
@@ -105,7 +107,9 @@ export function TasksListPage() {
           month={month}
           tasks={tasks ?? []}
           onMonthChange={setMonth}
-          onDayClick={(dayKey) => setDialogState({ task: null, defaultDueDate: dayKey })}
+          onDayClick={(dayKey) => {
+            if (canCreate) setDialogState({ task: null, defaultDueDate: dayKey });
+          }}
           onTaskClick={(task) => setDialogState({ task })}
         />
       ) : (

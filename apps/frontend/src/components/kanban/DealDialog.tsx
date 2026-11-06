@@ -6,6 +6,8 @@ import { listCompanies } from "@/lib/companies-api";
 import { listContacts } from "@/lib/contacts-api";
 import { Dialog, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { useCanWrite } from "@/lib/useCanWrite";
+import { ReadOnlyFieldset } from "@/components/ReadOnly";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
@@ -33,6 +35,7 @@ interface DealDialogProps {
 
 export function DealDialog({ open, onClose, pipelineId, stageId, deal }: DealDialogProps) {
   const queryClient = useQueryClient();
+  const readOnly = !useCanWrite("deals");
   const { data: companies } = useQuery({
     queryKey: ["companies"],
     queryFn: () => listCompanies(),
@@ -120,6 +123,7 @@ export function DealDialog({ open, onClose, pipelineId, stageId, deal }: DealDia
           saveMutation.mutate();
         }}
       >
+<ReadOnlyFieldset disabled={readOnly}>
         <div className="space-y-2">
           <Label htmlFor="title">Título *</Label>
           <Input id="title" value={form.title} onChange={handleChange("title")} required />
@@ -197,6 +201,8 @@ export function DealDialog({ open, onClose, pipelineId, stageId, deal }: DealDia
           />
         </div>
 
+        </ReadOnlyFieldset>
+
         {deal && (
           <div className="border-t border-border pt-4">
             <CustomFieldsSection entityType="DEAL" entityId={deal.id} />
@@ -213,6 +219,13 @@ export function DealDialog({ open, onClose, pipelineId, stageId, deal }: DealDia
           <p className="text-sm text-red-600">Não foi possível guardar o negócio. Tenta novamente.</p>
         )}
 
+        {readOnly ? (
+          <div className="flex justify-end pt-2">
+            <Button type="button" onClick={onClose}>
+              Fechar
+            </Button>
+          </div>
+        ) : (
         <div className="flex justify-between pt-2">
           {deal ? (
             <Button
@@ -233,6 +246,7 @@ export function DealDialog({ open, onClose, pipelineId, stageId, deal }: DealDia
             {saveMutation.isPending ? "A guardar..." : "Guardar"}
           </Button>
         </div>
+        )}
       </form>
     </Dialog>
   );

@@ -15,6 +15,8 @@ import { EmailSection } from "@/components/email/EmailSection";
 import { CustomFieldsSection } from "@/components/CustomFieldsSection";
 import { CallButton } from "@/components/CallButton";
 import { CallHistorySection } from "@/components/CallHistorySection";
+import { useCanWrite } from "@/lib/useCanWrite";
+import { ReadOnlyFieldset } from "@/components/ReadOnly";
 
 const STATUS_LABELS: Record<CompanyStatus, string> = {
   ATIVO: "Ativo",
@@ -34,6 +36,8 @@ const SOURCE_LABELS: Record<CompanySource, string> = {
 };
 
 export function CompanyDetailPage() {
+  const canEditCompany = useCanWrite("companies");
+  const canAddContact = useCanWrite("contacts");
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -127,6 +131,7 @@ export function CompanyDetailPage() {
                 updateMutation.mutate();
               }}
             >
+<ReadOnlyFieldset disabled={!canEditCompany}>
               <div className="space-y-2">
                 <Label htmlFor="name">Nome comercial *</Label>
                 <Input id="name" value={form.name} onChange={handleChange("name")} required />
@@ -228,7 +233,8 @@ export function CompanyDetailPage() {
                   {updateMutation.isPending ? "A guardar..." : "Guardar"}
                 </Button>
               </div>
-            </form>
+            </ReadOnlyFieldset>
+</form>
           </CardContent>
         </Card>
 
@@ -259,9 +265,11 @@ export function CompanyDetailPage() {
                 {contact.jobTitle && <span className="text-muted-foreground"> · {contact.jobTitle}</span>}
               </Link>
             ))}
-            <Button asChild variant="outline" size="sm" className="mt-2">
-              <Link to={`/contactos/novo?companyId=${company.id}`}>Adicionar contacto</Link>
-            </Button>
+            {canAddContact && (
+              <Button asChild variant="outline" size="sm" className="mt-2">
+                <Link to={`/contactos/novo?companyId=${company.id}`}>Adicionar contacto</Link>
+              </Button>
+            )}
           </CardContent>
         </Card>
       </div>

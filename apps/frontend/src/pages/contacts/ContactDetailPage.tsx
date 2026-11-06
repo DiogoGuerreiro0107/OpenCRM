@@ -16,6 +16,8 @@ import { EmailSection } from "@/components/email/EmailSection";
 import { CustomFieldsSection } from "@/components/CustomFieldsSection";
 import { CallButton } from "@/components/CallButton";
 import { CallHistorySection } from "@/components/CallHistorySection";
+import { useCanWrite } from "@/lib/useCanWrite";
+import { ReadOnlyFieldset } from "@/components/ReadOnly";
 
 const CHANNEL_LABELS: Record<PreferredChannel, string> = {
   TELEFONE: "Telefone",
@@ -25,6 +27,7 @@ const CHANNEL_LABELS: Record<PreferredChannel, string> = {
 };
 
 export function ContactDetailPage() {
+  const canEditContact = useCanWrite("contacts");
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -120,6 +123,7 @@ export function ContactDetailPage() {
               updateMutation.mutate();
             }}
           >
+<ReadOnlyFieldset disabled={!canEditContact}>
             <div className="space-y-2">
               <Label htmlFor="name">Nome *</Label>
               <Input id="name" value={form.name} onChange={handleChange("name")} required />
@@ -234,7 +238,8 @@ export function ContactDetailPage() {
                 {updateMutation.isPending ? "A guardar..." : "Guardar"}
               </Button>
             </div>
-          </form>
+          </ReadOnlyFieldset>
+</form>
         </CardContent>
       </Card>
 

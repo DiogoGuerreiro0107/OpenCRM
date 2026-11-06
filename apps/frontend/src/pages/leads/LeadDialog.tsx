@@ -13,6 +13,8 @@ import { Select } from "@/components/ui/select";
 import { CustomFieldsSection } from "@/components/CustomFieldsSection";
 import { TimelineSection } from "@/components/TimelineSection";
 import { CallButton } from "@/components/CallButton";
+import { useCanWrite } from "@/lib/useCanWrite";
+import { ReadOnlyFieldset } from "@/components/ReadOnly";
 
 const INTEREST_LABELS: Record<BusinessArea, string> = {
   IMPRESSAO: "Impressão",
@@ -40,6 +42,7 @@ interface LeadDialogProps {
 
 export function LeadDialog({ open, onClose, lead }: LeadDialogProps) {
   const queryClient = useQueryClient();
+  const readOnly = !useCanWrite("leads");
   const navigate = useNavigate();
   const { data: users } = useQuery({ queryKey: ["users"], queryFn: listUsers, enabled: open });
 
@@ -138,6 +141,7 @@ export function LeadDialog({ open, onClose, lead }: LeadDialogProps) {
           saveMutation.mutate();
         }}
       >
+<ReadOnlyFieldset disabled={readOnly}>
         <div className="space-y-2">
           <Label htmlFor="name">Nome *</Label>
           <Input id="name" value={form.name} onChange={handleChange("name")} required disabled={isConverted} />
@@ -218,6 +222,8 @@ export function LeadDialog({ open, onClose, lead }: LeadDialogProps) {
           <Textarea id="notes" value={form.notes} onChange={handleChange("notes")} />
         </div>
 
+        </ReadOnlyFieldset>
+
         {lead && (
           <div className="border-t border-border pt-4">
             <CustomFieldsSection entityType="LEAD" entityId={lead.id} />
@@ -237,6 +243,13 @@ export function LeadDialog({ open, onClose, lead }: LeadDialogProps) {
           <p className="text-sm text-red-600">Não foi possível converter o lead. Tenta novamente.</p>
         )}
 
+        {readOnly ? (
+          <div className="flex justify-end pt-2">
+            <Button type="button" onClick={onClose}>
+              Fechar
+            </Button>
+          </div>
+        ) : (
         <div className="flex items-center justify-between pt-2">
           <div className="flex gap-2">
             {lead && (
@@ -265,6 +278,7 @@ export function LeadDialog({ open, onClose, lead }: LeadDialogProps) {
             {saveMutation.isPending ? "A guardar..." : "Guardar"}
           </Button>
         </div>
+        )}
         {isConverted && lead?.convertedDeal && (
           <p className="text-xs text-muted-foreground">
             Este lead já foi convertido para o negócio "{lead.convertedDeal.title}".

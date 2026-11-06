@@ -42,7 +42,7 @@ Esconder opções dentro de dropdowns, permissões por registo (ex.: só o respo
 
 ## 6. Registo de execução
 
-- [ ] Matriz espelhada + hook + teste de desvio
-- [ ] Aplicado às páginas e diálogos
-- [ ] Validado no browser com 3 papéis
+- [x] Matriz espelhada + hook + teste de desvio
+- [x] Aplicado às páginas e diálogos
+- [x] Validado no browser com 3 papéis
 - [ ] PR

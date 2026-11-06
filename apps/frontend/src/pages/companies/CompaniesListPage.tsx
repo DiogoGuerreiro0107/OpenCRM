@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { useCanWrite } from "@/lib/useCanWrite";
 
 const STATUS_TABS: { value: CompanyStatus | "ALL"; label: string }[] = [
   { value: "ALL", label: "Todas" },
@@ -31,6 +32,7 @@ const STATUS_LABELS: Record<CompanyStatus, string> = {
 };
 
 export function CompaniesListPage() {
+  const canCreate = useCanWrite("companies");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<CompanyStatus | "ALL">("ALL");
   const { data: companies, isLoading } = useQuery({
@@ -46,9 +48,11 @@ export function CompaniesListPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Empresas</h1>
-        <Button asChild>
-          <Link to="/empresas/novo">Nova empresa</Link>
-        </Button>
+        {canCreate && (
+          <Button asChild>
+            <Link to="/empresas/novo">Nova empresa</Link>
+          </Button>
+        )}
       </div>
 
       <Input
