@@ -12,13 +12,17 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { RolesGuard } from "../auth/guards/roles.guard";
+import { WriteRoles } from "../auth/decorators/roles.decorator";
+import { WRITE_ACCESS } from "../auth/permissions";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { TasksService } from "./tasks.service";
 import { CreateTaskDto } from "./dto/create-task.dto";
 import { UpdateTaskDto } from "./dto/update-task.dto";
 import { QueryTasksDto } from "./dto/query-tasks.dto";
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@WriteRoles(...WRITE_ACCESS.dailyWork)
 @Controller("tasks")
 export class TasksController {
   constructor(private readonly tasksService: TasksService) {}

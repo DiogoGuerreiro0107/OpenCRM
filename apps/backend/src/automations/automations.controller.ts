@@ -1,10 +1,14 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, UseGuards } from "@nestjs/common";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { RolesGuard } from "../auth/guards/roles.guard";
+import { Roles } from "../auth/decorators/roles.decorator";
+import { WRITE_ACCESS } from "../auth/permissions";
 import { AutomationsService } from "./automations.service";
 import { CreateAutomationRuleDto } from "./dto/create-automation-rule.dto";
 import { UpdateAutomationRuleDto } from "./dto/update-automation-rule.dto";
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(...WRITE_ACCESS.adminOnly)
 @Controller("automation-rules")
 export class AutomationsController {
   constructor(private readonly automationsService: AutomationsService) {}

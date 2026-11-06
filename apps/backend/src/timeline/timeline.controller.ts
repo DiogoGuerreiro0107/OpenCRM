@@ -1,12 +1,16 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { RolesGuard } from "../auth/guards/roles.guard";
+import { WriteRoles } from "../auth/decorators/roles.decorator";
+import { WRITE_ACCESS } from "../auth/permissions";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { TimelineService } from "./timeline.service";
 import { CreateTimelineEventDto } from "./dto/create-timeline-event.dto";
 import { UpdateTimelineEventDto } from "./dto/update-timeline-event.dto";
 import { QueryTimelineDto } from "./dto/query-timeline.dto";
 
-@UseGuards(JwtAuthGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@WriteRoles(...WRITE_ACCESS.dailyWork)
 @Controller("timeline")
 export class TimelineController {
   constructor(private readonly timelineService: TimelineService) {}

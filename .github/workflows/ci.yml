@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+jobs:
+  test:
+    name: Build e testes
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: opencrm
+          POSTGRES_PASSWORD: changeme
+          POSTGRES_DB: opencrm
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U opencrm -d opencrm"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      # Os testes e2e recusam correr contra uma base de dados sem "test" no nome (ver apps/backend/test/test-env.ts).
+      TEST_DATABASE_URL: postgresql://opencrm:changeme@localhost:5432/opencrm_test?schema=public
+      # O `prisma generate` e o build não ligam à base de dados, mas o schema exige a variável definida.
+      DATABASE_URL: postgresql://opencrm:changeme@localhost:5432/opencrm?schema=public
+    steps:
+      - uses: actions/checkout@v4
+
+      # A versão do pnpm vem do campo "packageManager" do package.json.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Gerar o cliente Prisma
+        run: pnpm --filter backend exec prisma generate
+
+      - name: Build (backend, frontend, ...)
+        run: pnpm -r build
+
+      - name: Sintaxe do email-worker
+        run: node --check apps/email-worker/src/index.mjs
+
+      - name: Testes unitários
+        run: pnpm --filter backend test
+
+      - name: Testes e2e (Postgres real)
+        run: pnpm --filter backend test:e2e
+
+  audit:
+    name: Auditoria de dependências
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # Falha com vulnerabilidades altas/críticas em produção. As moderadas conhecidas (NestJS 10, React Router 6,
+      # file-type) estão documentadas em docs/decisoes.md e exigem saltar de major.
+      - run: pnpm audit --prod --audit-level=high

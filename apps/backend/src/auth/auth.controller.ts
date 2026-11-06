@@ -1,4 +1,5 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Post, UseGuards } from "@nestjs/common";
+import { Throttle } from "@nestjs/throttler";
 import { AuthService } from "./auth.service";
 import { LoginDto } from "./dto/login.dto";
 import { ForgotPasswordDto } from "./dto/forgot-password.dto";
@@ -7,6 +8,9 @@ import { JwtRefreshGuard } from "./guards/jwt-refresh.guard";
 import { JwtAuthGuard } from "./guards/jwt-auth.guard";
 import { CurrentUser } from "./decorators/current-user.decorator";
 import { UsersService } from "../users/users.service";
+
+/** Tentativas de login/recuperação por IP e por minuto — trava força bruta sem incomodar uso normal. */
+const STRICT_AUTH_LIMIT = { default: { limit: 5, ttl: 60_000 } };
 
 @Controller("auth")
 export class AuthController {
@@ -23,6 +27,7 @@ export class AuthController {
     return { id: found.id, email: found.email, name: found.name, role: found.role };
   }
 
+  @Throttle(STRICT_AUTH_LIMIT)
   @Post("login")
   @HttpCode(HttpStatus.OK)
   login(@Body() dto: LoginDto) {
@@ -43,12 +48,14 @@ export class AuthController {
     return this.authService.logout(user.userId);
   }
 
+  @Throttle(STRICT_AUTH_LIMIT)
   @Post("forgot-password")
   @HttpCode(HttpStatus.OK)
   forgotPassword(@Body() dto: ForgotPasswordDto) {
     return this.authService.forgotPassword(dto.email);
   }
 
+  @Throttle(STRICT_AUTH_LIMIT)
   @Post("reset-password")
   @HttpCode(HttpStatus.OK)
   resetPassword(@Body() dto: ResetPasswordDto) {

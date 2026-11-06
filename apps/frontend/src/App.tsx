@@ -3,6 +3,8 @@ import { LoginPage } from "./pages/LoginPage";
 import { ForgotPasswordPage } from "./pages/ForgotPasswordPage";
 import { ResetPasswordPage } from "./pages/ResetPasswordPage";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { RequireRole } from "@/components/RequireRole";
+import { ADMIN_ONLY, EMAIL_TEMPLATE_MANAGERS } from "@/lib/permissions";
 import { AppShell } from "@/components/layout/AppShell";
 import { CompaniesListPage } from "@/pages/companies/CompaniesListPage";
 import { NewCompanyPage } from "@/pages/companies/NewCompanyPage";
@@ -41,10 +43,10 @@ export default function App() {
           <Route path="/tarefas" element={<TasksListPage />} />
           <Route path="/email" element={<EmailInboxPage />} />
           <Route path="/leads" element={<LeadsListPage />} />
-          <Route path="/configuracoes/campos-personalizados" element={<CustomFieldsSettingsPage />} />
-          <Route path="/configuracoes/templates-email" element={<EmailTemplatesSettingsPage />} />
-          <Route path="/configuracoes/automacoes" element={<AutomationsSettingsPage />} />
-          <Route path="/configuracoes/zadarma" element={<ZadarmaSettingsPage />} />
+          <Route path="/configuracoes/campos-personalizados" element={<RequireRole roles={ADMIN_ONLY}><CustomFieldsSettingsPage /></RequireRole>} />
+          <Route path="/configuracoes/templates-email" element={<RequireRole roles={EMAIL_TEMPLATE_MANAGERS}><EmailTemplatesSettingsPage /></RequireRole>} />
+          <Route path="/configuracoes/automacoes" element={<RequireRole roles={ADMIN_ONLY}><AutomationsSettingsPage /></RequireRole>} />
+          <Route path="/configuracoes/zadarma" element={<RequireRole roles={ADMIN_ONLY}><ZadarmaSettingsPage /></RequireRole>} />
         </Route>
       </Route>
 
