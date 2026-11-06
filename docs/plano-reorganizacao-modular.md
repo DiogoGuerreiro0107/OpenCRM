@@ -1,6 +1,6 @@
 # Reorganização modular do OpenCRM: proposta de desenho (2026-11-06)
 
-**Estado: proposta para revisão. Nada disto está implementado.** Pedido: tornar o CRM o mais flexível possível, com **todos os módulos opcionais**, suporte a leads ligadas a empresas e/ou a pessoas, módulo de encomendas (com API de entrada, stock, fornecedores, transporte e faturação), módulo de assistências (passos e campos personalizáveis, cronómetro, automação de tarefas), tarefas unificadas numa agenda com páginas configuráveis na barra de navegação, e levantamento de mais fluxos comuns.
+**Estado: desenho aprovado nas decisões D1, D2, D3 e D8 (ver abaixo); implementação a começar pela Fase 0.** Pedido: tornar o CRM o mais flexível possível, com **todos os módulos opcionais**, suporte a leads ligadas a empresas e/ou a pessoas, módulo de encomendas (com API de entrada, stock, fornecedores, transporte e faturação), módulo de assistências (passos e campos personalizáveis, cronómetro, automação de tarefas), tarefas unificadas numa agenda com páginas configuráveis na barra de navegação, e levantamento de mais fluxos comuns.
 
 Estrutura: §1 resumo e decisões que preciso de ti · §2 o que existe hoje · §3 desenho · §4 mais fluxos · §5 fases · §6 riscos · §7 fontes.
 
@@ -23,7 +23,20 @@ Os módulos (Leads, Negócios, Produtos, Stock, Encomendas, Compras, Assistênci
 - **Leads:** *uma* tabela com um discriminador (`pessoa`/`empresa`), não duas — a "página mais importante" fica muito mais simples e rápida. Mas proponho **medir os dois** com dados de teste antes de decidir, porque custa pouco.
 - **"Tudo configurável"** tem um preço (§6): é a armadilha do *inner platform effect*. Proponho configurar o que pediste (passos, campos, tipos de tarefa, menu) e **manter em código** a lógica que tem de ser exata (stock, totais, impostos, cronómetros).
 
-### Decisões que preciso de ti (as respostas mudam o desenho)
+### Decisões
+
+**Tomadas pelo utilizador (2026-11-06):**
+
+| # | Decisão | Resposta |
+|---|---|---|
+| D1 | Leads: uma ou duas tabelas | **Uma tabela** com tipo empresa/pessoa, **com teste de carga** (200 mil leads sintéticas) antes de fechar o formato |
+| D2 | Orçamentos vs `globaltoner-orcamentos` | **O CRM substitui-o**: os orçamentos passam a viver no CRM (linhas de produto, totais, IVA, PDF). Implica analisar o que esse projeto faz hoje para não perder funcionalidade |
+| D3 | Stock e faturação | **A faturação manda** no stock; o CRM guarda reservas e movimentos e reconcilia com relatório de divergências. **Falta saber qual é o programa de faturação** |
+| D8 | Por onde começar | **Fase 0 — Fundações** |
+
+**Assumidas por mim (as recomendações), a rever:** D4 ligar/desligar módulos **por instalação** · D5 menu definido pelo administrador · D6 controlo de stock **opcional por produto** · D7 API de encomendas com formato neutro + adaptador por loja.
+
+### Decisões que ainda faltam / estavam em aberto
 
 | # | Decisão | A minha recomendação |
 |---|---|---|
