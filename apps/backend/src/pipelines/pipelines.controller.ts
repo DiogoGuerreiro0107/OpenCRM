@@ -12,6 +12,8 @@ import {
 } from "@nestjs/common";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
+import { ModuleGuard } from "../modules/module.guard";
+import { RequireModule } from "../modules/require-module.decorator";
 import { WriteRoles } from "../auth/decorators/roles.decorator";
 import { WRITE_ACCESS } from "../auth/permissions";
 import { PipelinesService } from "./pipelines.service";
@@ -21,7 +23,8 @@ import { CreateStageDto } from "./dto/create-stage.dto";
 import { UpdateStageDto } from "./dto/update-stage.dto";
 import { ReorderStagesDto } from "./dto/reorder-stages.dto";
 
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, ModuleGuard)
+@RequireModule("deals")
 @WriteRoles(...WRITE_ACCESS.adminOnly)
 @Controller()
 export class PipelinesController {

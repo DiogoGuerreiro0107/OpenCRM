@@ -1,36 +1,44 @@
 import { useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
-import { Building2, CheckSquare, FileText, KanbanSquare, LayoutDashboard, Mail, Phone, Settings, UserCog, UserPlus, Users, Zap } from "lucide-react";
+import { Building2, CheckSquare, FileText, KanbanSquare, LayoutDashboard, Mail, Phone, Puzzle, Settings, UserCog, UserPlus, Users, Zap, type LucideIcon } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
 import { PasswordDialog } from "@/components/PasswordDialog";
 import { changeOwnPassword } from "@/lib/users-api";
 import { cn } from "@/lib/utils";
 import { ADMIN_ONLY, EMAIL_TEMPLATE_MANAGERS, hasRole } from "@/lib/permissions";
+import { useModules } from "@/lib/useModules";
+import type { ModuleId } from "@/lib/modules-api";
+import type { Role } from "@opencrm/shared-types";
 
-const navItems = [
+// `module`: módulo opcional de que o item depende (sem ele, o item não aparece).
+const navItems: Array<{ to: string; label: string; icon: LucideIcon; module?: ModuleId }> = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/leads", label: "Leads", icon: UserPlus },
-  { to: "/funis", label: "Funis", icon: KanbanSquare },
+  { to: "/leads", label: "Leads", icon: UserPlus, module: "leads" },
+  { to: "/funis", label: "Funis", icon: KanbanSquare, module: "deals" },
   { to: "/tarefas", label: "Tarefas", icon: CheckSquare },
-  { to: "/email", label: "Email", icon: Mail },
+  { to: "/email", label: "Email", icon: Mail, module: "email" },
   { to: "/empresas", label: "Empresas", icon: Building2 },
   { to: "/contactos", label: "Contactos", icon: Users },
 ];
 
 // `roles`: papéis que veem o item (têm de coincidir com as <RequireRole> em App.tsx e com o backend).
-const settingsItems = [
+const settingsItems: Array<{ to: string; label: string; icon: LucideIcon; roles: Role[]; module?: ModuleId }> = [
   { to: "/configuracoes/campos-personalizados", label: "Campos Personalizados", icon: Settings, roles: ADMIN_ONLY },
-  { to: "/configuracoes/templates-email", label: "Templates de Email", icon: FileText, roles: EMAIL_TEMPLATE_MANAGERS },
-  { to: "/configuracoes/automacoes", label: "Automações", icon: Zap, roles: ADMIN_ONLY },
+  { to: "/configuracoes/templates-email", label: "Templates de Email", icon: FileText, roles: EMAIL_TEMPLATE_MANAGERS, module: "email" },
+  { to: "/configuracoes/automacoes", label: "Automações", icon: Zap, roles: ADMIN_ONLY, module: "automations" },
   { to: "/configuracoes/utilizadores", label: "Utilizadores", icon: UserCog, roles: ADMIN_ONLY },
-  { to: "/configuracoes/zadarma", label: "Zadarma", icon: Phone, roles: ADMIN_ONLY },
+  { to: "/configuracoes/zadarma", label: "Zadarma", icon: Phone, roles: ADMIN_ONLY, module: "zadarma" },
+  { to: "/configuracoes/modulos", label: "Módulos", icon: Puzzle, roles: ADMIN_ONLY },
 ];
 
 export function AppShell() {
   const { user, logout } = useAuth();
   const [isPasswordOpen, setIsPasswordOpen] = useState(false);
-  const visibleSettingsItems = settingsItems.filter((item) => hasRole(user?.role, item.roles));
+  const { enabled: enabledModules } = useModules();
+  const moduleOn = (id?: ModuleId) => !id || enabledModules.has(id);
+  const visibleNavItems = navItems.filter((item) => moduleOn(item.module));
+  const visibleSettingsItems = settingsItems.filter((item) => hasRole(user?.role, item.roles) && moduleOn(item.module));
 
   return (
     <div className="flex min-h-screen">
@@ -39,7 +47,7 @@ export function AppShell() {
           <span className="text-lg font-semibold">OpenCRM</span>
         </div>
         <nav className="flex-1 space-y-1 px-2">
-          {navItems.map(({ to, label, icon: Icon }) => (
+          {visibleNavItems.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
               to={to}

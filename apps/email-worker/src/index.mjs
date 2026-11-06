@@ -26,6 +26,16 @@ async function ingest(payload) {
   });
 }
 
+async function moduleEnabled() {
+  try {
+    await axios.get(`${BACKEND_URL}/email/worker-status`, { headers: { "x-internal-api-key": INTERNAL_API_KEY } });
+    return true;
+  } catch (err) {
+    if (err.response?.status === 404) return false; // módulo de email desligado no CRM
+    throw err;
+  }
+}
+
 async function syncOnce() {
   const lastUid = readLastUid();
   const client = new ImapFlow({
@@ -76,6 +86,9 @@ async function syncOnce() {
 
         log(`Sincronizado UID ${message.uid}: ${parsed.subject ?? "(sem assunto)"}`);
       } catch (err) {
+        // 404 = o módulo de email foi desligado no CRM a meio do ciclo: parar SEM avançar o UID, para estas
+        // mensagens não se perderem (voltam a ser lidas quando o módulo for ligado).
+        if (err.response?.status === 404) throw err;
         log(`Erro ao processar UID ${message.uid}:`, err.message);
       }
 
@@ -83,17 +96,28 @@ async function syncOnce() {
     }
   } finally {
     lock.release();
+    await client.logout(); // também quando o ciclo é interrompido (senão a ligação IMAP ficava aberta)
   }
-
-  await client.logout();
 
   if (maxUid > lastUid) writeLastUid(maxUid);
 }
 
+let disabledLogged = false;
+
 async function loop() {
   try {
+    if (!(await moduleEnabled())) {
+      if (!disabledLogged) log("Módulo de email desligado no CRM: a aguardar (não se lê o IMAP nem se avança o UID).");
+      disabledLogged = true;
+      return;
+    }
+    disabledLogged = false;
     await syncOnce();
   } catch (err) {
+    if (err.response?.status === 404) {
+      log("O módulo de email foi desligado a meio do ciclo: ciclo interrompido sem perder mensagens.");
+      return;
+    }
     log("Falha na sincronização:", err.message);
   }
 }

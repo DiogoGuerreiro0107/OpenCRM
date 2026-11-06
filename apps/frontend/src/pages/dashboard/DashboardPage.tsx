@@ -48,21 +48,26 @@ export function DashboardPage() {
       <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
         <KpiCard label="Empresas" value={data.companiesTotal} />
         <KpiCard label="Contactos" value={data.contactsTotal} />
-        <KpiCard label="Leads novos" value={data.leadsNew} />
-        <KpiCard label="Valor em aberto" value={formatCurrency(data.openValue)} />
-        <KpiCard label="Oportunidades abertas" value={data.dealsOpen} />
-        <KpiCard label="Oportunidades ganhas" value={data.dealsWon} />
-        <KpiCard label="Oportunidades perdidas" value={data.dealsLost} />
-        <KpiCard
-          label={`Paradas (>${data.staleDealDays}d)`}
-          value={data.staleDeals}
-          highlight={data.staleDeals > 0}
-        />
+        {data.modules.leads && <KpiCard label="Leads novos" value={data.leadsNew ?? 0} />}
+        {data.modules.deals && (
+          <>
+            <KpiCard label="Valor em aberto" value={formatCurrency(data.openValue ?? 0)} />
+            <KpiCard label="Oportunidades abertas" value={data.dealsOpen ?? 0} />
+            <KpiCard label="Oportunidades ganhas" value={data.dealsWon ?? 0} />
+            <KpiCard label="Oportunidades perdidas" value={data.dealsLost ?? 0} />
+            <KpiCard
+              label={`Paradas (>${data.staleDealDays}d)`}
+              value={data.staleDeals ?? 0}
+              highlight={(data.staleDeals ?? 0) > 0}
+            />
+          </>
+        )}
         <KpiCard label="Tarefas de hoje" value={data.tasksToday} />
         <KpiCard label="Tarefas atrasadas" value={data.tasksOverdue} highlight={data.tasksOverdue > 0} />
       </div>
 
-      <Card>
+      {data.modules.deals && (
+<Card>
         <CardHeader>
           <CardTitle>Oportunidades por funil</CardTitle>
         </CardHeader>
@@ -95,6 +100,7 @@ export function DashboardPage() {
           </div>
         </CardContent>
       </Card>
+)}
     </div>
   );
 }
