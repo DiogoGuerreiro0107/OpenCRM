@@ -3,11 +3,13 @@ import { useQuery } from "@tanstack/react-query";
 import type { EmailMessage } from "@opencrm/shared-types";
 import { listEmailMessages } from "@/lib/email-api";
 import { Button } from "@/components/ui/button";
+import { useCanWrite } from "@/lib/useCanWrite";
 import { EmailMessageList } from "@/components/email/EmailMessageList";
 import { EmailMessageDetail } from "@/components/email/EmailMessageDetail";
 import { ComposeEmailDialog } from "./ComposeEmailDialog";
 
 export function EmailInboxPage() {
+  const canSend = useCanWrite("sendEmail");
   const [selected, setSelected] = useState<EmailMessage | null>(null);
   const [isComposeOpen, setIsComposeOpen] = useState(false);
 
@@ -21,7 +23,7 @@ export function EmailInboxPage() {
     <div className="flex h-full flex-col space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Email</h1>
-        <Button onClick={() => setIsComposeOpen(true)}>Novo email</Button>
+        {canSend && <Button onClick={() => setIsComposeOpen(true)}>Novo email</Button>}
       </div>
 
       <div className="grid flex-1 grid-cols-[320px_1fr] overflow-hidden rounded-lg border border-border bg-background">

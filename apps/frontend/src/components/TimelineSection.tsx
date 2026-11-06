@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { useCanWrite } from "@/lib/useCanWrite";
 
 const EVENT_LABELS: Record<TimelineEventType, string> = {
   NOTE: "Nota",
@@ -52,7 +53,8 @@ function TimelineEntry({
     onSuccess: invalidate,
   });
 
-  const canEdit = event.type !== "SYSTEM";
+  const canWriteNotes = useCanWrite("dailyWork");
+  const canEdit = event.type !== "SYSTEM" && canWriteNotes;
 
   return (
     <div className="rounded-md border border-border p-3">
@@ -114,6 +116,7 @@ function TimelineEntry({
 
 export function TimelineSection({ entityType, entityId }: TimelineSectionProps) {
   const queryClient = useQueryClient();
+  const canAddNotes = useCanWrite("dailyWork");
   const { data: events } = useQuery({
     queryKey: ["timeline", entityType, entityId],
     queryFn: () => listTimeline(entityType, entityId),
@@ -135,6 +138,7 @@ export function TimelineSection({ entityType, entityId }: TimelineSectionProps) 
       {/* Não é um <form> propositadamente — este componente é usado dentro de outros
           formulários (ex: LeadDialog), e <form> aninhados são inválidos em HTML: o
           browser associa o botão de submit ao formulário exterior em vez deste. */}
+      {canAddNotes && (
       <div className="space-y-2">
         <div className="flex gap-2">
           <Select value={type} onChange={(e) => setType(e.target.value as TimelineEventType)} className="w-40">
@@ -168,6 +172,7 @@ export function TimelineSection({ entityType, entityId }: TimelineSectionProps) 
           </Button>
         </div>
       </div>
+      )}
 
       <div className="space-y-3">
         {events?.length === 0 && <p className="text-sm text-muted-foreground">Ainda sem atividade registada.</p>}

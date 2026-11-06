@@ -4,8 +4,10 @@ import { useQuery } from "@tanstack/react-query";
 import { listContacts } from "@/lib/contacts-api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useCanWrite } from "@/lib/useCanWrite";
 
 export function ContactsListPage() {
+  const canCreate = useCanWrite("contacts");
   const [search, setSearch] = useState("");
   const { data: contacts, isLoading } = useQuery({
     queryKey: ["contacts", search],
@@ -16,9 +18,11 @@ export function ContactsListPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Contactos</h1>
-        <Button asChild>
-          <Link to="/contactos/novo">Novo contacto</Link>
-        </Button>
+        {canCreate && (
+          <Button asChild>
+            <Link to="/contactos/novo">Novo contacto</Link>
+          </Button>
+        )}
       </div>
 
       <Input

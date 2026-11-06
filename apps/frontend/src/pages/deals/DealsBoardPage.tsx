@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/AuthContext";
 import { ADMIN_ONLY, hasRole } from "@/lib/permissions";
+import { useCanWrite } from "@/lib/useCanWrite";
 import { KanbanBoard } from "@/components/kanban/KanbanBoard";
 import { DealDialog } from "@/components/kanban/DealDialog";
 import { NewPipelineDialog } from "./NewPipelineDialog";
@@ -17,6 +18,7 @@ export function DealsBoardPage() {
   const { user } = useAuth();
   // Só o Administrador altera a estrutura dos funis (o backend também o exige).
   const canManagePipelines = hasRole(user?.role, ADMIN_ONLY);
+  const canWriteDeals = useCanWrite("deals");
   const [pipelineId, setPipelineId] = useState<string | null>(null);
   const [isNewPipelineOpen, setIsNewPipelineOpen] = useState(false);
   const [isManagePipelineOpen, setIsManagePipelineOpen] = useState(false);
@@ -102,6 +104,7 @@ export function DealsBoardPage() {
 
       {pipeline && deals && (
         <KanbanBoard
+          readOnly={!canWriteDeals}
           stages={pipeline.stages}
           deals={deals}
           onAddDeal={(stageId) => setDealDialog({ stageId, deal: null })}

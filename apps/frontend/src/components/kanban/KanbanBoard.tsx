@@ -31,9 +31,11 @@ interface KanbanBoardProps {
   onAddDeal: (stageId: string) => void;
   onDealClick: (deal: Deal) => void;
   onMove: (dealId: string, stageId: string, index: number) => void;
+  /** Sem permissão para alterar negócios: não se arrasta nem se cria (consultar continua a funcionar). */
+  readOnly?: boolean;
 }
 
-export function KanbanBoard({ stages, deals, onAddDeal, onDealClick, onMove }: KanbanBoardProps) {
+export function KanbanBoard({ stages, deals, onAddDeal, onDealClick, onMove, readOnly = false }: KanbanBoardProps) {
   const dealsById = Object.fromEntries(deals.map((d) => [d.id, d]));
   const [columns, setColumns] = useState<Columns>(() => buildColumns(stages, deals));
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -100,7 +102,7 @@ export function KanbanBoard({ stages, deals, onAddDeal, onDealClick, onMove }: K
 
   return (
     <DndContext
-      sensors={sensors}
+      sensors={readOnly ? [] : sensors}
       collisionDetection={closestCorners}
       onDragStart={handleDragStart}
       onDragOver={handleDragOver}
@@ -109,6 +111,7 @@ export function KanbanBoard({ stages, deals, onAddDeal, onDealClick, onMove }: K
       <div className="flex gap-4 overflow-x-auto pb-4">
         {stages.map((stage) => (
           <StageColumn
+            canAddDeal={!readOnly}
             key={stage.id}
             stage={stage}
             deals={(columns[stage.id] ?? []).map((id) => dealsById[id]).filter(Boolean)}

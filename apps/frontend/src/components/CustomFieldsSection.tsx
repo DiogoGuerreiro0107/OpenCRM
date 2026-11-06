@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
+import { useCanWrite } from "@/lib/useCanWrite";
+import { ReadOnlyFieldset } from "@/components/ReadOnly";
 
 interface CustomFieldsSectionProps {
   entityType: CustomFieldEntityType;
@@ -15,6 +17,7 @@ interface CustomFieldsSectionProps {
 
 export function CustomFieldsSection({ entityType, entityId }: CustomFieldsSectionProps) {
   const queryClient = useQueryClient();
+  const canEdit = useCanWrite("dailyWork");
   const { data: fields } = useQuery({
     queryKey: ["custom-fields", entityType],
     queryFn: () => listCustomFields(entityType),
@@ -57,7 +60,7 @@ export function CustomFieldsSection({ entityType, entityId }: CustomFieldsSectio
     // Não é um <form> propositadamente — este componente é usado dentro de outros
     // formulários (ex: LeadDialog, DealDialog), e <form> aninhados são inválidos em
     // HTML: o browser associa o botão de submit ao formulário exterior em vez deste.
-    <div className="space-y-4">
+    <ReadOnlyFieldset disabled={!canEdit}>
       {visibleFields.map((field) => {
         const value = form[field.id];
         return (
@@ -153,9 +156,11 @@ export function CustomFieldsSection({ entityType, entityId }: CustomFieldsSectio
         );
       })}
 
-      <Button type="button" size="sm" disabled={saveMutation.isPending} onClick={() => saveMutation.mutate()}>
-        {saveMutation.isPending ? "A guardar..." : "Guardar campos"}
-      </Button>
-    </div>
+      {canEdit && (
+        <Button type="button" size="sm" disabled={saveMutation.isPending} onClick={() => saveMutation.mutate()}>
+          {saveMutation.isPending ? "A guardar..." : "Guardar campos"}
+        </Button>
+      )}
+    </ReadOnlyFieldset>
   );
 }
