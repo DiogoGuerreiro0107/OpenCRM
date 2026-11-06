@@ -59,6 +59,29 @@ services:
       SMTP_PORT: ${SMTP_PORT:-465}
       SMTP_SECURE: ${SMTP_SECURE:-true}
 
+  # Cópias de segurança automáticas da base de dados e dos anexos (ver docs/plano-backups.md e o README).
+  # Uma cópia ao arrancar e depois a cada BACKUP_INTERVAL_HOURS, para ./backups (ou BACKUP_DIR).
+  backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    entrypoint: ["sh", "/scripts/backup.sh"]
+    command: ["loop"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB}
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-14}
+      BACKUP_INTERVAL_HOURS: ${BACKUP_INTERVAL_HOURS:-24}
+    volumes:
+      - ${BACKUP_DIR:-./backups}:/backups
+      # Leitura nas cópias; escrita só ao restaurar anexos (com o MinIO parado).
+      - minio_data:/minio
+      - ./scripts/backup:/scripts:ro
+
   backend:
     build:
       context: .

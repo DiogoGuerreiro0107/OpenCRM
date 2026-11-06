@@ -13,3 +13,4 @@ apps/backend/test
 **/*.spec.ts
 docs
 *.md
+backups

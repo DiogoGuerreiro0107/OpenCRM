@@ -52,7 +52,7 @@ Cópia fora do local (S3/rclone), cifra, alertas por email, cópias incrementais
 
 ## 7. Registo de execução
 
-- [ ] Scripts e serviço compose
-- [ ] Restauro validado de ponta a ponta numa stack isolada
-- [ ] Documentação (README + decisões)
+- [x] Scripts e serviço compose
+- [x] Restauro validado de ponta a ponta numa stack isolada
+- [x] Documentação (README + decisões)
 - [ ] PR

@@ -50,6 +50,9 @@ jobs:
       - name: Sintaxe do email-worker
         run: node --check apps/email-worker/src/index.mjs
 
+      - name: Sintaxe dos scripts de cópias de segurança
+        run: for f in scripts/backup/*.sh; do sh -n "$f"; done
+
       - name: Testes unitários
         run: pnpm --filter backend test
 

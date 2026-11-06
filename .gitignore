@@ -12,3 +12,6 @@ apps/backend/generated/
 apps/frontend/vite.config.js
 apps/frontend/vite.config.d.ts
 apps/email-worker/.sync-state.json
+
+# Cópias de segurança: contêm dados pessoais e hashes de passwords — nunca vão para o Git.
+backups/
