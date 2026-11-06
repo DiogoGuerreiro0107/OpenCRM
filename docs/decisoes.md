@@ -248,3 +248,29 @@ Antes deste pacote a aplicação tinha **zero testes** e nenhum CI; toda a valid
 - Os `Dockerfile` não copiam o `pnpm-lock.yaml` mas usam `pnpm install --frozen-lockfile` — as imagens Docker (backend, frontend, email-worker) **nunca foram construíveis**; só o modo `pnpm dev` foi validado até hoje. Pede um trabalho próprio (construir e validar as 3 imagens + o compose de produção). Nota: no compose, o backend corre com `NODE_ENV=production` no `Dockerfile`, por isso o novo controlo do pacote A recusará arrancar com os segredos `changeme_*` do `.env.example` — é o comportamento pretendido.
 - Não existe gestão de utilizadores (só `GET /users`); novos utilizadores só se criam por seed/SQL.
 - Sem tempo real (Socket.io), Nginx/domínio interno, ferramenta de migração do Bitrix24, produtos/orçamentos, importação CSV, cópias de segurança, nem ESLint.
+
+
+## Imagens Docker e arranque de produção (2026-11-06)
+
+Plano em [plano-docker-producao.md](plano-docker-producao.md). Ponto de partida: as imagens Docker **nunca tinham sido construídas** — só o modo `pnpm dev` fora validado.
+
+**Problemas encontrados e corrigidos**
+- Os 3 `Dockerfile` não copiavam o `pnpm-lock.yaml` (o `--frozen-lockfile` falhava) e usavam `node:20`, quando o `packageManager` (pnpm 11.9) exige Node ≥ 22.13 → `node:22-alpine`, lockfile + `package.json` de todo o workspace na camada de dependências, `openssl` para o motor do Prisma em Alpine.
+- **Sem `.dockerignore`**: `COPY apps/backend` levaria o `.env` (segredos) e `node_modules`/`dist` do Windows para dentro da imagem. Criado; verificado que a imagem não contém nenhum `.env`.
+- **Nada aplicava as migrações** no compose → serviço `migrate` (corre `prisma migrate deploy` e termina; o backend só arranca com `service_completed_successfully`). O mesmo serviço serve para o seed.
+- **Utilizador inicial**: o seed criava o admin com a password fixa `admin123`. Passa a usar `SEED_ADMIN_PASSWORD` (o valor antigo mantém-se só como omissão para desenvolvimento). Verificado: com a variável definida, a password nova entra e `admin123` é recusada. O seed continua a não alterar um admin já existente (`update: {}`).
+- **`VITE_API_URL` só em runtime não funciona no Vite** (é lida na compilação e embutida no JS) → passou a `ARG` de build. Verificado no JS servido.
+- **Links de download de anexos** eram assinados com `minio:9000` (inalcançável pelo browser) → `MINIO_PUBLIC_URL` opcional, com um segundo cliente S3 só para assinar (o host entra na assinatura, não basta trocá-lo depois). Coberto por teste unitário; **não testado com um anexo real em Docker** (precisava de uma caixa de email configurada).
+- **Bug de porta**: o compose passava `PORT: ${BACKEND_PORT}` ao contentor mas publicava `${BACKEND_PORT}:3000` — só funcionava com `BACKEND_PORT=3000`. Apanhado porque o teste usou uma porta alternativa. O contentor escuta sempre na 3000.
+- `N8N_WEBHOOK_URL` e `FRONTEND_URL` não eram passados ao backend no compose (webhooks e links de recuperação de password não funcionariam em Docker).
+- **Exposição de rede**: o Postgres estava publicado em `0.0.0.0:5432` com a password de exemplo → `127.0.0.1` (o `pnpm dev` continua a funcionar); consola do MinIO também só local. Portas do anfitrião configuráveis (`POSTGRES_HOST_PORT`, `MINIO_HOST_PORT`, `MINIO_CONSOLE_HOST_PORT`).
+- **CI**: novo job `docker` que constrói as imagens (`docker compose build`) para não voltarem a apodrecer.
+
+**Validação (ponta a ponta)**: stack completa num projeto compose à parte (`opencrm-dockertest`, volumes novos, portas alternativas, segredos aleatórios num ficheiro temporário fora do repositório, tudo apagado no fim): build das 3 imagens → migrações a partir de uma base vazia (14 aplicadas) → seed → login, 5 rotas autenticadas, helmet, CORS (origem pública recusada, LAN aceite, preflight do frontend ok) → frontend servido com a URL certa embutida → **login pela UI** e dashboard a carregar contra o backend em Docker. O `.env` e os contentores reais do utilizador não foram tocados; depois dos testes o `pnpm dev` foi revalidado com o compose alterado (Postgres recriado, dados preservados).
+
+**Limitações conhecidas (backlog)**
+- Sem HTTPS/Nginx nem domínio interno (acesso por `http://IP:porta`).
+- A imagem do backend leva as devDependencies (copia o `node_modules` inteiro do estágio de build): maior do que o necessário, mas simples e o serviço `migrate` precisa delas.
+- Sem *healthchecks* nos serviços da aplicação; imagem `minio/minio:latest` sem versão fixa.
+- O `email-worker` sem credenciais de email regista "Falha na sincronização:" (mensagem vazia) a cada intervalo, sem cair — comportamento já existente.
+- Cópias de segurança dos volumes (`postgres_data`, `minio_data`) ainda não existem.

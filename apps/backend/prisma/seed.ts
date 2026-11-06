@@ -4,7 +4,8 @@ import * as bcrypt from "bcrypt";
 const prisma = new PrismaClient();
 
 async function main() {
-  const passwordHash = await bcrypt.hash("admin123", 10);
+  // Em produção define SEED_ADMIN_PASSWORD; o valor por omissão só serve para desenvolvimento local.
+  const passwordHash = await bcrypt.hash(process.env.SEED_ADMIN_PASSWORD ?? "admin123", 10);
 
   await prisma.user.upsert({
     where: { email: "admin@globaltoner.local" },

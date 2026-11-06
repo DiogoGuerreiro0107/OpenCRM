@@ -44,6 +44,6 @@ HTTPS/Nginx e domínio interno, cópias de segurança dos volumes, atualização
 
 ## 6. Registo de execução
 
-- [ ] Alterações aplicadas
-- [ ] Stack de produção validada de ponta a ponta
+- [x] Alterações aplicadas
+- [x] Stack de produção validada de ponta a ponta (ver decisoes.md)
 - [ ] PR

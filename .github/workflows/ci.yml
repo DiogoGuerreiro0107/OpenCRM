@@ -68,3 +68,11 @@ jobs:
       # Falha com vulnerabilidades altas/críticas em produção. As moderadas conhecidas (NestJS 10, React Router 6,
       # file-type) estão documentadas em docs/decisoes.md e exigem saltar de major.
       - run: pnpm audit --prod --audit-level=high
+
+  docker:
+    name: Imagens Docker
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # Só constrói (não faz push): garante que os Dockerfiles não voltam a deixar de compilar sem ninguém reparar.
+      - run: docker compose --env-file .env.example build
