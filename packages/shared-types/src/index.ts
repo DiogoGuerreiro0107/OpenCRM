@@ -152,6 +152,16 @@ export interface UserSummary {
   role: Role;
 }
 
+/** Utilizador na página de gestão (Administrador). Nunca inclui hashes nem tokens. */
+export interface ManagedUser {
+  id: string;
+  name: string;
+  email: string;
+  role: Role;
+  active: boolean;
+  createdAt: string;
+}
+
 export interface Task {
   id: string;
   title: string;

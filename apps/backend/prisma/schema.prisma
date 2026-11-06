@@ -22,6 +22,8 @@ model User {
   name                String
   passwordHash        String
   role                Role            @default(COMERCIAL)
+  // Desativar em vez de eliminar: o utilizador está ligado a negócios, tarefas, leads e à timeline.
+  active              Boolean         @default(true)
   refreshToken        String?
   resetToken          String?         @unique
   resetTokenExpiresAt DateTime?

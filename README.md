@@ -35,7 +35,7 @@ Há quatro ficheiros `.env`: o da raiz alimenta o `docker-compose.yml`; os de `a
 
 O `email-worker` precisa de uma conta de email configurada (`EMAIL_ADDRESS`, `EMAIL_PASSWORD`, `IMAP_HOST`, etc., em `apps/backend/.env` e `apps/email-worker/.env`) para sincronizar mensagens — sem isso, o `pnpm --filter backend prisma:seed` não cria nenhum `EmailAccount` e a caixa de entrada fica vazia.
 
-Utilizador inicial criado pelo seed: `admin@globaltoner.local` / `admin123` (papel `ADMINISTRADOR`). Corre `pnpm --filter backend prisma:seed` depois do primeiro `pnpm dev` para o criar.
+Utilizador inicial criado pelo seed: `admin@globaltoner.local` / `admin123` (papel `ADMINISTRADOR`). Corre `pnpm --filter backend prisma:seed` depois do primeiro `pnpm dev` para o criar. Os restantes utilizadores criam-se na própria aplicação, em **Configurações > Utilizadores** (só o Administrador): criar, mudar o papel, desativar e definir uma nova password. Cada utilizador pode alterar a sua password no botão "Alterar password" do menu lateral.
 
 ## Estrutura
 
@@ -107,6 +107,7 @@ Estado atual: **todas as fases do roadmap consolidado e a revisão final conclu�
   - [x] Gestão de funis/fases (editar/eliminar funil; adicionar/editar/eliminar/reordenar fases)
   - [x] Motor de automações (mover negócios entre fases/funis por tempo parado, tarefas concluídas ou campo alterado; disparo de webhook n8n)
   - [x] Integração Zadarma (click-to-call, histórico de chamadas/gravações por polling periódico — estrutura pronta, por validar com credenciais reais quando existirem)
+  - [x] Gestão de utilizadores pela UI (criar, papel, desativar, passwords) — ver [docs/plano-gestao-utilizadores.md](docs/plano-gestao-utilizadores.md)
   - [x] Endurecimento: dependências sem vulnerabilidades altas/críticas, helmet + rate limiting + CORS restrito à rede local, permissões de escrita por papel, testes automáticos (unitários + e2e) e CI — ver [docs/plano-endurecimento.md](docs/plano-endurecimento.md)
 
 Decisões de arquitetura de cada fase em [docs/decisoes.md](docs/decisoes.md).

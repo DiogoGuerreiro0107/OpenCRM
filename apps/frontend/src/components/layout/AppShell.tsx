@@ -1,7 +1,10 @@
+import { useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
-import { Building2, CheckSquare, FileText, KanbanSquare, LayoutDashboard, Mail, Phone, Settings, UserPlus, Users, Zap } from "lucide-react";
+import { Building2, CheckSquare, FileText, KanbanSquare, LayoutDashboard, Mail, Phone, Settings, UserCog, UserPlus, Users, Zap } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
+import { PasswordDialog } from "@/components/PasswordDialog";
+import { changeOwnPassword } from "@/lib/users-api";
 import { cn } from "@/lib/utils";
 import { ADMIN_ONLY, EMAIL_TEMPLATE_MANAGERS, hasRole } from "@/lib/permissions";
 
@@ -20,11 +23,13 @@ const settingsItems = [
   { to: "/configuracoes/campos-personalizados", label: "Campos Personalizados", icon: Settings, roles: ADMIN_ONLY },
   { to: "/configuracoes/templates-email", label: "Templates de Email", icon: FileText, roles: EMAIL_TEMPLATE_MANAGERS },
   { to: "/configuracoes/automacoes", label: "Automações", icon: Zap, roles: ADMIN_ONLY },
+  { to: "/configuracoes/utilizadores", label: "Utilizadores", icon: UserCog, roles: ADMIN_ONLY },
   { to: "/configuracoes/zadarma", label: "Zadarma", icon: Phone, roles: ADMIN_ONLY },
 ];
 
 export function AppShell() {
   const { user, logout } = useAuth();
+  const [isPasswordOpen, setIsPasswordOpen] = useState(false);
   const visibleSettingsItems = settingsItems.filter((item) => hasRole(user?.role, item.roles));
 
   return (
@@ -69,7 +74,10 @@ export function AppShell() {
         <div className="border-t border-border p-4">
           <p className="truncate text-sm font-medium">{user?.name}</p>
           <p className="truncate text-xs text-muted-foreground">{user?.role}</p>
-          <Button variant="outline" size="sm" className="mt-3 w-full" onClick={() => logout()}>
+          <Button variant="outline" size="sm" className="mt-3 w-full" onClick={() => setIsPasswordOpen(true)}>
+            Alterar password
+          </Button>
+          <Button variant="outline" size="sm" className="mt-2 w-full" onClick={() => logout()}>
             Terminar sessão
           </Button>
         </div>
@@ -77,6 +85,16 @@ export function AppShell() {
       <main className="flex-1 overflow-y-auto bg-muted/20 p-6">
         <Outlet />
       </main>
+      {isPasswordOpen && (
+        <PasswordDialog
+          open
+          onClose={() => setIsPasswordOpen(false)}
+          title="Alterar a minha password"
+          description="As tuas outras sessões abertas terminam; esta continua."
+          askCurrentPassword
+          onSubmit={({ currentPassword, newPassword }) => changeOwnPassword(currentPassword, newPassword)}
+        />
+      )}
     </div>
   );
 }
