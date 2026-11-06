@@ -352,3 +352,13 @@ Plano em [plano-tempo-real.md](plano-tempo-real.md). Estava previsto no `CLAUDE.
 **Validado no browser** (backend real, sessão do administrador no Kanban; alterações feitas por outra via, a API, como faria outra pessoa): um negócio criado apareceu no Kanban **sem recarregar** (o marcador da página ficou intacto), movê-lo de fase mudou-o de coluna sozinho, e uma tarefa criada fez a lista passar de 6 para 7. **Controlo:** uma empresa criada da mesma forma **não** apareceu na lista de empresas (3 linhas antes e depois, como desenhado) — o que mostra que as atualizações vêm do canal em tempo real e não de um refetch ao ganhar foco. Só 3 pedidos Socket.io em vários minutos (o handshake e a subida para WebSocket, sem *polling* contínuo); sem erros de consola. Dados de teste apagados (3 empresas e 6 tarefas, como antes). **Não testado no browser:** duas pessoas diferentes ao mesmo tempo (usei uma sessão e a API), o reconetar depois de o token expirar (15 min) e o arrasto com um aviso a chegar a meio.
 
 **Fora de âmbito / backlog:** notificações push/sonoras, presença ("quem está a ver este negócio"), edição colaborativa e resolução de conflitos, tempo real nas fichas de empresa/contacto, várias instâncias do backend (exigiria um adaptador Redis; hoje há uma só), e emitir quando a sincronização da Zadarma insere chamadas novas.
+
+
+## Decisão: não implementar bloqueio de login por conta (2026-11-06)
+
+O item "limite de tentativas de login por conta" andava no backlog desde o endurecimento. Revisto, **decidiu-se não o implementar**, e fica registado porquê para não ser reaberto sem novos factos:
+
+- **Já existe um limite por IP**: 5 tentativas/min em `/auth/login`, `/auth/forgot-password`, `/auth/reset-password` e `/auth/change-password`, mais 300/min globais. Para uma aplicação só de rede local, o atacante realista é alguém já dentro da rede, com um único IP.
+- **O bloqueio por conta cria um problema novo, pior do que o que resolve**: qualquer pessoa que conheça um email (o do Administrador, por exemplo) poderia bloqueá-lo de forma contínua com 10 pedidos de 15 em 15 minutos — uma negação de serviço dirigida, e se for o único Administrador ninguém o consegue desbloquear. A alternativa (atrasos progressivos por conta) tem o mesmo defeito, mais suave.
+- **As passwords têm mínimo de 8 caracteres e hash com `bcrypt`**; a tentativa por força bruta de uma conta a 5 tentativas/min é inviável na prática.
+- **Rever se**: a aplicação passar a estar exposta à internet (aí o limite por IP deixa de bastar, porque o atacante tem muitos IPs, e o bloqueio por conta — ou 2FA — passa a compensar o risco de negação de serviço), ou se houver um registo de auditoria de logins falhados que justifique alertas.
