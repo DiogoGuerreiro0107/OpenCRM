@@ -1,4 +1,5 @@
 import { Body, Controller, Get, Param, Post, Query, UseGuards } from "@nestjs/common";
+import { SkipThrottle } from "@nestjs/throttler";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { InternalApiKeyGuard } from "../auth/guards/internal-api-key.guard";
 import { EmailService } from "./email.service";
@@ -10,6 +11,8 @@ import { SendEmailDto } from "./dto/send-email.dto";
 export class EmailController {
   constructor(private readonly emailService: EmailService) {}
 
+  // O email-worker pode enviar muitas mensagens seguidas numa sincronização inicial.
+  @SkipThrottle()
   @UseGuards(InternalApiKeyGuard)
   @Post("ingest")
   ingest(@Body() dto: IngestEmailDto) {

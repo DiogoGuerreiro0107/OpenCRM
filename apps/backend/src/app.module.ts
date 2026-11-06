@@ -1,6 +1,8 @@
 import { Module } from "@nestjs/common";
 import { ConfigModule } from "@nestjs/config";
 import { ScheduleModule } from "@nestjs/schedule";
+import { APP_GUARD } from "@nestjs/core";
+import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 import { PrismaModule } from "./prisma/prisma.module";
 import { AuthModule } from "./auth/auth.module";
 import { UsersModule } from "./users/users.module";
@@ -23,6 +25,9 @@ import { ZadarmaModule } from "./zadarma/zadarma.module";
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
     ScheduleModule.forRoot(),
+    // Limite global generoso (uso normal da UI faz dezenas de pedidos por minuto);
+    // login e recuperação de password têm um limite estrito próprio (ver AuthController).
+    ThrottlerModule.forRoot([{ name: "default", ttl: 60_000, limit: 300 }]),
     PrismaModule,
     WebhooksModule,
     UsersModule,
@@ -41,5 +46,6 @@ import { ZadarmaModule } from "./zadarma/zadarma.module";
     AutomationsModule,
     ZadarmaModule,
   ],
+  providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule {}
