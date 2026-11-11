@@ -1,6 +1,8 @@
 import { Body, Controller, Get, Post, Query, UseGuards } from "@nestjs/common";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
+import { ModuleGuard } from "../modules/module.guard";
+import { RequireModule } from "../modules/require-module.decorator";
 import { Roles, WriteRoles } from "../auth/decorators/roles.decorator";
 import { WRITE_ACCESS } from "../auth/permissions";
 import { ZadarmaService } from "./zadarma.service";
@@ -8,7 +10,8 @@ import { SaveZadarmaAccountDto } from "./dto/save-zadarma-account.dto";
 import { MakeCallDto } from "./dto/make-call.dto";
 import { QueryCallRecordsDto } from "./dto/query-call-records.dto";
 
-@UseGuards(JwtAuthGuard, RolesGuard)
+@UseGuards(JwtAuthGuard, RolesGuard, ModuleGuard)
+@RequireModule("zadarma")
 @WriteRoles(...WRITE_ACCESS.adminOnly)
 @Controller("zadarma")
 export class ZadarmaController {

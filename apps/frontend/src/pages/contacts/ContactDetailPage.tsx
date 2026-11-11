@@ -16,6 +16,7 @@ import { EmailSection } from "@/components/email/EmailSection";
 import { CustomFieldsSection } from "@/components/CustomFieldsSection";
 import { CallButton } from "@/components/CallButton";
 import { CallHistorySection } from "@/components/CallHistorySection";
+import { useModuleEnabled } from "@/lib/useModules";
 import { useCanWrite } from "@/lib/useCanWrite";
 import { ReadOnlyFieldset } from "@/components/ReadOnly";
 
@@ -27,6 +28,8 @@ const CHANNEL_LABELS: Record<PreferredChannel, string> = {
 };
 
 export function ContactDetailPage() {
+  const emailOn = useModuleEnabled("email");
+  const callsOn = useModuleEnabled("zadarma");
   const canEditContact = useCanWrite("contacts");
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -262,7 +265,8 @@ export function ContactDetailPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        {emailOn && (
+<Card>
           <CardHeader>
             <CardTitle>Email</CardTitle>
           </CardHeader>
@@ -270,8 +274,10 @@ export function ContactDetailPage() {
             <EmailSection contactId={contact.id} defaultTo={contact.email ?? undefined} />
           </CardContent>
         </Card>
+)}
 
-        <Card>
+        {callsOn && (
+<Card>
           <CardHeader>
             <CardTitle>Chamadas</CardTitle>
           </CardHeader>
@@ -279,6 +285,7 @@ export function ContactDetailPage() {
             <CallHistorySection contactId={contact.id} />
           </CardContent>
         </Card>
+)}
       </div>
     </div>
   );

@@ -89,7 +89,7 @@ Assistente de primeira instalação (fica para depois dos módulos novos existir
 Serão detalhados no seu próprio plano quando chegar a vez de cada um, com a mesma regra: plano → implementação → validação → PR → só então o seguinte. O 0c (fluxos) é o mais delicado e terá um plano de migração específico com **teste sobre uma cópia da base real**.
 
 ## Registo de execução
-- [x] 0a — Registo de módulos (PR #27)
+- [x] 0a — Registo de módulos (ver decisoes.md)
 - [ ] 0b — Campos personalizados genéricos
 - [ ] 0c — Fluxos genéricos
 - [ ] 0d — Permissões em base de dados

@@ -507,3 +507,12 @@ model CustomFieldValue {
   @@unique([customFieldId, entityId])
   @@index([entityType, entityId])
 }
+
+/// Estado dos módulos opcionais. Sem linha para um módulo = valor por omissão do manifesto (ativo).
+/// Os dados de um módulo desligado NUNCA se apagam: desligar só esconde e bloqueia.
+model ModuleSetting {
+  moduleId  String   @id
+  enabled   Boolean
+  options   Json     @default("{}")
+  updatedAt DateTime @updatedAt
+}

@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from "@nestjs/comm
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { WebhooksService } from "../webhooks/webhooks.service";
+import { ModulesService } from "../modules/modules.service";
 import { CreateLeadDto } from "./dto/create-lead.dto";
 import { UpdateLeadDto } from "./dto/update-lead.dto";
 import { QueryLeadsDto } from "./dto/query-leads.dto";
@@ -16,6 +17,7 @@ export class LeadsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly webhooks: WebhooksService,
+    private readonly modules: ModulesService,
   ) {}
 
   findAll(query: QueryLeadsDto) {
@@ -80,15 +82,18 @@ export class LeadsService {
   async convert(id: string, actingUserId: string) {
     const lead = await this.prisma.lead.findUnique({ where: { id } });
     if (!lead) throw new NotFoundException("Lead não encontrado");
-    if (lead.convertedDealId) throw new BadRequestException("Este lead já foi convertido");
+    // Sem o módulo de negócios uma lead convertida não tem negócio, por isso o estado também conta.
+    if (lead.convertedDealId || lead.status === "CONVERTIDO") throw new BadRequestException("Este lead já foi convertido");
 
-    const pipeline = await this.prisma.pipeline.findFirst({
-      include: { stages: { orderBy: { order: "asc" } } },
-    });
-    if (!pipeline || pipeline.stages.length === 0) {
+    // Sem o módulo de negócios a conversão cria só empresa e contacto: não exige funil nem cria negócio.
+    const dealsEnabled = this.modules.isEnabled("deals");
+    const pipeline = dealsEnabled
+      ? await this.prisma.pipeline.findFirst({ include: { stages: { orderBy: { order: "asc" } } } })
+      : null;
+    if (dealsEnabled && (!pipeline || pipeline.stages.length === 0)) {
       throw new BadRequestException("Nenhum funil configurado para associar a nova oportunidade");
     }
-    const firstOpenStage = pipeline.stages.find((s) => s.type === "OPEN") ?? pipeline.stages[0];
+    const firstOpenStage = pipeline ? (pipeline.stages.find((s) => s.type === "OPEN") ?? pipeline.stages[0]) : null;
 
     // Tudo ou nada: sem transação, uma falha a meio deixava empresa/contacto órfãos e o lead por converter
     // (e uma nova tentativa duplicava os registos).
@@ -106,7 +111,9 @@ export class LeadsService {
         },
       });
 
-      const deal = await tx.deal.create({
+      const deal =
+        pipeline && firstOpenStage
+          ? await tx.deal.create({
         data: {
           title: lead.companyName ? `Oportunidade — ${lead.companyName}` : `Oportunidade — ${lead.name}`,
           pipelineId: pipeline.id,
@@ -115,7 +122,8 @@ export class LeadsService {
           companyId: company?.id,
           ownerId: lead.responsavelId ?? actingUserId,
         },
-      });
+      })
+          : null;
 
       const noteContent = `Convertido a partir do lead "${lead.name}"${lead.source ? ` (origem: ${lead.source})` : ""}.`;
       await tx.timelineEvent.createMany({
@@ -130,7 +138,7 @@ export class LeadsService {
 
       const updatedLead = await tx.lead.update({
         where: { id },
-        data: { status: "CONVERTIDO", convertedDealId: deal.id },
+        data: { status: "CONVERTIDO", convertedDealId: deal?.id ?? null },
         include: LEAD_INCLUDE,
       });
 
