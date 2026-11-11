@@ -41,7 +41,9 @@ Uma extensão real pode combinar as três (um manifesto C + código B + um servi
 | E2 | **Carregar pela interface** | Exige **pacotes assinados** (assinatura verificada contra chaves de editores que o administrador aprova), soma de verificação, pré-visualização das permissões antes de aceitar e **registo de auditoria**. Sem assinatura válida, o pacote não instala |
 | E3 | Coleções do SDK; tabelas próprias só na forma B | Mantém-se; a forma D **só** tem coleções do SDK |
 | E4 | Cifrar segredos em repouso na fase E0 | Mantém-se; passa a **pré-requisito** de qualquer instalação de pacotes |
-| E5, E6 | **Por responder** | Assumidos: um programa de faturação ativo por instalação; n8n como tempo de execução suportado |
+| E5 | **Só um programa de faturação** (por definição) | Um único `BillingProvider` ativo por instalação; sem multi-fornecedor nem escolha por filial |
+| E6 | **n8n suportado** | Tempo de execução oficial da forma A, com modelos de fluxo de exemplo na documentação |
+| E7 (nova) | **O CRM não emite faturas nem orçamentos; só documentos internos** | Ver §7: o CRM nunca produz documentos para o cliente com valor comercial/fiscal; o modelo canónico só serve para **pedir** documentos ao programa de faturação. Interfere com a decisão D2 da reorganização (ver lá) |
 
 **Isto aumenta bastante o âmbito.** «Terceiros + carregar pela UI» é o caso mais exigente, e deve ser feito **por camadas**: primeiro a infraestrutura de confiança (assinatura, auditoria, âmbitos) e os pacotes que **não executam código** (forma C), depois o *runner* para código de terceiros (forma D). O ponto de partida continua a ser a API pública (E0), de que tudo depende.
 
@@ -87,7 +89,7 @@ Resposta à decisão E1: terceiros podem entregar **código**, mas ele **nunca c
 - A extensão só comunica com o CRM pela **API pública** com uma **chave de âmbitos** criada para ela, e recebe eventos por RPC/webhook interno. É, na prática, a **forma A gerida pelo CRM**: mesmo modelo de segurança, mas instalável pela UI.
 - O CRM **não** monta o `docker.sock` nem lança contentores por pedido (daria controlo do servidor a quem comprometesse o backend): o *runner* é um serviço fixo que o administrador ativa no `docker-compose`; sem *runner* configurado, a UI aceita só pacotes sem código (forma C).
 - **Limite assumido:** isolamento de contentor é bem mais forte do que `vm`/*worker threads*, mas **não é perfeito** (depende do *kernel* e da configuração). É aceitável para extensões de editores aprovados, não para código anónimo. A ativação do *runner* deve vir com um aviso claro ao administrador.
-- A confirmar na implementação (não verifiquei): se o modelo de permissões do Node (`--permission`) está estável na versão usada (Node 22) e se serve como camada adicional dentro do *runner*.
+- **Modelo de permissões do Node — verificado (2026-11-11):** na documentação oficial da v22 está marcado **«Stability: 2 – Stable»** (desde a v22.13.0 «já não é experimental»; o sinalizador é `--permission`, e `--experimental-permission` já não existe na v24 local, onde confirmei `--permission` a funcionar). Restringe `fs` (leitura/escrita por caminho), processos-filho, *worker threads*, *addons* nativos, WASI e o inspetor. **Mas a própria documentação diz que não é uma defesa contra código malicioso** («cinto de segurança» para código confiável): segue *symlinks* para fora dos caminhos permitidos, não é herdado por *worker threads*, descritores de ficheiro já abertos contornam-no, e **não tem permissão de rede** (não há `--allow-net` nem na documentação da v22 nem na ajuda do Node 24.17 que tenho instalado). Conclusão: serve como **camada adicional** dentro do *runner* (reduz acidentes e o alcance de erros), **nunca como a fronteira de segurança**; essa continua a ser o contentor (utilizador sem privilégios, sem credenciais da BD, rede limitada fora do processo — firewall/rede Docker). Requer fixar a versão do Node do *runner* e testar que o pacote funciona com `--permission`.
 
 ---
 
@@ -171,6 +173,8 @@ A extensão regista tarefas; **o agendador é do núcleo**. Cada execução fica
 ## 7. Faturação: o que o núcleo faz e o que o adaptador faz
 
 **Regra que não deve ser quebrada:** em Portugal a emissão de faturas tem de ser feita por **programa certificado pela AT** *(confirma isto com o teu contabilista; é a minha leitura e não aconselhamento fiscal)*. Por isso o CRM **nunca emite documentos fiscais**: pede ao programa de faturação que os emita e guarda a referência.
+
+**Decisão do utilizador (2026-11-11):** o CRM **não emite faturas nem orçamentos**, apenas **documentos internos** (p. ex. folha de trabalho de uma assistência, nota de encomenda, guia interna de preparação/expedição, resumo de proposta para uso da equipa), claramente marcados como «documento interno — sem valor fiscal ou comercial», sem numeração fiscal nem série. Consequências: (1) o modelo canónico `DocumentoFaturação` é o **pedido ao programa de faturação**, não um documento do CRM; (2) o tipo «orçamento» do modelo canónico só existe para **pedir/registar** um orçamento emitido pelo programa de faturação (`LigaçãoExterna`); (3) o PDF de orçamento do `globaltoner-orcamentos` **não** passa para o CRM — ver a nota em [plano-reorganizacao-modular.md](plano-reorganizacao-modular.md) §3.9.
 
 ### O que o núcleo fornece (igual para qualquer programa)
 - **Modelo canónico** `DocumentoFaturação` (tipo: orçamento, encomenda, fatura, nota de crédito; cliente com NIF, morada; linhas com referência, quantidade, preço, IVA, desconto) e `ClienteFaturação`. O adaptador traduz de/para o formato do programa.

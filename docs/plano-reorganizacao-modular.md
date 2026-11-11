@@ -205,6 +205,8 @@ Comparação das duas formas de guardar:
 
 ### 3.9 Orçamentos (decisão D2 pendente)
 
+> **Nota (2026-11-11) — conflito a resolver:** o utilizador decidiu depois que o CRM **não emite faturas nem orçamentos, só documentos internos** ([plano-extensoes-e-api.md](plano-extensoes-e-api.md) §7). Isto colide com a D2 («o CRM substitui o `globaltoner-orcamentos`, com PDF para o cliente»). Até se esclarecer, **a Fase 8 (Orçamentos) fica suspensa** e nada se desenha sobre ela. Leituras possíveis: (a) o CRM guarda só uma **versão interna** (valores e estado do que a equipa propõe) e o orçamento ao cliente continua a sair do `globaltoner-orcamentos` ou do programa de faturação; (b) o CRM só guarda a **referência** ao orçamento emitido noutro sítio.
+
 Tratam-se como `WorkItem` do tipo "Orçamento" (passos: rascunho → enviado → aceite/rejeitado) com linhas de produto e totais. **Antes de os desenhar preciso de saber o que o `globaltoner-orcamentos` já faz** e se o CRM o deve substituir, alimentar ou consumir; de outro modo arrisco construir um segundo gerador de propostas.
 
 ### 3.10 Menu configurável
@@ -259,7 +261,7 @@ Cada fase usa o padrão **expandir → migrar → contrair** (acrescentar o novo
 | **5 — Produtos, fornecedores e stock** | Catálogo, movimentos, reservas | 0 | D6 |
 | **6 — Encomendas, compras e transporte** | Encomendas por linha, compras com receção, avisos de "pronto a preparar", expedições, **API de entrada com chaves** | 0–3, 5 | D7 |
 | **7 — Faturação** | Adaptador do teu programa, reconciliação com relatório de divergências | 5, 6 | **D3** |
-| **8 — Orçamentos** | conforme a decisão D2 | 2, 5 | **D2** |
+| **8 — Orçamentos** | **suspensa**: conflito entre D2 e «só documentos internos» (ver §3.9) | 2, 5 | **D2 a rever** |
 | **9 — Extras** | os que escolheres de §4 (equipamentos/garantias, contratos e contadores, SLA, duplicados, CSV, auditoria…) | conforme | D8 |
 
 As fases 0–2 **não dependem** das decisões D2, D3 e D7, por isso podem começar assim que aprovares o desenho geral.
