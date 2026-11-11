@@ -36,7 +36,7 @@ export function parseCorsOrigins(value: string | undefined): string[] {
     .filter(Boolean);
 }
 
-const SECRET_VARS = ["JWT_SECRET", "JWT_REFRESH_SECRET", "INTERNAL_API_KEY"] as const;
+const SECRET_VARS = ["JWT_SECRET", "JWT_REFRESH_SECRET", "INTERNAL_API_KEY", "SECRETS_KEY"] as const;
 
 /**
  * Em produção, recusa arrancar com segredos em falta ou ainda com o valor de exemplo

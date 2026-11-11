@@ -9,6 +9,7 @@
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "ts-node prisma/seed.ts",
+    "secrets:encrypt": "node --env-file-if-exists=.env -r ts-node/register src/cli/encrypt-secrets.ts",
     "test": "jest",
     "test:e2e": "jest --config ./test/jest-e2e.json --runInBand"
   },

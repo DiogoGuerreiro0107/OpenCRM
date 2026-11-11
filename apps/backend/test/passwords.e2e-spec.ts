@@ -122,7 +122,7 @@ describe("Alterar e redefinir passwords (e2e)", () => {
       const unknown = await api().post("/auth/forgot-password").send({ email: "ninguem@e2e.test" }).expect(200);
       expect(inactive.body).toEqual(unknown.body);
       // nenhum token de recuperação foi gerado para o desativado
-      expect((await prisma.user.findUniqueOrThrow({ where: { id: user.id } })).resetToken).toBeNull();
+      expect((await prisma.user.findUniqueOrThrow({ where: { id: user.id } })).resetTokenHash).toBeNull();
     });
   });
 });

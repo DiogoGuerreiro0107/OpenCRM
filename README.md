@@ -75,7 +75,7 @@ Para restaurar também os anexos, pára o MinIO (`docker compose stop minio`) e 
 
 Três coisas que tens de saber:
 - **Uma cópia no mesmo disco não protege de uma avaria desse disco.** Aponta `BACKUP_DIR` a outro disco ou a uma partilha de rede.
-- As cópias **não são cifradas** e contêm dados pessoais e hashes de passwords: protege a pasta. Também **não incluem o `.env`** (tem os segredos) — guarda-o à parte, por exemplo num gestor de passwords; sem ele não consegues pôr a aplicação a funcionar a partir das cópias.
+- As cópias **não são cifradas** e contêm dados pessoais e hashes de passwords: protege a pasta. Também **não incluem o `.env`** (tem os segredos) — guarda-o à parte, por exemplo num gestor de passwords; sem ele não consegues pôr a aplicação a funcionar a partir das cópias. Em particular, **sem a `SECRETS_KEY` as credenciais cifradas (email, Zadarma) não se recuperam** de uma cópia da base de dados.
 - Uma cópia que nunca foi restaurada é uma esperança, não uma cópia: experimenta o restauro de vez em quando num servidor de teste.
 
 ## Testes
@@ -101,9 +101,10 @@ docker compose run --rm -e SEED_ADMIN_PASSWORD="<uma password forte>" migrate pn
 
 No `.env` tens de definir, antes de arrancar:
 
-- **Segredos novos** (`JWT_SECRET`, `JWT_REFRESH_SECRET`, `INTERNAL_API_KEY`, `MINIO_SECRET_KEY`, `POSTGRES_PASSWORD`). O backend corre com `NODE_ENV=production` e **recusa arrancar** se ainda tiverem o valor `changeme_*` de exemplo.
+- **Segredos novos** (`JWT_SECRET`, `JWT_REFRESH_SECRET`, `INTERNAL_API_KEY`, `SECRETS_KEY`, `MINIO_SECRET_KEY`, `POSTGRES_PASSWORD`). O backend corre com `NODE_ENV=production` e **recusa arrancar** se ainda tiverem o valor `changeme_*` de exemplo.
 - **O endereço do servidor visto pelos browsers**, nunca `localhost` se outros computadores acedem: `VITE_API_URL` (ex.: `http://192.168.50.10:3000`), `MINIO_PUBLIC_URL` (`http://192.168.50.10:9000`, usado nos links de download de anexos) e `FRONTEND_URL` (links do email de recuperação de password). **`VITE_API_URL` é embutido no frontend na compilação**: se o mudares, volta a correr `docker compose up -d --build`.
 - As credenciais de email (`EMAIL_*`, `IMAP_*`, `SMTP_*`) se quiseres a caixa de email.
+- **`SECRETS_KEY`** (mínimo 32 caracteres; `openssl rand -base64 32`) cifra na base de dados a password do email e o segredo da Zadarma. **Guarda-a à parte, junto do `.env`**: uma cópia de segurança da base de dados sem esta chave não recupera essas credenciais (têm de ser reintroduzidas). Ao atualizar uma instalação que já tinha credenciais guardadas, corre uma vez `docker compose exec backend node dist/cli/encrypt-secrets.js` (o backend avisa nos logs enquanto houver segredos em claro). Para trocar a chave: põe a antiga em `SECRETS_KEY_PREVIOUS`, a nova em `SECRETS_KEY` e corre o mesmo comando.
 
 O `migrate` corre sozinho em cada arranque e aplica as migrações pendentes antes do backend subir. Depois de atualizar o código: `git pull && docker compose up -d --build`. A base de dados (`127.0.0.1:5432`) e a consola do MinIO (`127.0.0.1:9001`) só são acessíveis a partir do próprio servidor; o frontend (5173), a API (3000) e o MinIO (9000) ficam na rede local.
 

@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from "@nestjs/comm
 import * as nodemailer from "nodemailer";
 import { PrismaService } from "../prisma/prisma.service";
 import { MinioService } from "./minio.service";
+import { SecretsService } from "../common/secrets.service";
 import { IngestEmailDto } from "./dto/ingest-email.dto";
 import { QueryEmailMessagesDto } from "./dto/query-email-messages.dto";
 import { SendEmailDto } from "./dto/send-email.dto";
@@ -17,6 +18,7 @@ export class EmailService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly minio: MinioService,
+    private readonly secrets: SecretsService,
   ) {}
 
   findAll(query: QueryEmailMessagesDto) {
@@ -88,7 +90,7 @@ export class EmailService {
       host: account.smtpHost,
       port: account.smtpPort,
       secure: account.smtpSecure,
-      auth: { user: account.username, pass: account.password },
+      auth: { user: account.username, pass: this.secrets.decrypt(account.password, "EmailAccount.password") },
     });
 
     const info = await transporter.sendMail({
@@ -129,7 +131,7 @@ export class EmailService {
       host: account.smtpHost,
       port: account.smtpPort,
       secure: account.smtpSecure,
-      auth: { user: account.username, pass: account.password },
+      auth: { user: account.username, pass: this.secrets.decrypt(account.password, "EmailAccount.password") },
     });
 
     await transporter.sendMail({ from: account.email, to, subject, text });

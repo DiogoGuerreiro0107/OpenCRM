@@ -5,8 +5,9 @@ import { PrismaService } from "../prisma/prisma.service";
 import { CreateUserDto } from "./dto/create-user.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
 import { RealtimeService } from "../realtime/realtime.service";
+import { hashToken } from "../common/secrets";
 
-/** Campos que podem sair para a API. NUNCA passwordHash, refreshToken nem resetToken. */
+/** Campos que podem sair para a API. NUNCA passwordHash, refreshToken nem resetTokenHash. */
 const MANAGED_USER_SELECT = {
   id: true,
   email: true,
@@ -123,18 +124,23 @@ export class UsersService {
     return this.prisma.user.update({ where: { id }, data: { refreshToken } });
   }
 
+  /** Procura pelo token em claro que veio no email: na base de dados só existe o SHA-256 (ver common/secrets.ts). */
   findByResetToken(token: string) {
-    return this.prisma.user.findUnique({ where: { resetToken: token } });
+    return this.prisma.user.findUnique({ where: { resetTokenHash: hashToken(token) } });
   }
 
+  /** Recebe o token em claro e guarda só o hash. `null` limpa o pedido. */
   setResetToken(id: string, resetToken: string | null, resetTokenExpiresAt: Date | null) {
-    return this.prisma.user.update({ where: { id }, data: { resetToken, resetTokenExpiresAt } });
+    return this.prisma.user.update({
+      where: { id },
+      data: { resetTokenHash: resetToken === null ? null : hashToken(resetToken), resetTokenExpiresAt },
+    });
   }
 
   updatePassword(id: string, passwordHash: string) {
     return this.prisma.user.update({
       where: { id },
-      data: { passwordHash, resetToken: null, resetTokenExpiresAt: null, refreshToken: null },
+      data: { passwordHash, resetTokenHash: null, resetTokenExpiresAt: null, refreshToken: null },
     });
   }
 }
