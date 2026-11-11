@@ -364,3 +364,9 @@ Plano em [plano-tempo-real.md](plano-tempo-real.md). Estava previsto no `CLAUDE.
 - **(2026-11-11)** E5: um só programa de faturação por instalação. E6: n8n suportado como runtime da forma A. **E7: o CRM não emite faturas nem orçamentos, só documentos internos** (sem valor fiscal/comercial) — suspende a Fase 8 e obriga a rever a decisão D2 (substituir o `globaltoner-orcamentos`).
 - **(2026-11-11)** Modelo de permissões do Node verificado: estável desde a v22.13 (`--permission`), mas **não protege contra código malicioso** e não tem permissão de rede; só serve como camada extra no *runner*, a fronteira é o contentor.
 - **(2026-11-11)** D2 revista (interpretação (a)): o CRM **não substitui** o `globaltoner-orcamentos`. Guarda uma **proposta interna** (linhas, valores, margem, estado) para a equipa; o orçamento ao cliente continua a ser emitido fora do CRM. A Fase 8 deixa de estar suspensa e passa a «Propostas internas».
+
+## Módulos adicionais (chat, atendimento, ponto, férias, mapas): viabilidade (2026-11-11)
+**Proposta em [plano-modulos-adicionais.md](plano-modulos-adicionais.md); nada implementado.**
+- O registo de módulos da 0a **cobre** ligar/desligar, dependências e bloqueio de rotas/tarefas, mas **não chega**: faltam permissões por âmbito (próprio/equipa/todos) e hierarquia, privacidade acima do papel, notificações, registo de tarefas agendadas, contribuições da interface, tempo real dirigido, ciclo de vida de dados pessoais, dependências fracas.
+- Os cinco módulos são **embutidos** (mesmo manifesto e interruptor), não extensões de terceiros; os seus fornecedores (geocodificação, encaminhamento, canais) são pontos de extensão.
+- Ponto e férias lidam com dados pessoais de colaboradores: sem biometria nem geolocalização contínua; valores legais configuráveis e a validar com jurista/contabilista.
