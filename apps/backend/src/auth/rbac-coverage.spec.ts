@@ -89,7 +89,10 @@ describe("cobertura de permissões nos controllers", () => {
   });
 
   it("nenhuma rota de leitura autenticada fica sem JwtAuthGuard (exceto as públicas conhecidas)", () => {
-    const publicReads = routes.filter((r) => r.httpMethod === RequestMethod.GET && !r.guards.includes(JwtAuthGuard));
+    // A chave interna (email-worker) é a única alternativa aceite ao JWT numa rota de leitura.
+    const publicReads = routes.filter(
+      (r) => r.httpMethod === RequestMethod.GET && !r.guards.includes(JwtAuthGuard) && !r.guards.includes(InternalApiKeyGuard),
+    );
     expect(publicReads.map((r) => r.label)).toEqual([]);
   });
 });

@@ -6,12 +6,17 @@ import * as bcrypt from "bcrypt";
 import { AppModule } from "../src/app.module";
 import { configureApp } from "../src/app.setup";
 import { PrismaService } from "../src/prisma/prisma.service";
+import { ModulesService } from "../src/modules/modules.service";
 
 export async function createTestApp(): Promise<INestApplication> {
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
   const app = moduleRef.createNestApplication();
   configureApp(app); // exatamente a mesma configuração (helmet, validação, CORS) que o main.ts
   await app.init();
+  // Cada ficheiro de testes começa com todos os módulos ativos (valor por omissão), seja qual for o estado em que
+  // o ficheiro anterior deixou a base de dados. (Só corre em bases de dados de teste: ver env.ts.)
+  await app.get(PrismaService).moduleSetting.deleteMany();
+  await app.get(ModulesService).reload();
   return app;
 }
 

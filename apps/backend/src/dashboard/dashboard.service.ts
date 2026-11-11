@@ -1,13 +1,20 @@
 import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
+import { ModulesService } from "../modules/modules.service";
 
 const STALE_DEAL_DAYS = 14;
 
 @Injectable()
 export class DashboardService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly modules: ModulesService,
+  ) {}
 
   async getSummary() {
+    // Indicadores de um módulo desligado não se calculam nem se devolvem (ficam a null).
+    const leadsOn = this.modules.isEnabled("leads");
+    const dealsOn = this.modules.isEnabled("deals");
     const now = new Date();
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const startOfTomorrow = new Date(startOfToday);
@@ -25,23 +32,22 @@ export class DashboardService {
     ] = await Promise.all([
       this.prisma.company.count(),
       this.prisma.contact.count(),
-      this.prisma.lead.count({ where: { status: "NOVO" } }),
+      leadsOn ? this.prisma.lead.count({ where: { status: "NOVO" } }) : Promise.resolve(null),
       this.prisma.task.count({
         where: { status: { not: "DONE" }, dueDate: { gte: startOfToday, lt: startOfTomorrow } },
       }),
       this.prisma.task.count({
         where: { status: { not: "DONE" }, dueDate: { lt: startOfToday } },
       }),
-      this.prisma.deal.count({
-        where: { stage: { type: "OPEN" }, updatedAt: { lt: staleThreshold } },
-      }),
-      this.getPipelineBreakdown(),
+      dealsOn
+        ? this.prisma.deal.count({ where: { stage: { type: "OPEN" }, updatedAt: { lt: staleThreshold } } })
+        : Promise.resolve(null),
+      dealsOn ? this.getPipelineBreakdown() : Promise.resolve([]),
     ]);
 
-    const openValueAgg = await this.prisma.deal.aggregate({
-      where: { stage: { type: "OPEN" } },
-      _sum: { value: true },
-    });
+    const openValueAgg = dealsOn
+      ? await this.prisma.deal.aggregate({ where: { stage: { type: "OPEN" } }, _sum: { value: true } })
+      : null;
 
     const dealsOpen = pipelines.reduce((sum, p) => sum + p.open, 0);
     const dealsWon = pipelines.reduce((sum, p) => sum + p.won, 0);
@@ -51,15 +57,16 @@ export class DashboardService {
       companiesTotal,
       contactsTotal,
       leadsNew,
-      dealsOpen,
-      dealsWon,
-      dealsLost,
-      openValue: openValueAgg._sum.value ?? 0,
+      dealsOpen: dealsOn ? dealsOpen : null,
+      dealsWon: dealsOn ? dealsWon : null,
+      dealsLost: dealsOn ? dealsLost : null,
+      openValue: dealsOn ? (openValueAgg?._sum.value ?? 0) : null,
       tasksToday,
       tasksOverdue,
       staleDeals,
       staleDealDays: STALE_DEAL_DAYS,
       pipelines,
+      modules: { leads: leadsOn, deals: dealsOn },
     };
   }
 

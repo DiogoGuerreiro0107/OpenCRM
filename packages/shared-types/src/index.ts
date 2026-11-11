@@ -302,16 +302,18 @@ export interface PipelineSummaryStats {
 export interface DashboardSummary {
   companiesTotal: number;
   contactsTotal: number;
-  leadsNew: number;
-  dealsOpen: number;
-  dealsWon: number;
-  dealsLost: number;
-  openValue: number;
+  /** Os indicadores de um módulo desligado vêm a `null` e não se mostram. */
+  leadsNew: number | null;
+  dealsOpen: number | null;
+  dealsWon: number | null;
+  dealsLost: number | null;
+  openValue: number | null;
   tasksToday: number;
   tasksOverdue: number;
-  staleDeals: number;
+  staleDeals: number | null;
   staleDealDays: number;
   pipelines: PipelineSummaryStats[];
+  modules: { leads: boolean; deals: boolean };
 }
 
 export interface EmailTemplate {
