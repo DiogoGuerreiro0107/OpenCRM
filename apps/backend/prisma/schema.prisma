@@ -36,6 +36,7 @@ model User {
   leads               Lead[]
   ownedCompanies      Company[]
   ownedContacts       Contact[]
+  auditEvents         AuditEvent[]
 }
 
 enum TimelineEventType {
@@ -516,4 +517,26 @@ model ModuleSetting {
   enabled   Boolean
   options   Json     @default("{}")
   updatedAt DateTime @updatedAt
+}
+
+// Registo de auditoria: quem fez o quê e quando. SÓ DE ACRESCENTAR (um trigger na migração recusa UPDATE e DELETE).
+// Nunca guarda segredos nem corpos de pedidos completos: só campos escolhidos (ver src/audit/).
+model AuditEvent {
+  id         String   @id @default(uuid())
+  createdAt  DateTime @default(now())
+  /// null = ação do sistema (p. ex. o comando secrets:encrypt)
+  actorId    String?
+  actor      User?    @relation(fields: [actorId], references: [id], onDelete: Restrict)
+  /// Nome no momento da ação (o utilizador pode mudar de nome depois).
+  actorName  String?
+  /// Ex.: "user.updated", "module.disabled" (ver docs/plano-e0-api-publica.md).
+  action     String
+  targetType String?
+  targetId   String?
+  metadata   Json?
+  ip         String?
+
+  @@index([createdAt(sort: Desc)])
+  @@index([actorId, createdAt(sort: Desc)])
+  @@index([action, createdAt(sort: Desc)])
 }

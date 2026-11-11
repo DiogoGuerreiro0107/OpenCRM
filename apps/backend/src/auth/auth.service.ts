@@ -5,6 +5,7 @@ import * as bcrypt from "bcrypt";
 import * as crypto from "crypto";
 import { UsersService } from "../users/users.service";
 import { EmailService } from "../email/email.service";
+import { AuditService } from "../audit/audit.service";
 
 const RESET_TOKEN_TTL_MS = 60 * 60 * 1000;
 
@@ -17,6 +18,7 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly config: ConfigService,
     private readonly emailService: EmailService,
+    private readonly audit: AuditService,
   ) {}
 
   async login(email: string, password: string) {
@@ -58,6 +60,7 @@ export class AuthService {
       const token = crypto.randomBytes(32).toString("hex");
       const expiresAt = new Date(Date.now() + RESET_TOKEN_TTL_MS);
       await this.usersService.setResetToken(user.id, token, expiresAt);
+      await this.audit.record({ action: "auth.password_reset_requested", targetType: "user", targetId: user.id });
 
       const frontendUrl = this.config.get<string>("FRONTEND_URL") ?? "http://localhost:5173";
       const resetLink = `${frontendUrl}/redefinir-password?token=${token}`;
@@ -83,6 +86,7 @@ export class AuthService {
 
     const passwordHash = await bcrypt.hash(newPassword, 10);
     await this.usersService.updatePassword(user.id, passwordHash);
+    await this.audit.record({ action: "auth.password_reset", actorId: user.id, targetType: "user", targetId: user.id });
     return { message: "Password redefinida com sucesso" };
   }
 
@@ -96,6 +100,7 @@ export class AuthService {
     await this.usersService.updatePassword(userId, await bcrypt.hash(newPassword, 10));
     const tokens = await this.issueTokens(user.id, user.email, user.role);
     await this.usersService.setRefreshToken(user.id, await bcrypt.hash(tokens.refreshToken, 10));
+    await this.audit.record({ action: "auth.password_changed", actorId: user.id, targetType: "user", targetId: user.id });
     return tokens;
   }
 

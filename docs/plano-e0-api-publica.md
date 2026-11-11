@@ -62,6 +62,25 @@ Quem consiga ler a base de dados (uma cópia de segurança, um *dump*, um acesso
 | Rotação mal feita deixa valores indecifráveis | O comando só grava depois de decifrar com sucesso; falha por campo sem alterar o resto |
 | Falsa sensação de segurança | A cifra protege **cópias da base de dados**, não um atacante com o ambiente do backend (que tem a chave). Escrito no documento de segurança |
 
+## Pacote E0b — Registo de auditoria (feito, 2026-11-11)
+
+### Desenho (como implementado)
+- **Tabela `AuditEvent`** (quem, nome no momento, ação, tipo e id do alvo, detalhes JSON, IP, data) **só de acrescentar**: um *trigger* na migração recusa `UPDATE` e `DELETE`, mesmo por SQL direto. **Limite assumido:** quem for dono da tabela pode desativar o *trigger* — protege de erros e de código da aplicação, não de um administrador da base de dados. O `TRUNCATE` não é bloqueado (os testes e2e precisam dele).
+- **Rotas de administração marcadas com `@Audit("recurso.acao", { target, fields, presence })`** e um interceptor global que regista **depois** de o pedido ter sido bem-sucedido (pedidos recusados por permissões, validação ou erro não são registados). O interceptor **espera** pela escrita para o evento já existir quando o cliente recebe o sucesso.
+- **Lista branca de campos:** só os campos listados em `fields` do corpo do pedido vão para os detalhes, nunca o corpo todo. `presence` regista apenas que um grupo de campos foi enviado (ex.: `credenciais: "alteradas"` na conta Zadarma, sem os valores). Defesa em profundidade: o serviço remove qualquer chave com nome `password|secret|token|apikey|authorization` mesmo que alguém a ponha na lista.
+- **Teste estrutural:** toda a rota de escrita **só do Administrador** tem de ter `@Audit`; um endpoint de administração novo sem decisão faz falhar o CI. As ações têm formato `recurso.acao` e não se repetem.
+- **O que é registado:** utilizadores (criar, alterar papel/estado/nome/email, password definida pelo Administrador), módulos, conta Zadarma, funis e fases, campos personalizados, automações; eventos de autenticação (password alterada pelo próprio, recuperação pedida, password redefinida); e o comando `secrets:encrypt` (ação do sistema, só contagens). **Não é registado** (decisão): trabalho do dia-a-dia (empresas, tarefas, negócios...), logins, leituras.
+- **API:** `GET /audit` (só Administrador; sem rotas de escrita), paginação por cursor (`createdAt`, `id`, com desempate), filtros por prefixo da ação, utilizador, alvo e intervalo de datas. **Interface:** Configurações > Auditoria.
+- **Falha a registar não desfaz a ação:** `record()` nunca lança; o erro fica no registo da aplicação. **Limite assumido:** o evento não é gravado na mesma transação da ação, por isso uma falha entre as duas pode perder o evento.
+- **Um utilizador que aparece no registo não pode ser apagado** (a chave estrangeira impede): consistente com a regra de desativar em vez de eliminar.
+
+### Validação
+- 186 unitários e 249 e2e a passar; build do frontend OK.
+- **Prova por mutação:** retirar `@Audit` de uma rota faz falhar o teste estrutural; pôr `password` na lista branca **e** desligar o filtro de segredos faz falhar o e2e de utilizadores.
+- **Browser** (backend real, base de desenvolvimento): a página lista o evento de sistema, o filtro por tipo mostra-o em «Segredos» e o estado vazio em «Utilizadores». A migração aplicou-se na base de desenvolvimento.
+- **Não testado no browser:** «Carregar mais» (coberto só pelo e2e da API), filtros por pessoa e datas, e um utilizador não administrador a tentar abrir a página (coberto pelos testes de permissões e pelo e2e do `GET /audit`: 403).
+- **Não resolvido:** não há política de conservação (o registo cresce indefinidamente); a decidir mais tarde.
+
 ## Execução do pacote E0a (2026-11-11)
 
 - **Implementado como planeado**, com um desvio: o comando vive em `src/cli/encrypt-secrets.ts` (compila para `dist/cli/`, para correr dentro do contentor de produção, que não tem `ts-node`); o script de desenvolvimento usa `node --env-file-if-exists=.env -r ts-node/register`.
@@ -72,7 +91,7 @@ Quem consiga ler a base de dados (uma cópia de segurança, um *dump*, um acesso
 
 ## Registo de execução
 - [x] E0a — Segredos em repouso (ver «Execução» abaixo)
-- [ ] E0b — Registo de auditoria
+- [x] E0b — Registo de auditoria (ver «Pacote E0b» abaixo)
 - [ ] E0c — Chaves de API e `/api/v1`
 - [ ] E0d — Eventos de domínio e webhooks
 - [ ] E0e — OpenAPI e `LigaçãoExterna`

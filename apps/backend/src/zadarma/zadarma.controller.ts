@@ -5,6 +5,7 @@ import { ModuleGuard } from "../modules/module.guard";
 import { RequireModule } from "../modules/require-module.decorator";
 import { Roles, WriteRoles } from "../auth/decorators/roles.decorator";
 import { WRITE_ACCESS } from "../auth/permissions";
+import { Audit } from "../audit/audit.decorator";
 import { ZadarmaService } from "./zadarma.service";
 import { SaveZadarmaAccountDto } from "./dto/save-zadarma-account.dto";
 import { MakeCallDto } from "./dto/make-call.dto";
@@ -23,6 +24,7 @@ export class ZadarmaController {
     return this.zadarmaService.getAccount();
   }
 
+  @Audit("zadarma.account_saved", { target: "zadarma_account", fields: ["callerExtension", "active"], presence: { credenciais: ["apiKey", "apiSecret"] } })
   @Post("account")
   saveAccount(@Body() dto: SaveZadarmaAccountDto) {
     return this.zadarmaService.saveAccount(dto);

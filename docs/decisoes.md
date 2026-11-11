@@ -407,3 +407,8 @@ O item "limite de tentativas de login por conta" andava no backlog desde o endur
 - **Token de recuperação de password** passa a guardar só o SHA-256 (`resetTokenHash`); a migração invalida pedidos pendentes (duram 1 h).
 - Teste estrutural: um campo novo com nome de segredo (`password|secret|token|apikey`) tem de estar cifrado ou ter exceção justificada, senão o CI falha. Apanhou logo `resetTokenExpiresAt` (uma data) como falso positivo, registado como exceção.
 - **Limite assumido:** a cifra protege cópias e leituras da base de dados, não um atacante com o ambiente do backend (que tem a chave).
+
+## Fase E0b: registo de auditoria (2026-11-11)
+- Tabela `AuditEvent` só de acrescentar (*trigger* recusa UPDATE/DELETE); regista ações de administração (utilizadores, módulos, Zadarma, funis, campos, automações), eventos de passwords e o comando `secrets:encrypt`. **Não** regista trabalho do dia-a-dia, logins nem leituras.
+- Marcação explícita com `@Audit` + teste estrutural que obriga toda a rota de escrita só do Administrador a tê-la. Só campos de uma lista branca vão para os detalhes; chaves com nome de segredo são sempre removidas.
+- Limites assumidos: o dono da tabela pode desativar o *trigger*; o evento não vai na mesma transação da ação; sem política de conservação ainda.

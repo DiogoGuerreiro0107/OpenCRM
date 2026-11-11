@@ -11,6 +11,7 @@ import { MODULE_KEY } from "./require-module.decorator";
  * senão um módulo novo ficaria "ligado para sempre" por esquecimento.
  */
 const CORE_CONTROLLERS = [
+  "AuditController",
   "AuthController",
   "UsersController",
   "CompaniesController",
