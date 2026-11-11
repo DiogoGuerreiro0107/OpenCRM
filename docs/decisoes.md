@@ -372,3 +372,12 @@ Primeiro pacote da [reorganização modular](plano-reorganizacao-modular.md); pl
 - **Não testado:** o worker a ler uma caixa real com o módulo religado a meio de um ciclo (o `.sync-state.json` e a tabela de emails confirmam que o meu arranque de teste não alterou nada); o comportamento com várias instâncias do backend (a cache é por instância — documentado); e a página Módulos num telemóvel.
 
 **Fora de âmbito (próximos pacotes):** assistente da primeira instalação (depende dos módulos novos existirem), opções por módulo (a coluna `options` existe mas só será usada a partir de Leads, Fase 1), campos personalizados genéricos (0b), fluxos genéricos (0c) e permissões em base de dados (0d).
+
+## Decisão: não implementar bloqueio de login por conta (2026-11-06)
+
+O item "limite de tentativas de login por conta" andava no backlog desde o endurecimento. Revisto, **decidiu-se não o implementar**, e fica registado porquê para não ser reaberto sem novos factos:
+
+- **Já existe um limite por IP**: 5 tentativas/min em `/auth/login`, `/auth/forgot-password`, `/auth/reset-password` e `/auth/change-password`, mais 300/min globais. Para uma aplicação só de rede local, o atacante realista é alguém já dentro da rede, com um único IP.
+- **O bloqueio por conta cria um problema novo, pior do que o que resolve**: qualquer pessoa que conheça um email (o do Administrador, por exemplo) poderia bloqueá-lo de forma contínua com 10 pedidos de 15 em 15 minutos — uma negação de serviço dirigida, e se for o único Administrador ninguém o consegue desbloquear. A alternativa (atrasos progressivos por conta) tem o mesmo defeito, mais suave.
+- **As passwords têm mínimo de 8 caracteres e hash com `bcrypt`**; a tentativa por força bruta de uma conta a 5 tentativas/min é inviável na prática.
+- **Rever se**: a aplicação passar a estar exposta à internet (aí o limite por IP deixa de bastar, porque o atacante tem muitos IPs, e o bloqueio por conta — ou 2FA — passa a compensar o risco de negação de serviço), ou se houver um registo de auditoria de logins falhados que justifique alertas.
