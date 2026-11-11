@@ -25,7 +25,8 @@ model User {
   // Desativar em vez de eliminar: o utilizador está ligado a negócios, tarefas, leads e à timeline.
   active              Boolean         @default(true)
   refreshToken        String?
-  resetToken          String?         @unique
+  // SHA-256 do token enviado por email (nunca o token). Ver docs/plano-e0-api-publica.md.
+  resetTokenHash      String?         @unique
   resetTokenExpiresAt DateTime?
   createdAt           DateTime        @default(now())
   updatedAt           DateTime        @updatedAt

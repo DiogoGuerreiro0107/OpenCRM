@@ -399,3 +399,11 @@ O item "limite de tentativas de login por conta" andava no backlog desde o endur
 - Os cinco módulos são **embutidos** (mesmo manifesto e interruptor), não extensões de terceiros; os seus fornecedores (geocodificação, encaminhamento, canais) são pontos de extensão.
 - Ponto e férias lidam com dados pessoais de colaboradores: sem biometria nem geolocalização contínua; valores legais configuráveis e a validar com jurista/contabilista.
 - **(2026-11-11)** Módulos adicionais: «atendimento» = caixa multicanal de clientes; ordem férias+ponto → chat → mapas → atendimento; ponto pessoal + quiosque opcional, sem biometria nem localização; mapas público em desenvolvimento e auto-alojado em produção.
+
+## Fase E0a: segredos em repouso (2026-11-11)
+- **AES-256-GCM** (`node:crypto`, sem dependências novas) para `EmailAccount.password` e `ZadarmaAccount.apiSecret`. Formato `enc:v1:…`; o contexto `Tabela.campo` vai como dados associados, por isso um valor não decifra noutro campo.
+- Chave `SECRETS_KEY` no ambiente (mín. 32 caracteres, HKDF-SHA256); em produção o backend recusa arrancar sem ela. `SECRETS_KEY_PREVIOUS` para rotação.
+- **Compatível com legado:** valores em claro continuam a funcionar (com aviso) até correr `encrypt-secrets` (idempotente). Decifra sempre antes de gravar: uma chave errada falha sem alterar dados.
+- **Token de recuperação de password** passa a guardar só o SHA-256 (`resetTokenHash`); a migração invalida pedidos pendentes (duram 1 h).
+- Teste estrutural: um campo novo com nome de segredo (`password|secret|token|apikey`) tem de estar cifrado ou ter exceção justificada, senão o CI falha. Apanhou logo `resetTokenExpiresAt` (uma data) como falso positivo, registado como exceção.
+- **Limite assumido:** a cifra protege cópias e leituras da base de dados, não um atacante com o ambiente do backend (que tem a chave).

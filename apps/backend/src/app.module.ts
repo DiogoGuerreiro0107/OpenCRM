@@ -4,6 +4,7 @@ import { ScheduleModule } from "@nestjs/schedule";
 import { APP_GUARD, APP_INTERCEPTOR } from "@nestjs/core";
 import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 import { PrismaModule } from "./prisma/prisma.module";
+import { SecretsModule } from "./common/secrets.module";
 import { AuthModule } from "./auth/auth.module";
 import { UsersModule } from "./users/users.module";
 import { CompaniesModule } from "./companies/companies.module";
@@ -32,6 +33,7 @@ import { RealtimeInterceptor } from "./realtime/realtime.interceptor";
     // login e recuperação de password têm um limite estrito próprio (ver AuthController).
     ThrottlerModule.forRoot([{ name: "default", ttl: 60_000, limit: 300 }]),
     PrismaModule,
+    SecretsModule,
     WebhooksModule,
     UsersModule,
     AuthModule,

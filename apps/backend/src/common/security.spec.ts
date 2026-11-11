@@ -66,7 +66,7 @@ describe("parseCorsOrigins", () => {
 });
 
 describe("findInsecureSecrets", () => {
-  const good = { NODE_ENV: "production", JWT_SECRET: "abc", JWT_REFRESH_SECRET: "def", INTERNAL_API_KEY: "ghi" };
+  const good = { NODE_ENV: "production", JWT_SECRET: "abc", JWT_REFRESH_SECRET: "def", INTERNAL_API_KEY: "ghi", SECRETS_KEY: "uma-chave-real-com-mais-de-32-caracteres" };
 
   it("em desenvolvimento nunca se queixa", () => {
     expect(findInsecureSecrets({ NODE_ENV: "development", JWT_SECRET: "changeme_jwt_secret" })).toEqual([]);
@@ -87,5 +87,20 @@ describe("findInsecureSecrets", () => {
   it("não revela o valor dos segredos nas mensagens", () => {
     const problems = findInsecureSecrets({ ...good, JWT_SECRET: "changeme_valor_visivel" });
     expect(problems.join(" ")).not.toContain("changeme_valor_visivel");
+  });
+});
+
+describe("findInsecureSecrets: SECRETS_KEY", () => {
+  const good = {
+    NODE_ENV: "production",
+    JWT_SECRET: "abc",
+    JWT_REFRESH_SECRET: "def",
+    INTERNAL_API_KEY: "ghi",
+    SECRETS_KEY: "uma-chave-real-com-mais-de-32-caracteres",
+  };
+
+  it("em produção recusa SECRETS_KEY em falta ou de exemplo", () => {
+    expect(findInsecureSecrets({ ...good, SECRETS_KEY: undefined }).join(" ")).toContain("SECRETS_KEY");
+    expect(findInsecureSecrets({ ...good, SECRETS_KEY: "changeme_secrets_key_gera_uma_com_openssl" }).join(" ")).toContain("SECRETS_KEY");
   });
 });

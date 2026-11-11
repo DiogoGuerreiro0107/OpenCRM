@@ -8,6 +8,7 @@ import { MakeCallDto } from "./dto/make-call.dto";
 import { QueryCallRecordsDto } from "./dto/query-call-records.dto";
 import { normalizePhone, signZadarmaRequest } from "./zadarma.utils";
 import { ModulesService } from "../modules/modules.service";
+import { SecretsService } from "../common/secrets.service";
 
 const ZADARMA_API_BASE = "https://api.zadarma.com";
 
@@ -18,6 +19,7 @@ export class ZadarmaService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly modules: ModulesService,
+    private readonly secrets: SecretsService,
   ) {}
 
   /** Nunca devolve apiKey/apiSecret — só o suficiente para a UI saber se já
@@ -38,7 +40,7 @@ export class ZadarmaService {
         where: { id: existing.id },
         data: {
           apiKey: dto.apiKey || undefined,
-          apiSecret: dto.apiSecret || undefined,
+          apiSecret: dto.apiSecret ? this.secrets.encrypt(dto.apiSecret, "ZadarmaAccount.apiSecret") : undefined,
           callerExtension: dto.callerExtension,
           active: dto.active,
         },
@@ -48,7 +50,10 @@ export class ZadarmaService {
         throw new BadRequestException("API key e API secret são obrigatórios na primeira configuração");
       }
       await this.prisma.zadarmaAccount.create({
-        data: { apiKey: dto.apiKey, apiSecret: dto.apiSecret, callerExtension: dto.callerExtension, active: dto.active },
+        data: {
+          apiKey: dto.apiKey,
+          apiSecret: this.secrets.encrypt(dto.apiSecret, "ZadarmaAccount.apiSecret"),
+          callerExtension: dto.callerExtension, active: dto.active },
       });
     }
     return this.getAccount();
@@ -179,7 +184,12 @@ export class ZadarmaService {
     path: string,
     params: Record<string, string>,
   ) {
-    const { queryString, authorization } = signZadarmaRequest(account.apiKey, account.apiSecret, path, params);
+    const { queryString, authorization } = signZadarmaRequest(
+      account.apiKey,
+      this.secrets.decrypt(account.apiSecret, "ZadarmaAccount.apiSecret"),
+      path,
+      params,
+    );
 
     const url = `${ZADARMA_API_BASE}${path}${queryString ? `?${queryString}` : ""}`;
     const response = await axios.request({

@@ -62,8 +62,16 @@ Quem consiga ler a base de dados (uma cópia de segurança, um *dump*, um acesso
 | Rotação mal feita deixa valores indecifráveis | O comando só grava depois de decifrar com sucesso; falha por campo sem alterar o resto |
 | Falsa sensação de segurança | A cifra protege **cópias da base de dados**, não um atacante com o ambiente do backend (que tem a chave). Escrito no documento de segurança |
 
+## Execução do pacote E0a (2026-11-11)
+
+- **Implementado como planeado**, com um desvio: o comando vive em `src/cli/encrypt-secrets.ts` (compila para `dist/cli/`, para correr dentro do contentor de produção, que não tem `ts-node`); o script de desenvolvimento usa `node --env-file-if-exists=.env -r ts-node/register`.
+- **Testes novos:** unitários da cifra, estrutural do schema, `SECRETS_KEY` em produção, e 10 e2e. Suite completa: 178 unitários e 232 e2e a passar.
+- **Prova por mutação:** removida a cifra em cada caminho de escrita da Zadarma, removida a decifra no envio de email e na assinatura dos pedidos, e removido o hash do token → os testes falham em todos. A mutação revelou **uma falha no meu próprio teste** (a atualização do segredo da Zadarma não verificava que o valor novo ficava cifrado, e um valor em claro também passava por ser tratado como legado); corrigida.
+- **Migração com dados reais** (base de desenvolvimento, 1 conta de email em claro): a migração SQL aplicou-se, o comando cifrou 1 valor, a segunda execução não alterou nada, e a decifra funciona. **Não testado:** envio de um email real com a password decifrada (só com SMTP simulado), nem a rotação de chave com dados reais (só e2e).
+- **Fora do âmbito:** `MINIO_SECRET_KEY`, `JWT_*` e `INTERNAL_API_KEY` continuam no ambiente (não estão na base de dados).
+
 ## Registo de execução
-- [ ] E0a — Segredos em repouso
+- [x] E0a — Segredos em repouso (ver «Execução» abaixo)
 - [ ] E0b — Registo de auditoria
 - [ ] E0c — Chaves de API e `/api/v1`
 - [ ] E0d — Eventos de domínio e webhooks

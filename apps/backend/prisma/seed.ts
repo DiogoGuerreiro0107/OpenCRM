@@ -1,5 +1,6 @@
 import { PrismaClient } from "@prisma/client";
 import * as bcrypt from "bcrypt";
+import { deriveKey, encryptSecret, secretsKeyProblem } from "../src/common/secrets";
 
 const prisma = new PrismaClient();
 
@@ -37,9 +38,12 @@ async function main() {
   }
 
   if (process.env.EMAIL_ADDRESS && process.env.EMAIL_PASSWORD) {
+    // A password da caixa de email fica cifrada na base de dados (docs/plano-e0-api-publica.md).
+    const keyProblem = secretsKeyProblem(process.env.SECRETS_KEY);
+    if (keyProblem) throw new Error(`${keyProblem}: precisa dela para guardar a password do email`);
     const emailAccountData = {
       username: process.env.EMAIL_ADDRESS,
-      password: process.env.EMAIL_PASSWORD,
+      password: encryptSecret(process.env.EMAIL_PASSWORD, deriveKey(process.env.SECRETS_KEY!), "EmailAccount.password"),
       imapHost: process.env.IMAP_HOST!,
       imapPort: Number(process.env.IMAP_PORT ?? 993),
       imapSecure: process.env.IMAP_SECURE !== "false",

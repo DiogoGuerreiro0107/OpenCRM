@@ -104,6 +104,8 @@ services:
       # BACKEND_PORT só escolhe a porta publicada no anfitrião (mapeamento abaixo).
       PORT: "3000"
       INTERNAL_API_KEY: ${INTERNAL_API_KEY}
+      SECRETS_KEY: ${SECRETS_KEY}
+      SECRETS_KEY_PREVIOUS: ${SECRETS_KEY_PREVIOUS:-}
       CORS_ORIGINS: ${CORS_ORIGINS:-}
       EMAIL_ADDRESS: ${EMAIL_ADDRESS}
       EMAIL_PASSWORD: ${EMAIL_PASSWORD}

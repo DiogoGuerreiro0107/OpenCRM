@@ -136,6 +136,6 @@ describe("UsersService.setPasswordByAdmin", () => {
 
     const { data } = prisma.user.update.mock.calls[0][0];
     expect(await bcrypt.compare("nova-password-ok", data.passwordHash)).toBe(true);
-    expect(data).toMatchObject({ refreshToken: null, resetToken: null });
+    expect(data).toMatchObject({ refreshToken: null, resetTokenHash: null });
   });
 });
