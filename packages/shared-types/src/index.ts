@@ -371,3 +371,21 @@ export interface CallRecord {
   startedAt: string;
   createdAt: string;
 }
+
+/** Evento do registo de auditoria (só Administrador). `metadata` nunca contém segredos. */
+export interface AuditEvent {
+  id: string;
+  createdAt: string;
+  actorId: string | null;
+  actorName: string | null;
+  action: string;
+  targetType: string | null;
+  targetId: string | null;
+  metadata: Record<string, unknown> | null;
+  ip: string | null;
+}
+
+export interface AuditPage {
+  items: AuditEvent[];
+  nextCursor: string | null;
+}

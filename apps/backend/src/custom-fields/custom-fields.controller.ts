@@ -1,5 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { Audit } from "../audit/audit.decorator";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { WriteRoles } from "../auth/decorators/roles.decorator";
 import { WRITE_ACCESS } from "../auth/permissions";
@@ -20,16 +21,19 @@ export class CustomFieldsController {
     return this.customFieldsService.findAll(query);
   }
 
+  @Audit("custom_field.created", { target: "custom_field", fields: ["entityType", "fieldLabel", "fieldType"] })
   @Post()
   create(@Body() dto: CreateCustomFieldDto) {
     return this.customFieldsService.create(dto);
   }
 
+  @Audit("custom_field.updated", { target: "custom_field", fields: ["fieldLabel", "isRequired", "isVisible", "sortOrder"] })
   @Patch(":id")
   update(@Param("id") id: string, @Body() dto: UpdateCustomFieldDto) {
     return this.customFieldsService.update(id, dto);
   }
 
+  @Audit("custom_field.deleted", { target: "custom_field" })
   @Delete(":id")
   remove(@Param("id") id: string) {
     return this.customFieldsService.remove(id);

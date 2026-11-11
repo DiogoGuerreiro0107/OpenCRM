@@ -4,6 +4,7 @@ import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles, WriteRoles } from "../auth/decorators/roles.decorator";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { WRITE_ACCESS } from "../auth/permissions";
+import { Audit } from "../audit/audit.decorator";
 import { UsersService } from "./users.service";
 import { CreateUserDto } from "./dto/create-user.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
@@ -28,16 +29,19 @@ export class UsersController {
     return this.usersService.findAllManaged();
   }
 
+  @Audit("user.created", { target: "user", fields: ["name", "email", "role"] })
   @Post()
   create(@Body() dto: CreateUserDto) {
     return this.usersService.createUser(dto);
   }
 
+  @Audit("user.updated", { target: "user", fields: ["name", "email", "role", "active"] })
   @Patch(":id")
   update(@CurrentUser() user: { userId: string }, @Param("id") id: string, @Body() dto: UpdateUserDto) {
     return this.usersService.updateUser(user.userId, id, dto);
   }
 
+  @Audit("user.password_set_by_admin", { target: "user" })
   @Post(":id/password")
   @HttpCode(HttpStatus.NO_CONTENT)
   async setPassword(@Param("id") id: string, @Body() dto: SetPasswordDto) {

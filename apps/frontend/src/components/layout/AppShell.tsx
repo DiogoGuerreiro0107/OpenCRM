@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
-import { Building2, CheckSquare, FileText, KanbanSquare, LayoutDashboard, Mail, Phone, Puzzle, Settings, UserCog, UserPlus, Users, Zap, type LucideIcon } from "lucide-react";
+import { Building2, CheckSquare, FileText, KanbanSquare, LayoutDashboard, Mail, Phone, Puzzle, ScrollText, Settings, UserCog, UserPlus, Users, Zap, type LucideIcon } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
 import { PasswordDialog } from "@/components/PasswordDialog";
@@ -30,6 +30,7 @@ const settingsItems: Array<{ to: string; label: string; icon: LucideIcon; roles:
   { to: "/configuracoes/utilizadores", label: "Utilizadores", icon: UserCog, roles: ADMIN_ONLY },
   { to: "/configuracoes/zadarma", label: "Zadarma", icon: Phone, roles: ADMIN_ONLY, module: "zadarma" },
   { to: "/configuracoes/modulos", label: "Módulos", icon: Puzzle, roles: ADMIN_ONLY },
+  { to: "/configuracoes/auditoria", label: "Auditoria", icon: ScrollText, roles: ADMIN_ONLY },
 ];
 
 export function AppShell() {

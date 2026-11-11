@@ -4,6 +4,7 @@ import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles, WriteRoles } from "../auth/decorators/roles.decorator";
 import { WRITE_ACCESS } from "../auth/permissions";
+import { Audit } from "../audit/audit.decorator";
 import { ModulesService } from "./modules.service";
 
 class SetModuleEnabledDto {
@@ -30,6 +31,7 @@ export class ModulesController {
     return this.modules.list();
   }
 
+  @Audit("module.toggled", { target: "module", fields: ["enabled"] })
   @Patch(":id")
   setEnabled(@Param("id") id: string, @Body() dto: SetModuleEnabledDto) {
     return this.modules.setEnabled(id, dto.enabled);

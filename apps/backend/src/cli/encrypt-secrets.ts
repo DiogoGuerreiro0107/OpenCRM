@@ -24,6 +24,10 @@ async function main() {
   const db = new PrismaClient();
   try {
     const reports = await encryptStoredSecrets(db, keys);
+    // Ação do sistema (sem utilizador): só contagens, nunca valores.
+    await db.auditEvent.create({
+      data: { action: "secrets.encrypted", targetType: "secrets", metadata: { resultado: reports.map((r) => ({ campo: r.field, cifrados: r.encrypted, recifrados: r.recrypted, semAlteracao: r.unchanged })) } },
+    });
     for (const r of reports) {
       console.log(`${r.field}: ${r.encrypted} cifrado(s), ${r.recrypted} recifrado(s), ${r.unchanged} já estava(m) em ordem`);
     }

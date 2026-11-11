@@ -5,6 +5,7 @@ import { APP_GUARD, APP_INTERCEPTOR } from "@nestjs/core";
 import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 import { PrismaModule } from "./prisma/prisma.module";
 import { SecretsModule } from "./common/secrets.module";
+import { AuditModule } from "./audit/audit.module";
 import { AuthModule } from "./auth/auth.module";
 import { UsersModule } from "./users/users.module";
 import { CompaniesModule } from "./companies/companies.module";
@@ -34,6 +35,7 @@ import { RealtimeInterceptor } from "./realtime/realtime.interceptor";
     ThrottlerModule.forRoot([{ name: "default", ttl: 60_000, limit: 300 }]),
     PrismaModule,
     SecretsModule,
+    AuditModule,
     WebhooksModule,
     UsersModule,
     AuthModule,
