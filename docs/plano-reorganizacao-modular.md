@@ -268,6 +268,8 @@ As fases 0–2 **não dependem** das decisões D2, D3 e D7, por isso podem come�
 
 **Faixa de extensões (proposta, ver [plano-extensoes-e-api.md](plano-extensoes-e-api.md) §10)** — corre em paralelo e encaixa assim: **E0** (API pública `/api/v1`, chaves de API, eventos e webhooks, cifra de segredos) **antes** da Fase 6 (a API de encomendas usa as chaves e a idempotência); **E1** (framework de extensões) **antes** da Fase 7; **E2** (Zadarma como primeiro adaptador) pode correr com a Fase 4. A Fase 7 passa a ser «contrato de faturação + adaptadores de referência», já não «adaptador do teu programa».
 
+**Módulos adicionais (proposta, ver [plano-modulos-adicionais.md](plano-modulos-adicionais.md)):** chat, atendimento, marcação de ponto, gestão de férias e mapas/rotas. O registo de módulos atual **não chega** para eles: faltam sete capacidades de plataforma (permissões por âmbito e hierarquia, notificações, registo de tarefas agendadas, contribuições da interface, tempo real dirigido, ciclo de vida de dados pessoais, dependências fracas). Entram como pacotes pequenos: **0a-bis** (manifesto e tarefas), âmbitos dentro da **0d**, pacote **P** (notificações, tempo real, auditoria) e contribuições da interface na **Fase 2**. Os cinco módulos são **embutidos**, não extensões de terceiros.
+
 ---
 
 ## 6. Riscos e como os reduzir
