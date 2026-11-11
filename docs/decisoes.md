@@ -381,3 +381,14 @@ O item "limite de tentativas de login por conta" andava no backlog desde o endur
 - **O bloqueio por conta cria um problema novo, pior do que o que resolve**: qualquer pessoa que conheça um email (o do Administrador, por exemplo) poderia bloqueá-lo de forma contínua com 10 pedidos de 15 em 15 minutos — uma negação de serviço dirigida, e se for o único Administrador ninguém o consegue desbloquear. A alternativa (atrasos progressivos por conta) tem o mesmo defeito, mais suave.
 - **As passwords têm mínimo de 8 caracteres e hash com `bcrypt`**; a tentativa por força bruta de uma conta a 5 tentativas/min é inviável na prática.
 - **Rever se**: a aplicação passar a estar exposta à internet (aí o limite por IP deixa de bastar, porque o atacante tem muitos IPs, e o bloqueio por conta — ou 2FA — passa a compensar o risco de negação de serviço), ou se houver um registo de auditoria de logins falhados que justifique alertas.
+## Extensões e API pública: decisões de desenho (2026-11-11)
+**Proposta em [plano-extensoes-e-api.md](plano-extensoes-e-api.md) (PR #28); nada implementado.**
+- O programa de faturação concreto deixa de ser relevante: o CRM define o contrato `BillingProvider` e cada programa é uma extensão.
+- Três formas de estender (externa via API, interna, declarativa) + forma D (código de terceiros num *runner* isolado, fora do backend).
+- **Terceiros podem instalar pacotes pela interface** (resposta do utilizador): exige pacotes assinados, editores aprovados, auditoria e *runner* isolado; sem *runner* só pacotes sem código.
+- Dados das extensões em coleções do SDK; tabelas próprias só na forma B.
+- Segredos de integrações (`EmailAccount.password`, `ZadarmaAccount.apiSecret`, hoje em claro) passam a ser cifrados em repouso na fase E0, antes de haver extensões.
+- Por decidir: E5 (um ou vários programas de faturação) e E6 (n8n como runtime suportado).
+- **(2026-11-11)** E5: um só programa de faturação por instalação. E6: n8n suportado como runtime da forma A. **E7: o CRM não emite faturas nem orçamentos, só documentos internos** (sem valor fiscal/comercial) — suspende a Fase 8 e obriga a rever a decisão D2 (substituir o `globaltoner-orcamentos`).
+- **(2026-11-11)** Modelo de permissões do Node verificado: estável desde a v22.13 (`--permission`), mas **não protege contra código malicioso** e não tem permissão de rede; só serve como camada extra no *runner*, a fronteira é o contentor.
+- **(2026-11-11)** D2 revista (interpretação (a)): o CRM **não substitui** o `globaltoner-orcamentos`. Guarda uma **proposta interna** (linhas, valores, margem, estado) para a equipa; o orçamento ao cliente continua a ser emitido fora do CRM. A Fase 8 deixa de estar suspensa e passa a «Propostas internas».
