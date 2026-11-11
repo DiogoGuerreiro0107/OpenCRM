@@ -33,6 +33,18 @@ Uma extensão real pode combinar as três (um manifesto C + código B + um servi
 | E5 | **Faturação:** um só programa ativo, ou vários (por filial/empresa)? | Um só por instalação; o contrato permite vários mais tarde |
 | E6 | O **n8n** (que já usas) é um tempo de execução oficial da forma A, com modelos prontos? | Sim: é o caminho mais barato para integrações pontuais |
 
+### Respostas do utilizador (2026-11-11) e consequências
+
+| # | Resposta | Consequência para o desenho |
+|---|---|---|
+| E1 | **Também terceiros/clientes** | O código de terceiros **não pode** correr no processo do CRM (§9). Nova forma **D — extensão empacotada com *runner* isolado** (§3.4): o código corre **fora** do backend, sem acesso à base de dados nem aos segredos do núcleo |
+| E2 | **Carregar pela interface** | Exige **pacotes assinados** (assinatura verificada contra chaves de editores que o administrador aprova), soma de verificação, pré-visualização das permissões antes de aceitar e **registo de auditoria**. Sem assinatura válida, o pacote não instala |
+| E3 | Coleções do SDK; tabelas próprias só na forma B | Mantém-se; a forma D **só** tem coleções do SDK |
+| E4 | Cifrar segredos em repouso na fase E0 | Mantém-se; passa a **pré-requisito** de qualquer instalação de pacotes |
+| E5, E6 | **Por responder** | Assumidos: um programa de faturação ativo por instalação; n8n como tempo de execução suportado |
+
+**Isto aumenta bastante o âmbito.** «Terceiros + carregar pela UI» é o caso mais exigente, e deve ser feito **por camadas**: primeiro a infraestrutura de confiança (assinatura, auditoria, âmbitos) e os pacotes que **não executam código** (forma C), depois o *runner* para código de terceiros (forma D). O ponto de partida continua a ser a API pública (E0), de que tudo depende.
+
 ---
 
 ## 2. O ponto de partida
@@ -65,6 +77,17 @@ Um pacote TypeScript com um manifesto, carregado pelo backend como módulo Nest 
 
 ### Forma C — Extensão declarativa (sem código)
 Um manifesto de dados que contribui: campos personalizados, tipos de item de trabalho, fluxos e passos, regras de automação, itens de menu, formulários de definições (gerados a partir de um esquema JSON), modelos de email/documentos. Como **não executa código**, é segura por construção e é a forma ideal de partilhar "um pacote de assistências para impressoras".
+
+### 3.4 Forma D — Extensão empacotada com *runner* isolado (para código de terceiros)
+
+Resposta à decisão E1: terceiros podem entregar **código**, mas ele **nunca corre no backend**.
+
+- O pacote (`.zip` com `extension.json` + código + assinatura) é carregado pela UI, validado e guardado.
+- Um serviço à parte, o **`extension-runner`** (contentor próprio, utilizador sem privilégios, sistema de ficheiros só de leitura, **sem credenciais da base de dados**, limites de CPU/memória, saída de rede **limitada aos domínios declarados** no manifesto), executa o código de cada extensão **num processo próprio**.
+- A extensão só comunica com o CRM pela **API pública** com uma **chave de âmbitos** criada para ela, e recebe eventos por RPC/webhook interno. É, na prática, a **forma A gerida pelo CRM**: mesmo modelo de segurança, mas instalável pela UI.
+- O CRM **não** monta o `docker.sock` nem lança contentores por pedido (daria controlo do servidor a quem comprometesse o backend): o *runner* é um serviço fixo que o administrador ativa no `docker-compose`; sem *runner* configurado, a UI aceita só pacotes sem código (forma C).
+- **Limite assumido:** isolamento de contentor é bem mais forte do que `vm`/*worker threads*, mas **não é perfeito** (depende do *kernel* e da configuração). É aceitável para extensões de editores aprovados, não para código anónimo. A ativação do *runner* deve vir com um aviso claro ao administrador.
+- A confirmar na implementação (não verifiquei): se o modelo de permissões do Node (`--permission`) está estável na versão usada (Node 22) e se serve como camada adicional dentro do *runner*.
 
 ---
 
@@ -175,7 +198,7 @@ Quando souberes o programa, o adaptador dele é um pacote pequeno que passa na m
 
 `descobrir → validar → instalar → ligar → (atualizar) → desligar → desinstalar`
 
-- **Descobrir:** pasta `extensions/` no servidor (volume Docker) — v1 (E2). Nada se descarrega da internet sozinho.
+- **Descobrir:** pasta `extensions/` no servidor (volume Docker) **e carregamento de pacote pela UI** (resposta E2, exige pacote assinado — fase E1b). Nada se descarrega da internet sozinho.
 - **Validar:** manifesto contra o esquema, compatibilidade de SDK, dependências, **soma de verificação** contra uma lista de permitidas definida pelo administrador.
 - **Instalar:** regista a extensão (`Extension`: id, versão, origem, estado, soma de verificação), corre as suas migrações. **Dados da extensão (E3):** por omissão no armazenamento do SDK (coleções em JSON, com índices nos campos declarados); a forma B pode ter tabelas próprias com o prefixo `ext_<id>_`, **nunca** a tocar nas do núcleo, com migrações registadas e ordenadas.
 - **Ligar/desligar:** reaproveita o registo de módulos (0a): rotas 404, tarefas não correm, gatilhos inativos, **dados mantidos**. Exige dependências.
@@ -192,6 +215,7 @@ Quando souberes o programa, o adaptador dele é um pacote pequeno que passa na m
 |---|---|---|
 | **Forma A** (integração externa) | **Real** | Chave com âmbitos, limites, revogação, assinatura dos webhooks; o conector corre fora |
 | **Forma C** (declarativa) | **Real** | Sem código; dados validados contra esquema |
+| **Forma D** (código de terceiros no *runner*) | **Forte, não perfeita** | Contentor sem privilégios, sem acesso à base de dados, rede limitada, chave de API com âmbitos; assinatura de pacotes. Mais fraca do que a forma A numa máquina à parte |
 | **Forma B** (código no processo) | **Nenhuma contra código malicioso** | Corre com os privilégios do backend: lê a base de dados, os segredos e a rede. Mitigação é **de confiança**, não técnica: só pasta controlada pelo administrador, lista de somas de verificação, revisão de código, e as `permissions` declaradas como auditoria |
 | Segredos das extensões | **Real, a implementar (E4)** | Campos `secret` cifrados em repouso (AES-GCM) com `SECRETS_KEY` fora da base de dados; nunca devolvidos pela API; mascarados na UI |
 | Falha de uma extensão | **Parcial** | `try/catch` e tempos-limite nas chamadas; disjuntor. **Não** protege de um ciclo infinito ou de consumo de memória (mesmo processo) |
@@ -211,6 +235,8 @@ Regra de ouro contra o *over-engineering*: **só se desenha um contrato depois d
 |---|---|---|---|
 | **E0 — API pública e eventos** | `/api/v1` + OpenAPI; **chaves de API** com âmbitos; idempotência; bus de eventos de domínio; **subscrições de webhook** assinadas com repetição e registo; `LigaçãoExterna`; **cifra de segredos em repouso**; registo de auditoria | 0a (feito) | E4 |
 | **E1 — Framework de extensões** | Manifesto + esquema; carregador (embutidas e da pasta `extensions/`); ciclo de vida; formulários de definições; SDK (`@opencrm/extension-sdk`); página **Extensões**; disjuntor | E0 | E1, E2, E3 |
+| **E1b — Confiança e pacotes** (decorre de E1/E2 do utilizador) | **Assinatura de pacotes** e lista de editores aprovados; carregar pacote **pela UI**; pré-visualização de permissões; auditoria; pacotes **declarativos** (forma C) instaláveis pela UI | E1 | E1, E2 |
+| **E1c — *Runner* isolado** | Serviço `extension-runner` (contentor), chaves de API por extensão, RPC de eventos, limites de recursos e de rede; **só depois** aceita pacotes com código de terceiros (forma D) | E1b | E1 |
 | **E2 — Dogfooding** | O **Zadarma** passa a adaptador de `TelephonyProvider`; os módulos embutidos passam a manifestos | E1 | — |
 | **E3 — Contrato de faturação** | Modelo canónico, *outbox*, reconciliação, UI de operação, **suite de conformidade**, adaptadores de referência (simulado e por ficheiros) | E1 + encomendas | E5 |
 | **E4 — Outros contratos** | `CarrierProvider`, `ShopConnector` (liga-se à API de encomendas), `MailTransport` | E1 | — |
@@ -229,6 +255,7 @@ Regra de ouro contra o *over-engineering*: **só se desenha um contrato depois d
 | **Segredos de terceiros em claro** | Agravam o problema que já existe | Cifra em repouso **antes** de haver extensões (E4) |
 | **Uma extensão a derrubar o CRM** | Mesmo processo na forma B | Disjuntor, tempos-limite, modo "arrancar sem extensões" (variável de ambiente) para recuperar |
 | **Complexidade operacional** | Mais peças (extensões, conectores, filas) | UI de operação desde o primeiro dia; registos e interruptores |
+| **Código de terceiros instalado pela UI** | É o caminho típico de comprometer o servidor (pacote malicioso, cadeia de fornecimento) | Forma D (fora do processo), assinatura obrigatória, editores aprovados, auditoria; sem *runner* só pacotes sem código |
 | **Âmbito** | Isto é um produto dentro do produto | Fases independentes; só E0–E1 são pré-requisito geral |
 | **HTTP sem TLS** | Chaves de API legíveis na rede | Resolver HTTPS antes de expor integrações fora da máquina |
 

@@ -352,3 +352,12 @@ Plano em [plano-tempo-real.md](plano-tempo-real.md). Estava previsto no `CLAUDE.
 **Validado no browser** (backend real, sessão do administrador no Kanban; alterações feitas por outra via, a API, como faria outra pessoa): um negócio criado apareceu no Kanban **sem recarregar** (o marcador da página ficou intacto), movê-lo de fase mudou-o de coluna sozinho, e uma tarefa criada fez a lista passar de 6 para 7. **Controlo:** uma empresa criada da mesma forma **não** apareceu na lista de empresas (3 linhas antes e depois, como desenhado) — o que mostra que as atualizações vêm do canal em tempo real e não de um refetch ao ganhar foco. Só 3 pedidos Socket.io em vários minutos (o handshake e a subida para WebSocket, sem *polling* contínuo); sem erros de consola. Dados de teste apagados (3 empresas e 6 tarefas, como antes). **Não testado no browser:** duas pessoas diferentes ao mesmo tempo (usei uma sessão e a API), o reconetar depois de o token expirar (15 min) e o arrasto com um aviso a chegar a meio.
 
 **Fora de âmbito / backlog:** notificações push/sonoras, presença ("quem está a ver este negócio"), edição colaborativa e resolução de conflitos, tempo real nas fichas de empresa/contacto, várias instâncias do backend (exigiria um adaptador Redis; hoje há uma só), e emitir quando a sincronização da Zadarma insere chamadas novas.
+
+## Extensões e API pública: decisões de desenho (2026-11-11)
+**Proposta em [plano-extensoes-e-api.md](plano-extensoes-e-api.md) (PR #28); nada implementado.**
+- O programa de faturação concreto deixa de ser relevante: o CRM define o contrato `BillingProvider` e cada programa é uma extensão.
+- Três formas de estender (externa via API, interna, declarativa) + forma D (código de terceiros num *runner* isolado, fora do backend).
+- **Terceiros podem instalar pacotes pela interface** (resposta do utilizador): exige pacotes assinados, editores aprovados, auditoria e *runner* isolado; sem *runner* só pacotes sem código.
+- Dados das extensões em coleções do SDK; tabelas próprias só na forma B.
+- Segredos de integrações (`EmailAccount.password`, `ZadarmaAccount.apiSecret`, hoje em claro) passam a ser cifrados em repouso na fase E0, antes de haver extensões.
+- Por decidir: E5 (um ou vários programas de faturação) e E6 (n8n como runtime suportado).
