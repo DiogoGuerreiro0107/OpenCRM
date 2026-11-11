@@ -62,6 +62,46 @@ Quem consiga ler a base de dados (uma cópia de segurança, um *dump*, um acesso
 | Rotação mal feita deixa valores indecifráveis | O comando só grava depois de decifrar com sucesso; falha por campo sem alterar o resto |
 | Falsa sensação de segurança | A cifra protege **cópias da base de dados**, não um atacante com o ambiente do backend (que tem a chave). Escrito no documento de segurança |
 
+## Pacote E0c — Chaves de API e `/api/v1` (plano, 2026-11-11)
+
+Base de tudo o que é «forma A» do [sistema de extensões](plano-extensoes-e-api.md): conectores de lojas, formulários, faturação e o n8n falam com o CRM por aqui, com credenciais **próprias** e de **âmbito limitado**, nunca com a sessão de uma pessoa.
+
+### O que entra (e o que fica de fora)
+- **Dentro:** chaves de API (criar, listar, revogar), guard próprio, âmbitos, limite por chave, idempotência, formato de erros único, política de versões, e **um conjunto mínimo de rotas reais** para provar o enquadramento: `GET /api/v1/ping`, leitura de empresas e contactos (cursor + `updated_since`) e `POST /api/v1/leads` (o caso típico de um formulário do site, que usa a idempotência).
+- **Fora (pacotes seguintes):** eventos e webhooks de saída (E0d), OpenAPI gerada e `LigaçãoExterna` (E0e), encomendas/produtos (módulos futuros). **Regra de dois:** não se desenham mais rotas públicas «por antecipação»; cada módulo novo acrescenta as suas à `v1`.
+
+### Decisões de desenho
+1. **Formato da chave:** `ocrm_` + 43 caracteres aleatórios (256 bits, base64url). Mostra-se **uma só vez**, ao criar. Na base de dados guarda-se só o **SHA-256** (a chave é aleatória e longa, por isso um hash rápido chega; `bcrypt` seria lento sem ganho) e um **prefixo** de 8 caracteres para o reconhecer na lista. Procura por hash com índice único.
+2. **Separação total das duas portas:** rotas `/api/v1` aceitam **só** chave de API (`Authorization: Bearer ocrm_…`); rotas da interface aceitam **só** JWT. Uma chave nunca abre a API da interface e um JWT nunca abre a `/api/v1`. Teste estrutural: toda a rota `/api/v1` tem `ApiKeyGuard` + `@Scopes(...)` e **nenhuma** tem `JwtAuthGuard`.
+3. **Âmbitos** declarados num registo único em código (`companies:read`, `contacts:read`, `leads:write`; cada módulo novo junta os seus). Criar uma chave com um âmbito desconhecido dá 400. Âmbito em falta → 403 (`insufficient_scope`, sem dizer que âmbitos existem).
+4. **Estados:** chave revogada, expirada ou inexistente → o mesmo **401** (não revela qual). `lastUsedAt` atualiza-se no máximo uma vez por minuto (não escreve na base de dados a cada pedido).
+5. **Limite por chave** (por omissão 120 pedidos/min, configurável 1–1000): janela deslizante em memória (uma só instância do backend, como já está documentado) → `429` com `Retry-After`. Pedidos recusados por falta de chave não consomem o limite de nenhuma chave (limitados por IP pelo limite global já existente).
+6. **Idempotência** (`Idempotency-Key`, em todo o `POST`; **obrigatória** em `POST /api/v1/leads`): a primeira chamada grava um registo `(chave de API, Idempotency-Key)` **antes** de executar; repetir o mesmo pedido devolve a **mesma resposta** guardada com o cabeçalho `Idempotent-Replayed: true`; a mesma `Idempotency-Key` com um corpo **diferente** dá `422` (`idempotency_key_reuse`); um pedido igual **ainda em curso** dá `409`. Registos duram 24 h (limpeza diária). Escopo por chave de API: duas integrações podem usar o mesmo texto sem colidir.
+7. **Erros:** `{ "error": { "code", "message", "details?" } }` com códigos estáveis (`invalid_request`, `unauthorized`, `insufficient_scope`, `not_found`, `conflict`, `idempotency_key_reuse`, `rate_limited`, `internal_error`). Só na `/api/v1`; a API da interface mantém o formato atual.
+8. **Paginação e sincronização:** cursor opaco (`createdAt`/`updatedAt`+`id`), `limit` 1–100, `updated_since` (ISO 8601) para sincronizar só o que mudou. Resposta `{ data: [...], next_cursor }`.
+9. **Forma pública estável:** as rotas `/api/v1` devolvem uma representação **escolhida à mão** (não o modelo da base de dados), para uma mudança interna não quebrar integrações. Campos só se **acrescentam** dentro da `v1`.
+10. **Política de versões:** dentro da `v1` só se acrescenta (campos, rotas, valores de enumerações **com aviso**); remover ou mudar o sentido exige `v2` e um período de descontinuação anunciado com cabeçalhos `Deprecation`/`Sunset`. Escrita em `docs/api-publica.md`.
+11. **Auditoria (E0b):** criar e revogar chaves são ações auditadas (`api_key.created`, `api_key.revoked`, com nome, âmbitos, expiração; nunca a chave). Só o Administrador gere chaves.
+12. **Efeitos dos pedidos de escrita:** `POST /api/v1/leads` faz o mesmo que criar um lead na interface (tarefa «Contactar lead», webhook `lead.created`, atualização em tempo real), com `source` por omissão `API: <nome da chave>` e a tarefa atribuída ao **utilizador que criou a chave** (uma chave não é uma pessoa). Respeita o interruptor do módulo de leads (`404` se estiver desligado).
+13. **Tempo real:** o interceptor de tempo real passa a reconhecer `/api/v1/<recurso>` (hoje veria «api» e a interface não atualizaria a lista de leads criada por uma integração).
+14. **Interface:** Configurações > **Chaves de API** (Administrador): lista (nome, prefixo, âmbitos, última utilização, expiração, estado), criar (nome, âmbitos, expiração opcional, limite) com a chave mostrada uma vez e botão de copiar, revogar.
+
+### Testes e validação
+- **Unitários:** geração/hash/formato da chave, registo de âmbitos, limitador por janela, cursor, mapeadores públicos.
+- **E2E:** chave válida/revogada/expirada/inexistente/formato errado (todas 401 iguais); JWT em `/api/v1` → 401 e chave na API da interface → 401; âmbito em falta → 403; limite por chave → 429 com `Retry-After`; idempotência (repetição devolve o mesmo, corpo diferente 422, concorrência 409, outra chave não colide); paginação por cursor e `updated_since`; formato de erros; módulo de leads desligado → 404; efeitos do `POST /leads` (tarefa, atribuição, `source`); a chave nunca aparece em respostas de listagem nem na auditoria; só o Administrador gere chaves.
+- **Estruturais:** o ponto 2; as rotas de gestão de chaves têm `@Audit`; classificação de módulos dos controllers novos.
+- **Prova por mutação:** remover a verificação de revogação, a de âmbito e a de corpo diferente na idempotência.
+- **Browser:** criar uma chave, copiá-la, usá-la com `curl`, ver a lista, revogar e confirmar que deixa de funcionar.
+
+### Riscos
+| Risco | Mitigação |
+|---|---|
+| **Chave em `http://` (sem TLS) é legível na rede** | Documentado; HTTPS é pré-requisito para expor integrações fora da máquina (backlog já existente). A chave só abre o âmbito que lhe deram |
+| Limite em memória perde-se ao reiniciar | Aceitável (só abranda abusos); uma só instância |
+| Idempotência com pedido a meio e crash do backend | O registo «em curso» expira (5 min) para a chamada poder ser repetida |
+| Superfície pública a crescer sem controlo | Regra de dois + política de versões + teste de que todas as rotas têm âmbito |
+| Chave de quem saiu da empresa | Chaves não pertencem a pessoas: revogam-se na página; a tarefa de lead vai para o criador (que pode ser reatribuída) |
+
 ## Pacote E0b — Registo de auditoria (feito, 2026-11-11)
 
 ### Desenho (como implementado)
