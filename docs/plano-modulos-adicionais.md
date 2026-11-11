@@ -1,6 +1,6 @@
 # Módulos adicionais (chat, atendimento, ponto, férias, mapas e rotas): viabilidade e plano (2026-11-11)
 
-**Estado: proposta para revisão. Nada disto está implementado.** Complementa o [registo de módulos](plano-fase-0-fundacoes.md) (Fase 0a), a [reorganização modular](plano-reorganizacao-modular.md) e o [sistema de extensões](plano-extensoes-e-api.md).
+**Estado: proposta para revisão (M1–M4 respondidas, ver §11). Nada disto está implementado.** Complementa o [registo de módulos](plano-fase-0-fundacoes.md) (Fase 0a), a [reorganização modular](plano-reorganizacao-modular.md) e o [sistema de extensões](plano-extensoes-e-api.md).
 
 **Pedido:** planear módulos novos (chat, atendimento, marcação de ponto, gestão de férias, mapas e rotas, «etc.»), todos **opcionais** e construídos sobre o sistema de módulos, e **confirmar se o sistema de módulos planeado os permite**.
 
@@ -255,6 +255,8 @@ Recomendação de ordem entre os cinco (a rever, decisão M2): **1.º férias + 
 ---
 
 ## 11. Decisões
+
+**Respondidas pelo utilizador (2026-11-11):** M1 caixa multicanal de clientes (leitura 1) · M2 férias + ponto → chat → mapas → atendimento · M3 ponto pessoal + quiosque opcional, **sem biometria e sem localização** (a posição opcional fica fora até haver validação jurídica) · M4 mapas público em desenvolvimento e **auto-alojado em produção**. **Por responder:** M5 (chat: administrador não lê mensagens privadas e construir o mínimo — assumido), M6 (`managerId` + âmbitos — assumido), M7 (outros módulos).
 
 | # | Decisão | A minha recomendação |
 |---|---|---|
