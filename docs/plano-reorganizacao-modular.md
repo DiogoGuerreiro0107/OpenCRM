@@ -34,6 +34,8 @@ Os módulos (Leads, Negócios, Produtos, Stock, Encomendas, Compras, Assistênci
 | D3 | Stock e faturação | **A faturação manda** no stock; o CRM guarda reservas e movimentos e reconcilia com relatório de divergências. **Falta saber qual é o programa de faturação** |
 | D8 | Por onde começar | **Fase 0 — Fundações** |
 
+**Atualização (2026-11-11):** o **programa de faturação concreto é irrelevante** nesta fase. O que importa é uma **API pública** estável e um **sistema de extensões** (add-ons/plugins), de modo a que o adaptador de qualquer programa de faturação seja um módulo à parte. Isto está desenhado em [plano-extensoes-e-api.md](plano-extensoes-e-api.md) (proposta, a rever) e **substitui** a dependência da decisão D3 («falta saber qual é o programa») pelo contrato `BillingProvider`. A regra «a faturação manda no stock» mantém-se.
+
 **Assumidas por mim (as recomendações), a rever:** D4 ligar/desligar módulos **por instalação** · D5 menu definido pelo administrador · D6 controlo de stock **opcional por produto** · D7 API de encomendas com formato neutro + adaptador por loja.
 
 ### Decisões que ainda faltam / estavam em aberto
@@ -184,7 +186,7 @@ Comparação das duas formas de guardar:
   - Manual: formulário no CRM.
   - **API de entrada** (`POST /api/v1/orders`): **chaves de API por integração** (guardadas com hash, com âmbitos — p. ex. só "criar encomendas" e "ler produtos" — revogáveis, com data de último uso), **idempotência** por `(origem, idExterno)` para uma loja poder repetir o pedido sem duplicar, validação estrita, `429` por chave, ligação de produtos por SKU e do cliente por NIF/email (criando ou ligando) e **webhooks de saída** quando o estado muda (a loja fica a saber que foi enviada). Documentada com OpenAPI.
   - **Segurança:** a API de integração é **separada** da API da interface (outras credenciais, outro conjunto de rotas e limites); nunca aceita JWT de utilizador; nunca devolve dados além do âmbito da chave.
-- **Faturação (D3):** definir uma **interface de adaptador** `ProvedorFaturacao` (empurrar encomenda/fatura, **ler stock**, **emitir ajustes**) e escrever o adaptador do **programa que usas** quando soubermos qual é. Regra de reconciliação: **uma fonte de verdade para o stock** (recomendo a faturação), o CRM guarda reservas e movimentos e uma **tarefa periódica** compara e **gera um relatório de divergências** em vez de corrigir silenciosamente. Sem saber o programa e a sua API, não é possível desenhar mais do que isto.
+- **Faturação (D3):** definir uma **interface de adaptador** `ProvedorFaturacao` (empurrar encomenda/fatura, **ler stock**, **emitir ajustes**) e escrever o adaptador do **programa que usas** quando soubermos qual é. Regra de reconciliação: **uma fonte de verdade para o stock** (recomendo a faturação), o CRM guarda reservas e movimentos e uma **tarefa periódica** compara e **gera um relatório de divergências** em vez de corrigir silenciosamente. **Atualização (2026-11-11):** não é preciso saber o programa. O CRM define o contrato (`BillingProvider`, modelo canónico, *outbox*, reconciliação, suite de conformidade) e o adaptador de cada programa é uma **extensão** — ver [plano-extensoes-e-api.md](plano-extensoes-e-api.md) §7.
 
 ### 3.8 Assistências
 
@@ -261,6 +263,8 @@ Cada fase usa o padrão **expandir → migrar → contrair** (acrescentar o novo
 | **9 — Extras** | os que escolheres de §4 (equipamentos/garantias, contratos e contadores, SLA, duplicados, CSV, auditoria…) | conforme | D8 |
 
 As fases 0–2 **não dependem** das decisões D2, D3 e D7, por isso podem começar assim que aprovares o desenho geral.
+
+**Faixa de extensões (proposta, ver [plano-extensoes-e-api.md](plano-extensoes-e-api.md) §10)** — corre em paralelo e encaixa assim: **E0** (API pública `/api/v1`, chaves de API, eventos e webhooks, cifra de segredos) **antes** da Fase 6 (a API de encomendas usa as chaves e a idempotência); **E1** (framework de extensões) **antes** da Fase 7; **E2** (Zadarma como primeiro adaptador) pode correr com a Fase 4. A Fase 7 passa a ser «contrato de faturação + adaptadores de referência», já não «adaptador do teu programa».
 
 ---
 
