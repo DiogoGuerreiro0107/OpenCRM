@@ -139,6 +139,7 @@ Estado atual: **todas as fases do roadmap consolidado e a revisão final conclu�
   - [x] Cópias de segurança automáticas e restauro validado — ver [docs/plano-backups.md](docs/plano-backups.md)
   - [x] Interface por papel: fichas só de consulta e botões escondidos conforme o papel — ver [docs/plano-ux-permissoes.md](docs/plano-ux-permissoes.md)
   - [x] Atualizações em tempo real (Socket.io): Kanban, tarefas, leads, dashboard, timeline e email atualizam sem recarregar — ver [docs/plano-tempo-real.md](docs/plano-tempo-real.md)
+  - [x] Módulos opcionais (Fase 0a da [reorganização modular](docs/plano-reorganizacao-modular.md)): leads, funis/negócios, email, telefonia e automações podem ser ligados/desligados em Configurações > Módulos, sem apagar dados — ver [docs/plano-fase-0-fundacoes.md](docs/plano-fase-0-fundacoes.md)
 
 ### Por fazer (backlog)
 
@@ -146,7 +147,7 @@ Decisões e limitações de cada ponto em [docs/decisoes.md](docs/decisoes.md):
 
 - HTTPS / Nginx / domínio interno (o acesso é por `http://IP:porta`)
 - Cópias de segurança fora do servidor e aviso quando uma cópia falha (hoje só se vê nos logs)
-- Produtos e orçamentos (decidir primeiro a relação com o projeto `globaltoner-orcamentos`)
+- Reorganização modular — **em curso**, por fases ([desenho](docs/plano-reorganizacao-modular.md)): fluxos genéricos, campos personalizados genéricos, leads por empresa/pessoa, itens de trabalho e agenda, produtos/stock, encomendas, assistências e orçamentos (o CRM passa a substituir o projeto `globaltoner-orcamentos`)
 - Migração de dados do Bitrix24 (precisa de uma exportação)
 - Validar a integração Zadarma com credenciais reais
 - Migrar NestJS 10→11 e React Router 6→7 (as 5 vulnerabilidades moderadas que restam exigem estes saltos de versão)
