@@ -41,15 +41,17 @@ Utilizador inicial criado pelo seed: `admin@globaltoner.local` / `admin123` (pap
 
 ```
 apps/
-  backend/         NestJS API (auth JWT+refresh, RBAC, Prisma)
-                    módulos: users, companies, contacts, timeline, pipelines, deals, tasks, email, email-templates, leads, custom-fields, webhooks, automations, dashboard, zadarma, integrations (só contratos)
+  backend/         NestJS API (auth JWT+refresh, RBAC por papel, Prisma, Socket.io)
+                    módulos: users, companies, contacts, timeline, pipelines, deals, tasks, email, email-templates, leads, custom-fields, webhooks, automations, dashboard, zadarma, realtime, integrations (só contratos)
+                    testes: unitários em src/**/*.spec.ts, e2e (Postgres real) em test/
   frontend/        React + Vite + Tailwind + shadcn/ui
-                    páginas: login, dashboard, leads, empresas, contactos, funis (kanban), tarefas (lista + calendário), email, configurações
+                    páginas: login, dashboard, leads, empresas, contactos, funis (kanban), tarefas (lista + calendário), email, configurações (incl. utilizadores)
   email-worker/    Sincronização IMAP (imapflow + mailparser), fala com o backend por HTTP
 packages/
   shared-types/    Tipos TypeScript partilhados
 scripts/
   dev-setup.mjs    Usado por 'pnpm dev' — ver secção de arranque rápido
+  backup/          Cópias de segurança e restauro (serviço 'backup' do docker-compose) — ver secção própria
 ```
 
 ## Cópias de segurança e restauro
@@ -133,5 +135,22 @@ Estado atual: **todas as fases do roadmap consolidado e a revisão final conclu�
   - [x] Integração Zadarma (click-to-call, histórico de chamadas/gravações por polling periódico — estrutura pronta, por validar com credenciais reais quando existirem)
   - [x] Gestão de utilizadores pela UI (criar, papel, desativar, passwords) — ver [docs/plano-gestao-utilizadores.md](docs/plano-gestao-utilizadores.md)
   - [x] Endurecimento: dependências sem vulnerabilidades altas/críticas, helmet + rate limiting + CORS restrito à rede local, permissões de escrita por papel, testes automáticos (unitários + e2e) e CI — ver [docs/plano-endurecimento.md](docs/plano-endurecimento.md)
+  - [x] Imagens Docker construíveis e arranque de produção validado de ponta a ponta — ver [docs/plano-docker-producao.md](docs/plano-docker-producao.md)
+  - [x] Cópias de segurança automáticas e restauro validado — ver [docs/plano-backups.md](docs/plano-backups.md)
+  - [x] Interface por papel: fichas só de consulta e botões escondidos conforme o papel — ver [docs/plano-ux-permissoes.md](docs/plano-ux-permissoes.md)
+  - [x] Atualizações em tempo real (Socket.io): Kanban, tarefas, leads, dashboard, timeline e email atualizam sem recarregar — ver [docs/plano-tempo-real.md](docs/plano-tempo-real.md)
+
+### Por fazer (backlog)
+
+Decisões e limitações de cada ponto em [docs/decisoes.md](docs/decisoes.md):
+
+- HTTPS / Nginx / domínio interno (o acesso é por `http://IP:porta`)
+- Cópias de segurança fora do servidor e aviso quando uma cópia falha (hoje só se vê nos logs)
+- Produtos e orçamentos (decidir primeiro a relação com o projeto `globaltoner-orcamentos`)
+- Migração de dados do Bitrix24 (precisa de uma exportação)
+- Validar a integração Zadarma com credenciais reais
+- Migrar NestJS 10→11 e React Router 6→7 (as 5 vulnerabilidades moderadas que restam exigem estes saltos de versão)
+- Tempo real nas fichas de empresa/contacto; várias instâncias do backend (exigiria Redis)
+
 
 Decisões de arquitetura de cada fase em [docs/decisoes.md](docs/decisoes.md).
