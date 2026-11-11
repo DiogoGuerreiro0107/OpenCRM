@@ -8,7 +8,9 @@ const RESOURCE_ALIASES: Record<string, string> = { stages: "pipelines" };
 
 /** Primeiro segmento do caminho: "/deals/123/move?x=1" -> "deals". */
 export function resourceOf(url: string): string | null {
-  const first = url.split("?")[0].split("/").filter(Boolean)[0];
+  const segments = url.split("?")[0].split("/").filter(Boolean);
+  // API pública: /api/v1/leads -> "leads" (as integrações escrevem nos mesmos recursos que a interface mostra).
+  const first = segments[0] === "api" && segments[1] === "v1" ? segments[2] : segments[0];
   if (!first || first === "auth") return null; // login/refresh/passwords não são alterações de dados do CRM
   return RESOURCE_ALIASES[first] ?? first;
 }

@@ -21,6 +21,8 @@ const ACTION_LABELS: Record<string, string> = {
   "automation.created": "Automação criada",
   "automation.updated": "Automação alterada",
   "automation.deleted": "Automação eliminada",
+  "api_key.created": "Chave de API criada",
+  "api_key.revoked": "Chave de API revogada",
   "secrets.encrypted": "Segredos cifrados (comando do sistema)",
 };
 
@@ -35,5 +37,6 @@ export const ACTION_GROUPS: Array<{ prefix: string; label: string }> = [
   { prefix: "pipeline.", label: "Funis" },
   { prefix: "custom_field.", label: "Campos personalizados" },
   { prefix: "automation.", label: "Automações" },
+  { prefix: "api_key.", label: "Chaves de API" },
   { prefix: "secrets.", label: "Segredos (sistema)" },
 ];

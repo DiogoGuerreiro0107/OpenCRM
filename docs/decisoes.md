@@ -412,3 +412,9 @@ O item "limite de tentativas de login por conta" andava no backlog desde o endur
 - Tabela `AuditEvent` só de acrescentar (*trigger* recusa UPDATE/DELETE); regista ações de administração (utilizadores, módulos, Zadarma, funis, campos, automações), eventos de passwords e o comando `secrets:encrypt`. **Não** regista trabalho do dia-a-dia, logins nem leituras.
 - Marcação explícita com `@Audit` + teste estrutural que obriga toda a rota de escrita só do Administrador a tê-la. Só campos de uma lista branca vão para os detalhes; chaves com nome de segredo são sempre removidas.
 - Limites assumidos: o dono da tabela pode desativar o *trigger*; o evento não vai na mesma transação da ação; sem política de conservação ainda.
+
+## Fase E0c: chaves de API e API pública /api/v1 (2026-11-11)
+- Chaves `ocrm_` + 256 bits aleatórios, mostradas uma vez; só o SHA-256 fica guardado. **Duas portas separadas**: `/api/v1` só aceita chaves, a interface só aceita login (teste estrutural). Âmbitos num registo único; limite por chave (janela deslizante em memória); chave inexistente, revogada ou expirada dão o mesmo 401.
+- **Idempotência** com `Idempotency-Key` (obrigatório em `POST /leads`, escopo por chave, 24 h): repetir devolve a mesma resposta, corpo diferente 422, concorrência 409; só respostas bem-sucedidas ficam guardadas.
+- Contrato em **snake_case**, representações escritas à mão, erros `{ error: { code, message, details? } }`; dentro da v1 só se acrescenta (política em `docs/api-publica.md`).
+- Criar/revogar chaves é auditado (sem a chave). Tarefas de leads criados por uma chave ficam para quem a criou. Limites assumidos: limitador em memória; HTTP sem TLS expõe a chave na rede.

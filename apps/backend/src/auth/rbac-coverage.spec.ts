@@ -5,6 +5,7 @@ import { RequestMethod } from "@nestjs/common";
 import { Role } from "@prisma/client";
 import { ROLES_KEY, WRITE_ROLES_KEY } from "./decorators/roles.decorator";
 import { InternalApiKeyGuard } from "./guards/internal-api-key.guard";
+import { ApiKeyGuard } from "../public-api/api-key.guard";
 import { JwtAuthGuard } from "./guards/jwt-auth.guard";
 import { RolesGuard } from "./guards/roles.guard";
 import { WRITE_ACCESS } from "./permissions";
@@ -79,6 +80,7 @@ describe("cobertura de permissões nos controllers", () => {
     const problems: string[] = [];
     for (const route of writes) {
       if (route.guards.includes(InternalApiKeyGuard)) continue; // email-worker, chave interna
+      if (route.guards.includes(ApiKeyGuard)) continue; // API pública: coberta por public-api-coverage.spec.ts
       if (route.controllerPath === "auth") continue; // login/refresh/reset: sem sessão por definição
 
       if (!route.guards.includes(JwtAuthGuard)) problems.push(`${route.label}: falta JwtAuthGuard`);
@@ -91,7 +93,11 @@ describe("cobertura de permissões nos controllers", () => {
   it("nenhuma rota de leitura autenticada fica sem JwtAuthGuard (exceto as públicas conhecidas)", () => {
     // A chave interna (email-worker) é a única alternativa aceite ao JWT numa rota de leitura.
     const publicReads = routes.filter(
-      (r) => r.httpMethod === RequestMethod.GET && !r.guards.includes(JwtAuthGuard) && !r.guards.includes(InternalApiKeyGuard),
+      (r) =>
+        r.httpMethod === RequestMethod.GET &&
+        !r.guards.includes(JwtAuthGuard) &&
+        !r.guards.includes(InternalApiKeyGuard) &&
+        !r.guards.includes(ApiKeyGuard),
     );
     expect(publicReads.map((r) => r.label)).toEqual([]);
   });

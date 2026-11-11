@@ -54,6 +54,10 @@ scripts/
   backup/          Cópias de segurança e restauro (serviço 'backup' do docker-compose) — ver secção própria
 ```
 
+## API pública para integrações
+
+O CRM tem uma API pública estável em `/api/v1` (leitura de empresas e contactos, criação de leads a partir de formulários) para lojas online, o n8n e outros sistemas. Cada integração usa uma **chave de API** própria, criada em **Configurações > Chaves de API** (só Administrador), com os âmbitos mínimos e revogável a qualquer momento. Contrato, erros, idempotência e política de versões: [docs/api-publica.md](docs/api-publica.md). **Usa estas chaves só em redes de confiança enquanto o CRM não tiver HTTPS.**
+
 ## Cópias de segurança e restauro
 
 O `docker compose up -d` arranca também o serviço `backup`: faz uma cópia ao arrancar e depois a cada 24 h, para a pasta `./backups/` do servidor — `db/opencrm-AAAAMMDD-HHMMSS.dump` (base de dados) e `files/minio-AAAAMMDD-HHMMSS.tar.gz` (anexos dos emails). Mantém 14 dias e verifica cada cópia depois de a fazer (uma cópia ilegível é descartada e o erro fica nos logs). Configurável no `.env`: `BACKUP_DIR`, `BACKUP_INTERVAL_HOURS`, `BACKUP_KEEP_DAYS`.

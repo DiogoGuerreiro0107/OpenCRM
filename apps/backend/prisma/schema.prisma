@@ -37,6 +37,7 @@ model User {
   ownedCompanies      Company[]
   ownedContacts       Contact[]
   auditEvents         AuditEvent[]
+  apiKeys             ApiKey[]
 }
 
 enum TimelineEventType {
@@ -539,4 +540,44 @@ model AuditEvent {
   @@index([createdAt(sort: Desc)])
   @@index([actorId, createdAt(sort: Desc)])
   @@index([action, createdAt(sort: Desc)])
+}
+
+// Chaves de API para integrações (E0c, docs/plano-e0-api-publica.md). Só o SHA-256 da chave fica guardado.
+model ApiKey {
+  id                 String              @id @default(uuid())
+  name               String
+  /// Primeiros caracteres da chave, só para a reconhecer na lista.
+  prefix             String
+  keyHash            String              @unique
+  scopes             String[]
+  rateLimitPerMinute Int                 @default(120)
+  /// Quem criou a chave: as tarefas criadas por esta chave (p. ex. «Contactar lead») são atribuídas a esta pessoa.
+  createdById        String
+  createdBy          User                @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt          DateTime            @default(now())
+  expiresAt          DateTime?
+  lastUsedAt         DateTime?
+  revokedAt          DateTime?
+  idempotencyRecords IdempotencyRecord[]
+
+  @@index([createdAt])
+}
+
+// Pedidos da API pública já executados, para repetições com o mesmo Idempotency-Key devolverem a mesma resposta.
+model IdempotencyRecord {
+  id           String    @id @default(uuid())
+  apiKeyId     String
+  apiKey       ApiKey    @relation(fields: [apiKeyId], references: [id], onDelete: Cascade)
+  key          String
+  method       String
+  path         String
+  requestHash  String
+  /// null = ainda em curso
+  status       Int?
+  responseBody Json?
+  createdAt    DateTime  @default(now())
+  completedAt  DateTime?
+
+  @@unique([apiKeyId, key])
+  @@index([createdAt])
 }

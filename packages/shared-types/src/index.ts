@@ -389,3 +389,30 @@ export interface AuditPage {
   items: AuditEvent[];
   nextCursor: string | null;
 }
+
+export type ApiKeyStatus = "active" | "expired" | "revoked";
+
+/** Chave de API na página de gestão (Administrador). Nunca inclui a chave nem o hash. */
+export interface ApiKeyView {
+  id: string;
+  name: string;
+  prefix: string;
+  scopes: string[];
+  rateLimitPerMinute: number;
+  createdById: string;
+  createdAt: string;
+  expiresAt: string | null;
+  lastUsedAt: string | null;
+  revokedAt: string | null;
+  status: ApiKeyStatus;
+}
+
+/** Resposta de criar: a chave completa só existe aqui, uma única vez. */
+export interface CreatedApiKey extends ApiKeyView {
+  key: string;
+}
+
+export interface ApiScopeInfo {
+  scope: string;
+  description: string;
+}

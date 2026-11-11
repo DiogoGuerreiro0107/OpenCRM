@@ -2,6 +2,7 @@ import { Injectable, Logger } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { QueryAuditDto } from "./dto/query-audit.dto";
+import { decodeCursor, encodeCursor } from "../common/cursor";
 
 export interface RecordAuditInput {
   action: string;
@@ -91,14 +92,5 @@ export class AuditService {
   }
 }
 
-export function encodeCursor(createdAt: Date, id: string): string {
-  return Buffer.from(`${createdAt.toISOString()}|${id}`).toString("base64url");
-}
-
-export function decodeCursor(cursor: string | undefined): { createdAt: Date; id: string } | null {
-  if (!cursor) return null;
-  const [iso, id] = Buffer.from(cursor, "base64url").toString("utf8").split("|");
-  const createdAt = new Date(iso);
-  if (!id || Number.isNaN(createdAt.getTime())) return null;
-  return { createdAt, id };
-}
+// O cursor passou para common/cursor.ts (partilhado com a API pública); reexportado por compatibilidade.
+export { decodeCursor, encodeCursor };

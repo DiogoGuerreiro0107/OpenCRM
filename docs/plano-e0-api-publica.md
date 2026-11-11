@@ -102,6 +102,25 @@ Base de tudo o que é «forma A» do [sistema de extensões](plano-extensoes-e-a
 | Superfície pública a crescer sem controlo | Regra de dois + política de versões + teste de que todas as rotas têm âmbito |
 | Chave de quem saiu da empresa | Chaves não pertencem a pessoas: revogam-se na página; a tarefa de lead vai para o criador (que pode ser reatribuída) |
 
+### Execução do pacote E0c (2026-11-11)
+
+**Desvios ao plano acima (a registar):**
+- **snake_case em toda a API pública** (campos, parâmetros `updated_since`, `next_cursor`, corpos): decidido durante a implementação; desacopla o contrato público dos nomes internos (que são camelCase). O plano falava em `updated_since`/`next_cursor` mas deixava o resto por definir.
+- `POST /api/v1/leads` **ignora** campos desconhecidos (validação do Nest com lista branca) em vez de os recusar; um `status` ou `responsavelId` enviado não tem efeito.
+- A regra «**toda a rota de escrita é `@Idempotent`**» ficou num teste estrutural (o plano só a exigia em `/leads`).
+- Os três controllers da `/api/v1` vivem em ficheiros `*.controller.ts` separados (para os testes estruturais existentes os descobrirem).
+- O cursor passou a `common/cursor.ts`, partilhado com a auditoria.
+
+**Validação:**
+- 215 unitários e 277 e2e a passar; migração sem desvio contra o `schema.prisma` (`prisma migrate diff`); builds OK.
+- **Prova por mutação:** retirar a verificação de revogação, a de âmbito e a comparação do corpo na idempotência faz falhar quatro testes e2e.
+- **Browser + `curl`** (backend real, base de testes descartável): criar a chave pela interface (mostrada uma vez, copiar), `ping`, leitura com âmbito certo e `403` sem ele, `POST /leads` (`201`; repetição com `Idempotent-Replayed: true`; corpo diferente `422`; sem cabeçalho `400`; email inválido `400`), módulo de leads desligado (`404`), revogar na interface e a chave deixar de funcionar (`401`). A auditoria mostra criação e revogação sem a chave.
+- Um segundo achado do teste estrutural de segredos: campos com nome «apiKey» que são relações, não segredos; registados como exceções justificadas.
+
+**Não testado:** o limite por chave sob carga real e com o backend reiniciado (só e2e); idempotência com dois backends (só há um); o botão «Copiar» com permissões de área de transferência negadas; chaves com `expiresAt` pela interface (só e2e).
+
+**Limites assumidos:** o limitador é em memória (perde-se ao reiniciar); chaves viajam em claro em `http://`; se a gravação do resultado idempotente falhar depois de o pedido ter sucesso, o registo fica «em curso» e a repetição recebe `409` até expirar (5 min), preferido a duplicar.
+
 ## Pacote E0b — Registo de auditoria (feito, 2026-11-11)
 
 ### Desenho (como implementado)
@@ -132,6 +151,6 @@ Base de tudo o que é «forma A» do [sistema de extensões](plano-extensoes-e-a
 ## Registo de execução
 - [x] E0a — Segredos em repouso (ver «Execução» abaixo)
 - [x] E0b — Registo de auditoria (ver «Pacote E0b» abaixo)
-- [ ] E0c — Chaves de API e `/api/v1`
+- [x] E0c — Chaves de API e `/api/v1` (ver «Execução do pacote E0c»)
 - [ ] E0d — Eventos de domínio e webhooks
 - [ ] E0e — OpenAPI e `LigaçãoExterna`
