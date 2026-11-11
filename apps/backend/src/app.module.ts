@@ -21,6 +21,7 @@ import { DashboardModule } from "./dashboard/dashboard.module";
 import { AutomationsModule } from "./automations/automations.module";
 import { ZadarmaModule } from "./zadarma/zadarma.module";
 import { RealtimeModule } from "./realtime/realtime.module";
+import { ModulesModule } from "./modules/modules.module";
 import { RealtimeInterceptor } from "./realtime/realtime.interceptor";
 
 @Module({
@@ -48,6 +49,7 @@ import { RealtimeInterceptor } from "./realtime/realtime.interceptor";
     AutomationsModule,
     ZadarmaModule,
     RealtimeModule,
+    ModulesModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

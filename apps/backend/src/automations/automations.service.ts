@@ -4,6 +4,7 @@ import { AutomationRule, Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { WebhooksService } from "../webhooks/webhooks.service";
 import { RealtimeService } from "../realtime/realtime.service";
+import { ModulesService } from "../modules/modules.service";
 import { CreateAutomationRuleDto } from "./dto/create-automation-rule.dto";
 import { UpdateAutomationRuleDto } from "./dto/update-automation-rule.dto";
 
@@ -20,7 +21,13 @@ export class AutomationsService {
     private readonly prisma: PrismaService,
     private readonly webhooks: WebhooksService,
     private readonly realtime: RealtimeService,
+    private readonly modules: ModulesService,
   ) {}
+
+  /** As regras atuais só atuam sobre negócios: precisam do módulo de automações E do de negócios ativos. */
+  private active() {
+    return this.modules.isEnabled("automations") && this.modules.isEnabled("deals");
+  }
 
   findAll() {
     return this.prisma.automationRule.findMany({ orderBy: { createdAt: "desc" }, include: RULE_INCLUDE });
@@ -61,6 +68,7 @@ export class AutomationsService {
   /** Corre periodicamente: negócios parados há X dias numa fase. */
   @Cron(CronExpression.EVERY_HOUR)
   async evaluateIdleRules() {
+    if (!this.active()) return;
     const rules = await this.prisma.automationRule.findMany({
       where: { active: true, triggerType: "STAGE_IDLE_TIME" },
     });
@@ -83,6 +91,7 @@ export class AutomationsService {
 
   /** Chamado quando uma tarefa é concluída, para reavaliar regras "tarefas concluídas". */
   async evaluateTaskCompletedRules(dealId: string) {
+    if (!this.active()) return;
     const deal = await this.prisma.deal.findUnique({ where: { id: dealId } });
     if (!deal) return;
 
@@ -103,7 +112,7 @@ export class AutomationsService {
     pipelineId: string,
     changes: Record<string, { before: unknown; after: unknown }>,
   ) {
-    if (Object.keys(changes).length === 0) return;
+    if (!this.active() || Object.keys(changes).length === 0) return;
 
     const rules = await this.prisma.automationRule.findMany({
       where: {
