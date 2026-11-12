@@ -62,6 +62,37 @@ Quem consiga ler a base de dados (uma cópia de segurança, um *dump*, um acesso
 | Rotação mal feita deixa valores indecifráveis | O comando só grava depois de decifrar com sucesso; falha por campo sem alterar o resto |
 | Falsa sensação de segurança | A cifra protege **cópias da base de dados**, não um atacante com o ambiente do backend (que tem a chave). Escrito no documento de segurança |
 
+## Pacote E0d — Eventos e webhooks de saída (plano, 2026-11-12)
+
+Hoje o CRM avisa o n8n por **um único URL** (`N8N_WEBHOOK_URL`), sem assinatura, sem repetição e sem registo: se o n8n estiver em baixo, o evento perde-se e ninguém fica a saber. Este pacote generaliza isso para **subscrições de webhook** geridas na interface, que é como os conectores da «forma A» (lojas, faturação, n8n) ficam a saber do que acontece no CRM.
+
+### O que entra (e o que fica de fora)
+- **Dentro:** subscrições (URL, eventos, segredo), **assinatura HMAC**, **fila de entregas persistente** com repetição e recuo, **registo de entregas**, reenvio manual, desativação automática de destinos que falham sempre, página de gestão, documentação do contrato.
+- **Fora:** um *bus* de eventos **dentro do processo** para módulos subscreverem (não há ainda nenhum consumidor; entra com o primeiro, na E1 — regra de dois); eventos novos para além dos que já existem (cada módulo acrescenta os seus); garantia «exatamente uma vez» (não existe em webhooks: a garantia é **pelo menos uma vez**, com `id` para o consumidor deduplicar).
+
+### Decisões de desenho
+1. **Ponto único de publicação:** mantém-se `WebhooksService.trigger(evento, dados)` (as chamadas existentes não mudam). Passa a fazer duas coisas: (a) o envio antigo para `N8N_WEBHOOK_URL`, **tal como hoje** (compatibilidade; marcado como legado na documentação); (b) criar uma **entrega** por cada subscrição ativa que queira esse evento.
+2. **Envelope estável** (snake_case, como a API pública): `{ "id", "type", "version": 1, "occurred_at", "data": {…} }`. O `id` é o do **evento** (igual em todas as subscrições e em todas as repetições), para o consumidor deduplicar. Os dados são os que já hoje vão para o n8n, com as chaves convertidas para snake_case.
+3. **Assinatura:** cabeçalho `X-OpenCRM-Signature: t=<unix>,v1=<hex>` com HMAC-SHA256 de `"<t>.<corpo>"` e o segredo da subscrição (o carimbo de tempo entra na assinatura para o consumidor poder recusar repetições antigas). Também `X-OpenCRM-Event`, `X-OpenCRM-Delivery` e `User-Agent`.
+4. **Segredo por subscrição** (`whsec_…`, 256 bits), gerado pelo CRM, **mostrado uma vez** e rodável. Como é preciso para assinar, guarda-se **cifrado** (E0a: `WebhookSubscription.secret` entra em `SECRET_FIELDS` e no comando `secrets:encrypt`).
+5. **Fila persistente** (`WebhookDelivery`): a entrega grava-se na base de dados **antes** de se tentar enviar; tenta-se logo a seguir e, se falhar, um agendador repete com recuo **1 min → 5 min → 30 min → 2 h → 6 h** (com variação aleatória de ±20%), no máximo **6 tentativas**; depois fica **falhada** e visível, com botão «reenviar». Sucesso = resposta `2xx` em 10 s. **Não segue redirecionamentos.**
+6. **Uma só entrega de cada vez por linha:** antes de enviar, a entrega é «reservada» com uma atualização atómica (evita que a tentativa imediata e o agendador a enviem em duplicado).
+7. **Disjuntor:** uma subscrição com **20 falhas seguidas** é desativada automaticamente (fica dito na página e na auditoria); um sucesso repõe a contagem. Reativar é manual.
+8. **Eventos:** os que já existem (`lead.created`, `deal.created`, `deal.stage_changed`, `deal.proposal_sent`, `automation.deal_moved`, `automation.triggered` e os nomes personalizados das automações) mais `webhook.test`. Uma subscrição escolhe uma lista ou `*` (todos).
+9. **Gestão só do Administrador, auditada** (`webhook.created/updated/deleted/secret_rotated/test_sent/delivery_retried`, e `webhook.auto_disabled` como ação do sistema). O registo de entregas guarda o estado HTTP e um erro curto, **nunca o corpo da resposta** do destino.
+10. **URLs:** só `http`/`https`, sem credenciais no URL. **Endereços privados são permitidos** (o n8n está na rede local; é o caso de uso principal); só o Administrador os configura.
+
+### Limites assumidos
+- **Não é um *outbox* transacional:** o evento é publicado **depois** da escrita principal, não na mesma transação. Se o backend cair nesse intervalo, o evento perde-se (como hoje). A partir do momento em que a entrega está gravada, já não se perde. Mover a publicação para dentro das transações fica para quando houver um consumidor que o exija (faturação, E3).
+- **Pelo menos uma vez**, ordem não garantida entre eventos (uma repetição pode chegar depois de um evento mais recente): o consumidor usa `id` e `occurred_at`.
+- Uma só instância do backend (o agendador não é distribuído).
+
+### Testes e validação
+- **Unitários:** assinatura (vetor fixo, adulteração, segredo errado), recuo e variação, conversão para snake_case, correspondência de eventos (`*`), validação de URL.
+- **E2E com um servidor HTTP local de teste:** entrega com assinatura verificável; só eventos subscritos; subscrição inativa não recebe; falha → repete com recuo; esgotar tentativas → falhada; reenvio manual; disjuntor; rodar o segredo muda a assinatura; segredo cifrado na base de dados e nunca devolvido depois da criação; não segue redirecionamentos; tempo-limite; permissões e auditoria; o envio legado para o n8n continua igual.
+- **Prova por mutação:** assinar com outro segredo; ignorar o filtro de eventos; não reservar a entrega (duplicados).
+- **Browser:** criar subscrição para um servidor local, disparar o teste e um evento real (criar lead), ver as entregas, simular falha e reenviar.
+
 ## Pacote E0c — Chaves de API e `/api/v1` (plano, 2026-11-11)
 
 Base de tudo o que é «forma A» do [sistema de extensões](plano-extensoes-e-api.md): conectores de lojas, formulários, faturação e o n8n falam com o CRM por aqui, com credenciais **próprias** e de **âmbito limitado**, nunca com a sessão de uma pessoa.
