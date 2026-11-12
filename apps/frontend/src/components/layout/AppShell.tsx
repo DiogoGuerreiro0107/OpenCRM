@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
-import { Building2, CheckSquare, FileText, KanbanSquare, LayoutDashboard, KeyRound, Mail, Phone, Puzzle, ScrollText, Settings, UserCog, UserPlus, Users, Zap, type LucideIcon } from "lucide-react";
+import { Building2, CheckSquare, FileText, KanbanSquare, LayoutDashboard, KeyRound, Mail, Phone, Puzzle, ScrollText, Settings, UserCog, UserPlus, Users, Webhook, Zap, type LucideIcon } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
 import { PasswordDialog } from "@/components/PasswordDialog";
@@ -31,6 +31,7 @@ const settingsItems: Array<{ to: string; label: string; icon: LucideIcon; roles:
   { to: "/configuracoes/zadarma", label: "Zadarma", icon: Phone, roles: ADMIN_ONLY, module: "zadarma" },
   { to: "/configuracoes/modulos", label: "Módulos", icon: Puzzle, roles: ADMIN_ONLY },
   { to: "/configuracoes/chaves-api", label: "Chaves de API", icon: KeyRound, roles: ADMIN_ONLY },
+  { to: "/configuracoes/webhooks", label: "Webhooks", icon: Webhook, roles: ADMIN_ONLY },
   { to: "/configuracoes/auditoria", label: "Auditoria", icon: ScrollText, roles: ADMIN_ONLY },
 ];
 

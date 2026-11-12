@@ -8,6 +8,7 @@
 export const SECRET_FIELDS = [
   { model: "EmailAccount", field: "password", table: "EmailAccount" },
   { model: "ZadarmaAccount", field: "apiSecret", table: "ZadarmaAccount" },
+  { model: "WebhookSubscription", field: "secret", table: "WebhookSubscription" },
 ] as const;
 
 export const secretContext = (model: string, field: string) => `${model}.${field}`;
