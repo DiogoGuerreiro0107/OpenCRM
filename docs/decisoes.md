@@ -418,3 +418,10 @@ O item "limite de tentativas de login por conta" andava no backlog desde o endur
 - **Idempotência** com `Idempotency-Key` (obrigatório em `POST /leads`, escopo por chave, 24 h): repetir devolve a mesma resposta, corpo diferente 422, concorrência 409; só respostas bem-sucedidas ficam guardadas.
 - Contrato em **snake_case**, representações escritas à mão, erros `{ error: { code, message, details? } }`; dentro da v1 só se acrescenta (política em `docs/api-publica.md`).
 - Criar/revogar chaves é auditado (sem a chave). Tarefas de leads criados por uma chave ficam para quem a criou. Limites assumidos: limitador em memória; HTTP sem TLS expõe a chave na rede.
+
+## Fase E0d: eventos e webhooks de saída (2026-11-12)
+- `WebhooksService.trigger()` continua a ser o ponto único de publicação; além do envio legado para `N8N_WEBHOOK_URL` (inalterado), cria uma **entrega persistente** por cada subscrição que queira o evento.
+- Envelope `{ id, type, version, occurred_at, data }` em snake_case; assinatura `X-OpenCRM-Signature: t=…,v1=…` (HMAC-SHA256 de `t.corpo`); segredo por subscrição, mostrado uma vez e **cifrado em repouso**.
+- Repetição 1 min → 5 min → 30 min → 2 h → 6 h (6 tentativas), reserva atómica contra duplicados, disjuntor às 20 falhas seguidas, reenvio manual, sem seguir redirecionamentos, sem guardar o corpo da resposta.
+- Garantia **pelo menos uma vez** (o consumidor deduplica pelo `id`). **Não é um outbox transacional**: o evento é publicado depois da escrita principal; fica para quando a faturação o exigir.
+- Um *bus* de eventos dentro do processo ficou de fora até haver um consumidor (regra de dois).

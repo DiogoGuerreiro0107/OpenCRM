@@ -2,7 +2,7 @@
 
 API para sistemas externos (loja online, formulários do site, n8n, programas de faturação) falarem com o CRM. É **separada** da API que a interface usa: outras credenciais, outras rotas, outras garantias. Desenho e decisões: [plano-e0-api-publica.md](plano-e0-api-publica.md) (pacote E0c).
 
-> **Estado:** primeira versão, só com o enquadramento e três recursos (`companies`, `contacts`, `leads`). Cada módulo novo acrescenta as suas rotas aqui. A especificação OpenAPI gerada e os webhooks de saída chegam nos pacotes E0d/E0e.
+> **Estado:** primeira versão, só com o enquadramento e três recursos (`companies`, `contacts`, `leads`). Cada módulo novo acrescenta as suas rotas aqui. Os webhooks de saída estão descritos abaixo; a especificação OpenAPI gerada chega no pacote E0e.
 
 ## Autenticação
 
@@ -91,6 +91,64 @@ curl -X POST http://IP-DO-CRM:3000/api/v1/leads \
 Corpo: `name` (obrigatório), `company_name`, `phone`, `email`, `source` (por omissão «API: <nome da chave>»), `interest`, `notes`. Outros campos são ignorados: uma integração **não escolhe** o estado nem o responsável (o lead entra como `NOVO`). Resposta `201` com o lead (`id`, `name`, `company_name`, `phone`, `email`, `source`, `interest`, `status`, `notes`, `created_at`, `updated_at`).
 
 Efeitos (iguais a criar um lead na interface): fica criada a tarefa «Contactar lead», atribuída a **quem criou a chave**; é disparado o webhook `lead.created` para o n8n (se configurado); a lista de leads atualiza-se nos browsers abertos.
+
+## Webhooks (o CRM avisa o teu sistema)
+
+Em vez de perguntares à API «há novidades?», o CRM chama um endereço teu quando algo acontece. Um Administrador cria a subscrição em **Configurações > Webhooks** (nome, URL de destino, eventos) e recebe um **segredo de assinatura** (`whsec_…`), mostrado **uma única vez**.
+
+### O que recebes
+Um `POST` com `Content-Type: application/json` e este envelope:
+
+```json
+{
+  "id": "0b1f7c2e-5a0e-4f7e-9a53-2f1c8d0a7e11",
+  "type": "lead.created",
+  "version": 1,
+  "occurred_at": "2026-11-12T10:00:00.000Z",
+  "data": { "lead_id": "…", "name": "Maria Silva", "company_name": "Exemplo Lda", "email": "maria@exemplo.pt", "phone": "912345678", "source": "API: Formulário do site" }
+}
+```
+
+Cabeçalhos: `X-OpenCRM-Event` (o tipo), `X-OpenCRM-Delivery` (id desta entrega), `X-OpenCRM-Signature` e `User-Agent: OpenCRM-Webhooks/1`.
+
+| Evento | Quando | `data` |
+|---|---|---|
+| `lead.created` | lead criado (interface ou API) | `lead_id`, `name`, `company_name`, `email`, `phone`, `source` |
+| `deal.created` | negócio criado | `deal_id`, `title`, `value`, `pipeline_id`, `stage_id`, `stage_name` |
+| `deal.stage_changed` | negócio mudou de fase | `deal_id`, `title`, `pipeline_id`, `from_stage_id`, `from_stage_name`, `to_stage_id`, `to_stage_name`, `to_stage_type` |
+| `deal.proposal_sent` | negócio entrou em «Proposta enviada» | `deal_id`, `title`, `pipeline_id`, `stage_id` |
+| `automation.deal_moved` | uma automação moveu um negócio | `deal_id`, `rule_id`, `rule_name`, `to_stage_id`, `to_pipeline_id` |
+| `automation.triggered` (ou o nome que deres na regra) | uma automação disparou um webhook | `deal_id`, `rule_id`, `rule_name` |
+| `webhook.test` | botão «Enviar teste» | `message`, `subscription_name` |
+
+Uma subscrição escolhe uma lista de eventos ou **todos** (`*`), o que inclui os que vierem a existir. Se uma regra de automação usar um nome de evento próprio fora do formato `recurso.acao` (minúsculas, com ponto), só as subscrições com `*` o recebem.
+
+### Confirmar que o aviso vem do CRM (assinatura)
+`X-OpenCRM-Signature: t=<unix>,v1=<hex>`, em que `v1` é o HMAC-SHA256, com o teu segredo, do texto `"<t>.<corpo exatamente como chegou>"`. Verifica **sempre** e recusa carimbos com mais de 5 minutos (evita que um pedido capturado seja repetido mais tarde):
+
+```js
+const crypto = require("crypto");
+
+function vemDoCrm(segredo, corpoEmTexto, cabecalho) {
+  const m = /^t=(\d+),v1=([0-9a-f]{64})$/.exec(cabecalho ?? "");
+  if (!m || Math.abs(Date.now() / 1000 - Number(m[1])) > 300) return false;
+  const esperado = crypto.createHmac("sha256", segredo).update(`${m[1]}.${corpoEmTexto}`).digest();
+  const recebido = Buffer.from(m[2], "hex");
+  return recebido.length === esperado.length && crypto.timingSafeEqual(recebido, esperado);
+}
+```
+
+Usa o corpo **em bruto** (antes de o converteres de JSON): reserializar muda os bytes e a assinatura deixa de bater.
+
+### Entrega, repetição e duplicados
+- Responde **`2xx` em menos de 10 segundos**. Faz o trabalho pesado depois de responderes. Qualquer outra resposta (incluindo redirecionamentos, que **não são seguidos**) conta como falha.
+- Em caso de falha o CRM volta a tentar ao fim de cerca de **1 min, 5 min, 30 min, 2 h e 6 h** (6 tentativas no total); depois a entrega fica **falhada** e um Administrador pode **reenviá-la** na página.
+- A garantia é **pelo menos uma vez**: podes receber o mesmo evento mais de uma vez (repetições, reenvios). **Deduplica pelo `id` do envelope**, que é igual em todas as repetições. A ordem entre eventos não é garantida: usa `occurred_at`.
+- Um destino com **20 falhas seguidas** é desativado automaticamente (fica dito na página e na auditoria); reativa-se à mão depois de corrigido.
+- Se o backend do CRM for abaixo no instante exato entre gravar a alteração e registar o evento, esse evento perde-se. É raro, mas para dados críticos complementa os webhooks com uma sincronização periódica por `updated_since`.
+
+### Variável antiga `N8N_WEBHOOK_URL`
+Continua a funcionar como antes (um só URL, **sem assinatura nem repetição**, formato `{ event, payload, triggeredAt }`). É um modo **legado**: o recomendado é criar um webhook para o n8n na página e retirar a variável.
 
 ## Política de versões
 

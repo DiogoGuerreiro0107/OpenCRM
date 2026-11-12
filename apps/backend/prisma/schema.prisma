@@ -38,6 +38,7 @@ model User {
   ownedContacts       Contact[]
   auditEvents         AuditEvent[]
   apiKeys             ApiKey[]
+  webhookSubscriptions WebhookSubscription[]
 }
 
 enum TimelineEventType {
@@ -580,4 +581,56 @@ model IdempotencyRecord {
 
   @@unique([apiKeyId, key])
   @@index([createdAt])
+}
+
+// Webhooks de saída (E0d, docs/plano-e0-api-publica.md): quem quer ser avisado de que eventos.
+model WebhookSubscription {
+  id                  String            @id @default(uuid())
+  name                String
+  url                 String
+  /// Tipos de evento ("lead.created"...) ou "*" para todos.
+  events              String[]
+  /// Segredo de assinatura, CIFRADO em repouso (ver common/secret-fields.ts).
+  secret              String
+  active              Boolean           @default(true)
+  /// Porque foi desativada automaticamente (disjuntor), se foi.
+  disabledReason      String?
+  consecutiveFailures Int               @default(0)
+  lastSuccessAt       DateTime?
+  lastFailureAt       DateTime?
+  createdById         String
+  createdBy           User              @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  deliveries          WebhookDelivery[]
+}
+
+enum WebhookDeliveryStatus {
+  PENDING
+  DELIVERED
+  FAILED
+}
+
+// Fila persistente de entregas: grava-se ANTES de tentar enviar; repete com recuo até esgotar as tentativas.
+model WebhookDelivery {
+  id             String                @id @default(uuid())
+  subscriptionId String
+  subscription   WebhookSubscription   @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+  /// Id do EVENTO (igual em todas as subscrições e repetições), para o consumidor deduplicar.
+  eventId        String
+  eventType      String
+  /// O envelope completo que é enviado.
+  payload        Json
+  status         WebhookDeliveryStatus @default(PENDING)
+  attempts       Int                   @default(0)
+  nextAttemptAt  DateTime              @default(now())
+  /// Reserva: enquanto estiver no futuro, outra tentativa não pega nesta entrega.
+  lockedUntil    DateTime?
+  lastStatusCode Int?
+  lastError      String?
+  createdAt      DateTime              @default(now())
+  deliveredAt    DateTime?
+
+  @@index([status, nextAttemptAt])
+  @@index([subscriptionId, createdAt(sort: Desc)])
 }

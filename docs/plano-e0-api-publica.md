@@ -93,6 +93,23 @@ Hoje o CRM avisa o n8n por **um único URL** (`N8N_WEBHOOK_URL`), sem assinatura
 - **Prova por mutação:** assinar com outro segredo; ignorar o filtro de eventos; não reservar a entrega (duplicados).
 - **Browser:** criar subscrição para um servidor local, disparar o teste e um evento real (criar lead), ver as entregas, simular falha e reenviar.
 
+### Execução do pacote E0d (2026-11-12)
+
+**Implementado como planeado.** Pormenores decididos durante a implementação:
+- O **URL de destino nunca vai para a auditoria** (pode conter um token, como os URLs de webhook do n8n): regista-se só que mudou. Pelo mesmo motivo, **até as leituras** das rotas de webhooks são só do Administrador.
+- **Reenviar** cria uma entrega **nova** com o mesmo evento, em vez de alterar a original (o histórico não mente).
+- Uma entrega cuja subscrição foi entretanto desativada fica **falhada** com o motivo, em vez de ficar na fila para sempre.
+- O teste antigo do comando `secrets:encrypt` assumia uma lista fixa de campos cifrados; passou a olhar só para os que semeia.
+
+**Validação:**
+- 228 unitários e 298 e2e a passar; migração sem desvio contra o `schema.prisma`; builds OK.
+- **Prova por mutação:** assinar com o valor cifrado em vez do segredo, ignorar o filtro de eventos e retirar a reserva da entrega fazem falhar quatro testes e2e.
+- **Browser + destino HTTP local** (backend real, base de testes descartável): criar o webhook (segredo mostrado uma vez), «Enviar teste» entregue e a **assinatura verificada do lado do destino** com o algoritmo da documentação; criar um lead na interface com o destino a responder 500 → entrega «Na fila» com a hora da nova tentativa e contador de falhas; destino recuperado → **o agendador repetiu sozinho ~1 min depois, com o mesmo `id` de evento**; «Reenviar» criou uma entrega nova.
+
+**Não testado:** o tempo-limite de 10 s com um destino lento (só o código); a tabela de recuo completa em tempo real (só a 1.ª repetição no browser; as restantes por teste com datas forçadas); o disjuntor em tempo real (por teste); um n8n verdadeiro como destino; rodar o segredo e apagar pela interface (só e2e da API).
+
+**Limites assumidos:** os do plano (não é um *outbox* transacional; pelo menos uma vez; uma só instância). O registo de entregas **não tem limpeza automática** ainda (cresce com o uso); fica para o registo de tarefas agendadas dos módulos.
+
 ## Pacote E0c — Chaves de API e `/api/v1` (plano, 2026-11-11)
 
 Base de tudo o que é «forma A» do [sistema de extensões](plano-extensoes-e-api.md): conectores de lojas, formulários, faturação e o n8n falam com o CRM por aqui, com credenciais **próprias** e de **âmbito limitado**, nunca com a sessão de uma pessoa.
@@ -183,5 +200,5 @@ Base de tudo o que é «forma A» do [sistema de extensões](plano-extensoes-e-a
 - [x] E0a — Segredos em repouso (ver «Execução» abaixo)
 - [x] E0b — Registo de auditoria (ver «Pacote E0b» abaixo)
 - [x] E0c — Chaves de API e `/api/v1` (ver «Execução do pacote E0c»)
-- [ ] E0d — Eventos de domínio e webhooks
+- [x] E0d — Eventos e webhooks de saída (ver «Execução do pacote E0d»)
 - [ ] E0e — OpenAPI e `LigaçãoExterna`
