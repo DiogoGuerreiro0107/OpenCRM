@@ -24,6 +24,7 @@ const KEYS_BY_RESOURCE: Record<string, string[]> = {
   users: ["users"],
   // Um administrador ligou/desligou um módulo: menu, rotas e dashboard de todas as sessões atualizam-se.
   modules: ["modules", "dashboard-summary"],
+  "api-keys": ["api-keys"],
 };
 
 /** Junta rajadas de eventos (ex.: uma automação + o pedido que a causou) num só refrescamento. */

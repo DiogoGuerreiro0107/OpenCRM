@@ -12,11 +12,14 @@ describe("resourceOf", () => {
     ["/email/ingest", "email"],
     ["/stages/abc", "pipelines"], // as fases são mostradas no Kanban, tal como os funis
     ["/pipelines/1/stages", "pipelines"],
+    ["/api/v1/leads", "leads"], // API pública: o recurso é o que vem depois de /api/v1
+    ["/api/v1/leads?x=1", "leads"],
+    ["/api-keys", "api-keys"],
   ])("%s -> %s", (url, resource) => {
     expect(resourceOf(url)).toBe(resource);
   });
 
-  it.each(["/auth/login", "/auth/change-password", "/auth/refresh", "/", ""])("%j não é um recurso do CRM", (url) => {
+  it.each(["/auth/login", "/auth/change-password", "/auth/refresh", "/", "", "/api/v1", "/api/v1/"])("%j não é um recurso do CRM", (url) => {
     expect(resourceOf(url)).toBeNull();
   });
 });

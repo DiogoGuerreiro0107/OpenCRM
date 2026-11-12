@@ -6,6 +6,8 @@ import { ThrottlerGuard, ThrottlerModule } from "@nestjs/throttler";
 import { PrismaModule } from "./prisma/prisma.module";
 import { SecretsModule } from "./common/secrets.module";
 import { AuditModule } from "./audit/audit.module";
+import { ApiKeysModule } from "./api-keys/api-keys.module";
+import { PublicApiModule } from "./public-api/public-api.module";
 import { AuthModule } from "./auth/auth.module";
 import { UsersModule } from "./users/users.module";
 import { CompaniesModule } from "./companies/companies.module";
@@ -36,6 +38,8 @@ import { RealtimeInterceptor } from "./realtime/realtime.interceptor";
     PrismaModule,
     SecretsModule,
     AuditModule,
+    ApiKeysModule,
+    PublicApiModule,
     WebhooksModule,
     UsersModule,
     AuthModule,

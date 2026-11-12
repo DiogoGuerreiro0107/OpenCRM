@@ -18,5 +18,9 @@ export const SECRET_FIELD_EXCEPTIONS: Record<string, string> = {
   "User.refreshToken": "guarda o hash bcrypt do refresh token, nunca o token",
   "User.resetTokenHash": "SHA-256 de um token aleatório de 256 bits",
   "User.resetTokenExpiresAt": "data de expiração do pedido de recuperação, não é um segredo",
+  "ApiKey.keyHash": "SHA-256 de uma chave aleatória de 256 bits; a chave em claro nunca se guarda",
+  "User.apiKeys": "campo de relação (Prisma), não guarda nada",
+  "IdempotencyRecord.apiKey": "campo de relação (Prisma), não guarda nada",
+  "IdempotencyRecord.apiKeyId": "identificador da chave de API, não o segredo",
   "ZadarmaAccount.apiKey": "identificador público da conta, não é o segredo (esse é o apiSecret)",
 };
