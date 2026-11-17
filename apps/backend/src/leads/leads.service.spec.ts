@@ -16,7 +16,7 @@ describe("LeadsService.convert é atómica", () => {
     responsavelId: null,
     convertedDealId: null,
   };
-  const pipeline = { id: "p1", stages: [{ id: "s1", type: "OPEN", order: 0 }] };
+  const pipeline = { id: "p1", entityType: "DEAL", steps: [{ id: "s1", category: "OPEN", outcome: null, order: 0 }] };
 
   function buildMocks(dealCreate: jest.Mock) {
     const tx = {
@@ -28,7 +28,7 @@ describe("LeadsService.convert é atómica", () => {
     };
     const prisma = {
       lead: { findUnique: jest.fn().mockResolvedValue(lead), update: jest.fn() },
-      pipeline: { findFirst: jest.fn().mockResolvedValue(pipeline) },
+      workflow: { findFirst: jest.fn().mockResolvedValue(pipeline) },
       // fora da transação não pode ser escrito nada:
       company: { create: jest.fn() },
       contact: { create: jest.fn() },

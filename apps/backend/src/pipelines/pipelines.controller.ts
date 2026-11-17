@@ -8,6 +8,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   UseGuards,
 } from "@nestjs/common";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
@@ -81,7 +82,7 @@ export class PipelinesController {
   @Audit("pipeline.stage_deleted", { target: "stage", param: "stageId" })
   @Delete("stages/:stageId")
   @HttpCode(HttpStatus.NO_CONTENT)
-  removeStage(@Param("stageId") stageId: string) {
-    return this.pipelinesService.removeStage(stageId);
+  removeStage(@Param("stageId") stageId: string, @Query("moveTo") moveTo?: string) {
+    return this.pipelinesService.removeStage(stageId, moveTo || undefined);
   }
 }

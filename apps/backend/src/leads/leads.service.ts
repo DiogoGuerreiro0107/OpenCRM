@@ -6,6 +6,7 @@ import { ModulesService } from "../modules/modules.service";
 import { CreateLeadDto } from "./dto/create-lead.dto";
 import { UpdateLeadDto } from "./dto/update-lead.dto";
 import { QueryLeadsDto } from "./dto/query-leads.dto";
+import { isOpenStep } from "../workflows/workflow-steps";
 
 const LEAD_INCLUDE = {
   responsavel: { select: { id: true, name: true } },
@@ -94,12 +95,12 @@ export class LeadsService {
     // Sem o módulo de negócios a conversão cria só empresa e contacto: não exige funil nem cria negócio.
     const dealsEnabled = this.modules.isEnabled("deals");
     const pipeline = dealsEnabled
-      ? await this.prisma.pipeline.findFirst({ include: { stages: { orderBy: { order: "asc" } } } })
+      ? await this.prisma.workflow.findFirst({ where: { entityType: "DEAL" }, orderBy: { createdAt: "asc" }, include: { steps: { orderBy: { order: "asc" } } } })
       : null;
-    if (dealsEnabled && (!pipeline || pipeline.stages.length === 0)) {
+    if (dealsEnabled && (!pipeline || pipeline.steps.length === 0)) {
       throw new BadRequestException("Nenhum funil configurado para associar a nova oportunidade");
     }
-    const firstOpenStage = pipeline ? (pipeline.stages.find((s) => s.type === "OPEN") ?? pipeline.stages[0]) : null;
+    const firstOpenStage = pipeline ? (pipeline.steps.find(isOpenStep) ?? pipeline.steps[0]) : null;
 
     // Tudo ou nada: sem transação, uma falha a meio deixava empresa/contacto órfãos e o lead por converter
     // (e uma nova tentativa duplicava os registos).

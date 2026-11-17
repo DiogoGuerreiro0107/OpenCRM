@@ -5,6 +5,7 @@ import { AutomationsService } from "../automations/automations.service";
 import { CreateDealDto } from "./dto/create-deal.dto";
 import { UpdateDealDto } from "./dto/update-deal.dto";
 import { MoveDealDto } from "./dto/move-deal.dto";
+import { isOpenStep, stageTypeOf } from "../workflows/workflow-steps";
 
 const DEAL_INCLUDE = {
   contact: { select: { id: true, name: true } },
@@ -37,9 +38,9 @@ export class DealsService {
   }
 
   async create(dto: CreateDealDto, ownerId: string) {
-    const stage = await this.prisma.stage.findUnique({ where: { id: dto.stageId } });
-    if (!stage) throw new NotFoundException("Fase não encontrada");
-    if (stage.pipelineId !== dto.pipelineId) {
+    const stage = await this.prisma.workflowStep.findUnique({ where: { id: dto.stageId }, include: { workflow: { select: { entityType: true } } } });
+    if (!stage || stage.workflow.entityType !== "DEAL") throw new NotFoundException("Fase não encontrada");
+    if (stage.workflowId !== dto.pipelineId) {
       throw new BadRequestException("A fase indicada não pertence a este funil");
     }
 
@@ -62,7 +63,7 @@ export class DealsService {
         companyId: dto.companyId,
         ownerId,
         order: (last?.order ?? -1) + 1,
-        closedAt: stage.type === "OPEN" ? null : new Date(),
+        closedAt: isOpenStep(stage) ? null : new Date(),
       },
       include: DEAL_INCLUDE,
     });
@@ -111,13 +112,13 @@ export class DealsService {
     const deal = await this.prisma.deal.findUnique({ where: { id }, include: { stage: true } });
     if (!deal) throw new NotFoundException("Negócio não encontrado");
 
-    const targetStage = await this.prisma.stage.findUnique({ where: { id: dto.stageId } });
+    const targetStage = await this.prisma.workflowStep.findUnique({ where: { id: dto.stageId } });
     if (!targetStage) throw new NotFoundException("Fase não encontrada");
-    if (targetStage.pipelineId !== deal.pipelineId) {
+    if (targetStage.workflowId !== deal.pipelineId) {
       throw new BadRequestException("A fase indicada não pertence ao funil deste negócio");
     }
 
-    if (targetStage.type === "LOST" && !dto.lossReason && !deal.lossReason) {
+    if (stageTypeOf(targetStage) === "LOST" && !dto.lossReason && !deal.lossReason) {
       throw new BadRequestException("O motivo de perda é obrigatório ao mover um negócio para uma fase perdida");
     }
 
@@ -136,7 +137,7 @@ export class DealsService {
         where: { id },
         data: {
           stageId: dto.stageId,
-          closedAt: targetStage.type === "OPEN" ? null : (deal.closedAt ?? new Date()),
+          closedAt: isOpenStep(targetStage) ? null : (deal.closedAt ?? new Date()),
           lossReason: dto.lossReason ?? undefined,
           stageEnteredAt: deal.stageId !== dto.stageId ? new Date() : undefined,
         },
@@ -155,7 +156,7 @@ export class DealsService {
         fromStageName: deal.stage.name,
         toStageId: targetStage.id,
         toStageName: targetStage.name,
-        toStageType: targetStage.type,
+        toStageType: stageTypeOf(targetStage),
       });
 
       if (targetStage.name.trim().toLowerCase() === "proposta enviada") {

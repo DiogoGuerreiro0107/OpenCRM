@@ -209,8 +209,8 @@ describe("Campos personalizados (e2e)", () => {
   });
 
   async function createDeal() {
-    const pipeline = await prisma().pipeline.create({ data: { name: "Vendas" } });
-    const stage = await prisma().stage.create({ data: { name: "Novo", order: 0, pipelineId: pipeline.id } });
+    const pipeline = await prisma().workflow.create({ data: { name: "Vendas", entityType: "DEAL" } });
+    const stage = await prisma().workflowStep.create({ data: { name: "Novo", order: 0, workflowId: pipeline.id } });
     const owner = (await prisma().user.findFirst()) ?? (await createUser(prisma(), "ADMINISTRADOR"));
     return prisma().deal.create({ data: { title: "Negócio", pipelineId: pipeline.id, stageId: stage.id, ownerId: owner.id } });
   }

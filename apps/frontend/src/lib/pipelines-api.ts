@@ -30,8 +30,9 @@ export async function updateStage(stageId: string, input: { name?: string; type?
   return data;
 }
 
-export async function deleteStage(stageId: string) {
-  await api.delete(`/stages/${stageId}`);
+/** `moveTo`: fase do mesmo funil para onde vão os negócios desta fase antes de ela ser eliminada. */
+export async function deleteStage(stageId: string, moveTo?: string) {
+  await api.delete(`/stages/${stageId}`, { params: moveTo ? { moveTo } : undefined });
 }
 
 export async function reorderStages(pipelineId: string, stages: { id: string; order: number }[]) {

@@ -1,114 +1,142 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { Workflow, WorkflowStep } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
+import { WorkflowsService } from "../workflows/workflows.service";
+import { StageType, stageTypeOf, stepStateFor } from "../workflows/workflow-steps";
 import { CreatePipelineDto } from "./dto/create-pipeline.dto";
 import { UpdatePipelineDto } from "./dto/update-pipeline.dto";
 import { CreateStageDto } from "./dto/create-stage.dto";
 import { UpdateStageDto } from "./dto/update-stage.dto";
 import { ReorderStagesDto } from "./dto/reorder-stages.dto";
 
-const DEFAULT_STAGES: Array<{ name: string; type: "OPEN" | "WON" | "LOST" }> = [
+/**
+ * Funis dos negócios = fluxos genéricos com `entityType` "DEAL" (Fase 0c). Esta classe é a FACHADA que mantém a API
+ * `/pipelines` e `/stages` exatamente como antes (`stages`, `type` OPEN/WON/LOST, `pipelineId`), traduzindo de e
+ * para categoria + resultado. As respostas ganham `category` e `outcome` (só acrescenta).
+ */
+const ENTITY = "DEAL" as const;
+
+const DEFAULT_STAGES: Array<{ name: string; type: StageType }> = [
   { name: "Novo", type: "OPEN" },
   { name: "Em negociação", type: "OPEN" },
   { name: "Ganho", type: "WON" },
   { name: "Perdido", type: "LOST" },
 ];
 
+type StepWithCount = WorkflowStep & { _count?: { deals: number } };
+
+/** Fase como a API dos negócios sempre a mostrou, mais a categoria e o resultado. */
+export function stageView(step: StepWithCount) {
+  return {
+    id: step.id,
+    name: step.name,
+    order: step.order,
+    type: stageTypeOf(step),
+    category: step.category,
+    outcome: step.outcome,
+    pipelineId: step.workflowId,
+    ...(step._count ? { _count: step._count } : {}),
+  };
+}
+
+function pipelineView(workflow: Workflow & { steps: StepWithCount[] }) {
+  return {
+    id: workflow.id,
+    name: workflow.name,
+    createdAt: workflow.createdAt,
+    updatedAt: workflow.updatedAt,
+    stages: workflow.steps.map(stageView),
+  };
+}
+
 @Injectable()
 export class PipelinesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly workflows: WorkflowsService,
+  ) {}
 
-  findAll() {
-    return this.prisma.pipeline.findMany({
+  async findAll() {
+    const workflows = await this.prisma.workflow.findMany({
+      where: { entityType: ENTITY },
       orderBy: { createdAt: "asc" },
-      include: {
-        stages: { orderBy: { order: "asc" }, include: { _count: { select: { deals: true } } } },
-      },
+      include: { steps: { orderBy: { order: "asc" }, include: { _count: { select: { deals: true } } } } },
     });
+    return workflows.map(pipelineView);
   }
 
   async findOne(id: string) {
-    const pipeline = await this.prisma.pipeline.findUnique({
+    const workflow = await this.prisma.workflow.findUnique({
       where: { id },
-      include: { stages: { orderBy: { order: "asc" } } },
+      include: { steps: { orderBy: { order: "asc" } } },
     });
-    if (!pipeline) throw new NotFoundException("Funil não encontrado");
-    return pipeline;
+    if (!workflow || workflow.entityType !== ENTITY) throw new NotFoundException("Funil não encontrado");
+    return pipelineView(workflow);
   }
 
-  create(dto: CreatePipelineDto) {
-    return this.prisma.pipeline.create({
-      data: {
-        name: dto.name,
-        stages: {
-          create: DEFAULT_STAGES.map((stage, index) => ({ ...stage, order: index })),
-        },
-      },
-      include: { stages: { orderBy: { order: "asc" } } },
-    });
+  async create(dto: CreatePipelineDto) {
+    const created = await this.workflows.create(
+      ENTITY,
+      dto.name,
+      DEFAULT_STAGES.map(({ name, type }) => ({ name, ...stepStateFor(type) })),
+    );
+    return this.findOne(created.id);
   }
 
   async update(id: string, dto: UpdatePipelineDto) {
-    await this.ensurePipelineExists(id);
-    return this.prisma.pipeline.update({ where: { id }, data: dto });
+    await this.workflows.findWorkflowOrThrow(id, ENTITY).catch(() => {
+      throw new NotFoundException("Funil não encontrado");
+    });
+    const updated = await this.prisma.workflow.update({ where: { id }, data: { name: dto.name } });
+    return { id: updated.id, name: updated.name, createdAt: updated.createdAt, updatedAt: updated.updatedAt };
   }
 
   async remove(id: string) {
-    const pipeline = await this.prisma.pipeline.findUnique({
-      where: { id },
-      include: { _count: { select: { deals: true } } },
-    });
-    if (!pipeline) throw new NotFoundException("Funil não encontrado");
-    if (pipeline._count.deals > 0) {
+    const workflow = await this.prisma.workflow.findUnique({ where: { id }, include: { _count: { select: { deals: true } } } });
+    if (!workflow || workflow.entityType !== ENTITY) throw new NotFoundException("Funil não encontrado");
+    if (workflow._count.deals > 0) {
       throw new BadRequestException("Move ou elimina os negócios deste funil antes de o eliminar");
     }
-    await this.prisma.pipeline.delete({ where: { id } });
+    await this.prisma.workflow.delete({ where: { id } });
   }
 
   async addStage(pipelineId: string, dto: CreateStageDto) {
-    await this.ensurePipelineExists(pipelineId);
-    const last = await this.prisma.stage.findFirst({
-      where: { pipelineId },
-      orderBy: { order: "desc" },
-    });
-    return this.prisma.stage.create({
-      data: { name: dto.name, type: dto.type, pipelineId, order: (last?.order ?? -1) + 1 },
-    });
+    await this.ensurePipeline(pipelineId);
+    const step = await this.workflows.addStep(pipelineId, ENTITY, { name: dto.name, ...stepStateFor(dto.type ?? "OPEN") });
+    return stageView(step);
   }
 
   async updateStage(stageId: string, dto: UpdateStageDto) {
-    await this.ensureStageExists(stageId);
-    return this.prisma.stage.update({ where: { id: stageId }, data: dto });
+    await this.ensureStage(stageId);
+    const step = await this.workflows.updateStep(stageId, ENTITY, {
+      ...(dto.name !== undefined ? { name: dto.name } : {}),
+      ...(dto.type !== undefined ? stepStateFor(dto.type) : {}),
+    });
+    return stageView(step);
   }
 
-  async removeStage(stageId: string) {
-    const stage = await this.prisma.stage.findUnique({
-      where: { id: stageId },
-      include: { _count: { select: { deals: true } } },
-    });
-    if (!stage) throw new NotFoundException("Fase não encontrada");
-    if (stage._count.deals > 0) {
-      throw new BadRequestException("Move ou elimina os negócios desta fase antes de a eliminar");
-    }
-    await this.prisma.stage.delete({ where: { id: stageId } });
+  /** Com `moveTo`, os negócios da fase passam para essa fase (do mesmo funil) antes de a apagar. */
+  async removeStage(stageId: string, moveTo?: string) {
+    await this.ensureStage(stageId);
+    await this.workflows.removeStep(stageId, ENTITY, moveTo);
   }
 
   async reorderStages(pipelineId: string, dto: ReorderStagesDto) {
-    await this.ensurePipelineExists(pipelineId);
-    await this.prisma.$transaction(
-      dto.stages.map(({ id, order }) =>
-        this.prisma.stage.update({ where: { id }, data: { order } }),
-      ),
-    );
+    await this.ensurePipeline(pipelineId);
+    await this.workflows.reorderSteps(pipelineId, ENTITY, dto.stages);
     return this.findOne(pipelineId);
   }
 
-  private async ensurePipelineExists(id: string) {
-    const exists = await this.prisma.pipeline.findUnique({ where: { id }, select: { id: true } });
-    if (!exists) throw new NotFoundException("Funil não encontrado");
+  /** Mantém as mensagens de sempre («Funil/Fase não encontrado/a»). */
+  private async ensurePipeline(id: string) {
+    await this.workflows.findWorkflowOrThrow(id, ENTITY).catch(() => {
+      throw new NotFoundException("Funil não encontrado");
+    });
   }
 
-  private async ensureStageExists(id: string) {
-    const exists = await this.prisma.stage.findUnique({ where: { id }, select: { id: true } });
-    if (!exists) throw new NotFoundException("Fase não encontrada");
+  private async ensureStage(id: string) {
+    await this.workflows.findStepOrThrow(id, ENTITY).catch(() => {
+      throw new NotFoundException("Fase não encontrada");
+    });
   }
 }

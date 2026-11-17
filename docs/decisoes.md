@@ -437,3 +437,10 @@ O item "limite de tentativas de login por conta" andava no backlog desde o endur
 - Corrigidos problemas encontrados na revisão: campo de outro tipo de registo aceite; valores sem validação por tipo (números, datas, opções, email, URL, telefone, obrigatório); registos inexistentes; **valores órfãos ao apagar** empresas/contactos/leads/negócios; mudar o tipo de um campo com valores.
 - **Mudança de comportamento deliberada:** escrever valores exige poder editar esse tipo de registo (mesma matriz `WRITE_ACCESS`). O **Técnico** deixa de poder preencher campos personalizados de empresas, contactos, leads e negócios (já não podia editar esses registos); o Financeiro deixa de poder nos contactos. Se o Técnico precisar, a matriz da entidade é que deve mudar.
 - Órfãos antigos não são apagados pela migração (nenhum na base de desenvolvimento). Âmbito por tipo e filtros por campos personalizados ficam para quando houver tipos e listagens que os usem.
+
+## Fase 0c: fluxos genéricos (2026-11-17)
+- `Pipeline`/`Stage` **renomeados** para `Workflow`/`WorkflowStep` (tabelas, colunas, índices, chaves) numa só migração transacional, **sem copiar dados**: os ids mantêm-se e negócios/regras continuam a apontar para os mesmos registos. Em `Deal`/`AutomationRule` as colunas mantêm `pipelineId`/`stageId`.
+- `type` (OPEN/WON/LOST) → `category` (OPEN, IN_PROGRESS, DONE, CANCELLED) + `outcome` (WON/LOST, só em DONE, com CHECK na base de dados). Regras únicas em `workflows/workflow-steps.ts`; `Workflow.entityType` + registo em código (hoje só `DEAL`).
+- **A API dos negócios não mudou** (`/pipelines` e `/stages` com `type`; ganham `category`/`outcome`). Novo: apagar uma fase com negócios escolhendo para onde os mover.
+- Migração ensaiada numa cópia da base real, com reversão (`prisma/rollbacks/…down.sql`) testada até ao esquema idêntico.
+- Fora (regra de dois): transições, portões, rotas `/workflows` genéricas e ações por passo — entram com o segundo módulo com fluxos.

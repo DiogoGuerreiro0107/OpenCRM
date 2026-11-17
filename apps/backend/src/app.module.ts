@@ -14,6 +14,7 @@ import { CompaniesModule } from "./companies/companies.module";
 import { ContactsModule } from "./contacts/contacts.module";
 import { TimelineModule } from "./timeline/timeline.module";
 import { PipelinesModule } from "./pipelines/pipelines.module";
+import { WorkflowsModule } from "./workflows/workflows.module";
 import { DealsModule } from "./deals/deals.module";
 import { TasksModule } from "./tasks/tasks.module";
 import { EmailModule } from "./email/email.module";
@@ -46,6 +47,7 @@ import { RealtimeInterceptor } from "./realtime/realtime.interceptor";
     CompaniesModule,
     ContactsModule,
     TimelineModule,
+    WorkflowsModule,
     PipelinesModule,
     DealsModule,
     TasksModule,

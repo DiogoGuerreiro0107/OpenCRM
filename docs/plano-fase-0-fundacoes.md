@@ -7,8 +7,8 @@ Primeira fase do [desenho da reorganização modular](plano-reorganizacao-modula
 | Pacote | Entrega | Risco para os dados | Estado |
 |---|---|---|---|
 | **0a — Registo de módulos** | Ligar/desligar módulos (leads, funis/negócios, email, telefonia, automações), menu e rotas dependentes do que está ativo, dependências, página de definições | **Nenhum** (só acrescenta uma tabela) | a fazer agora |
-| **0b — Campos personalizados genéricos** | `entityType` deixa de ser um enum fechado (registo de tipos); validação dos valores; limpeza ao apagar; permissões por tipo de registo | Baixo (conversão de enum para texto, valores iguais) | a fazer agora |
-| **0c — Fluxos genéricos** | `Pipeline`/`Stage` → `Workflow`/`WorkflowStep`, com categorias, transições e portões | **Médio** (migra dados reais: negócios e regras de automação apontam para as fases) | depois |
+| **0b — Campos personalizados genéricos** | `entityType` deixa de ser um enum fechado (registo de tipos); validação dos valores; limpeza ao apagar; permissões por tipo de registo | Baixo (conversão de enum para texto, valores iguais) | feito |
+| **0c — Fluxos genéricos** | `Pipeline`/`Stage` → `Workflow`/`WorkflowStep` (renomeados, mesmos ids), categoria + resultado, apagar passo movendo os itens | **Médio** (migra dados reais: negócios e regras de automação apontam para as fases) | a fazer agora |
 | **0d — Permissões em base de dados** | Matriz por módulo/tipo guardada na BD, com os valores atuais por omissão; o frontend deixa de ter uma cópia | Baixo | depois |
 
 Cada pacote só avança depois de o anterior estar integrado.
@@ -145,11 +145,78 @@ Assistente de primeira instalação (fica para depois dos módulos novos existir
 
 **Não testado:** a interface com leads/negócios desligados (só a API, por e2e); a edição de campos personalizados dentro dos diálogos de lead e negócio (o componente é o mesmo).
 
-### Pacotes 0c, 0d
-Serão detalhados no seu próprio plano quando chegar a vez de cada um. O 0c (fluxos) é o mais delicado e terá um plano de migração específico com **teste sobre uma cópia da base real**.
+## Pacote 0c — Fluxos genéricos (plano, 2026-11-17)
+
+### O que existe hoje
+- `Pipeline` (funil) e `Stage` (fase, com `type` = `OPEN`/`WON`/`LOST`) só servem negócios. `Deal` e `AutomationRule` apontam para eles (`pipelineId`, `stageId`).
+- O significado de `type` está espalhado: fecho do negócio (`closedAt`), motivo de perda obrigatório, indicadores do dashboard, conversão de leads (primeira fase aberta), automações, webhook `deal.stage_changed`, cores do Kanban.
+- Base de desenvolvimento: 3 funis, 13 fases, 1 negócio, 0 regras de automação.
+
+### Objetivo
+Transformar funis/fases num **fluxo genérico** que os próximos módulos (assistências, encomendas, orçamentos, tipos de tarefa) reutilizam, **sem mudar nada do que os utilizadores veem** nos negócios.
+
+### Desenho
+1. **Renomear, não copiar:** `Pipeline` → `Workflow`, `Stage` → `WorkflowStep` (tabelas, colunas, índices e chaves renomeados na mesma migração). **Os ids não mudam**, por isso negócios e regras de automação continuam a apontar para os mesmos registos, sem copiar dados. Nos negócios e nas regras as colunas mantêm os nomes `pipelineId`/`stageId` (é o vocabulário dos negócios).
+2. **Fluxo pertence a um tipo de coisa:** `Workflow.entityType` (texto; hoje só `DEAL`), com um **registo em código** como o dos campos personalizados (módulo a que pertence, como contar e mover os itens de um passo). Todos os funis existentes ficam `DEAL`.
+3. **Categoria + resultado em vez de `type`:**
+   - `category`: `OPEN`, `IN_PROGRESS`, `DONE`, `CANCELLED` — o que a agenda e os relatórios dos módulos futuros vão usar sem conhecer os nomes dados pelo utilizador;
+   - `outcome` (só em passos `DONE`): `WON` ou `LOST`.
+   - Conversão (como no desenho aprovado): `OPEN` → `OPEN`; `WON` → `DONE` + `WON`; `LOST` → `DONE` + `LOST`.
+   - Regras únicas, num só sítio (`workflow-steps.ts`): «está aberto?» = categoria `OPEN` ou `IN_PROGRESS`; «ganho» = resultado `WON`; «perdido» = resultado `LOST`. Todos os sítios que hoje comparam `type` passam a usar estas regras.
+4. **A API dos negócios não muda:** `/pipelines` e `/stages` continuam a devolver e a aceitar `type` (`OPEN`/`WON`/`LOST`), traduzido para categoria+resultado. As respostas **ganham** `category` e `outcome` (só acrescenta). O frontend dos negócios, o dashboard, as automações e o webhook `deal.stage_changed` (`to_stage_type`) continuam iguais.
+5. **Serviço genérico `WorkflowsService`** (criar fluxo com passos por omissão, renomear, acrescentar/editar/reordenar/apagar passos) usado pelos funis; os módulos futuros usam-no com o seu `entityType`. **Sem rotas genéricas `/workflows` ainda** (regra de dois: só os negócios usam fluxos; as rotas entram com o segundo módulo).
+6. **Apagar um passo com itens:** hoje é recusado. Passa a aceitar **«mover para»** outro passo do mesmo fluxo (os negócios são movidos e o passo apagado, na mesma transação). Sem destino continua recusado, com a contagem. A interface de gestão do funil passa a perguntar para onde mover.
+
+### Fora de âmbito (com motivo)
+- **Transições restritas e portões** (*gates*): não há nenhum caso que os use; entram com assistências/encomendas (regra de dois).
+- **Ações ao entrar/sair de um passo:** já existem como automações dos negócios; generalizá-las é a Fase 3 (automações generalizadas).
+- **Expor as categorias `IN_PROGRESS` e `CANCELLED` na interface dos negócios:** os negócios continuam com aberto/ganho/perdido; as novas categorias servem os módulos futuros.
+
+### Migração (o mais delicado)
+- **Uma só migração SQL, dentro de uma transação** (`BEGIN … COMMIT`): ou corre toda, ou nada muda.
+- Passos: renomear tabelas, coluna `pipelineId` da fase → `workflowId`, chaves e índices (para os nomes coincidirem com os que o Prisma espera); criar os enums de categoria/resultado; acrescentar `entityType` (= `DEAL`), `category`, `outcome`; preencher a partir de `type`; **verificar** (a migração aborta se alguma fase ficar sem categoria ou se `WON`/`LOST` não tiver resultado); apagar `type` e o enum `StageType`.
+- **Reversão escrita e testada:** um script `down.sql` (guardado junto da migração, **não** aplicado automaticamente) que repõe o esquema anterior a partir das categorias.
+- **Ensaio sobre uma cópia da base real** antes de tocar na de desenvolvimento: copiar a base (`pg_dump`/`pg_restore` para uma base temporária), fotografar funis, fases, negócios e regras; aplicar a migração; confirmar que **nenhum id mudou**, que todos os negócios/regras apontam para os mesmos registos e que cada `type` foi convertido certo; aplicar o `down.sql` e confirmar que volta **exatamente** à fotografia inicial; apagar a cópia.
+- **Em produção:** o serviço de cópias de segurança faz uma cópia ao arrancar; o guia de atualização diz para confirmar que existe uma cópia recente antes de atualizar.
+
+### Testes e validação
+- **Unitários:** regras de categoria/resultado e tradução `type` ↔ categoria+resultado (nos dois sentidos, para os três valores e para as categorias novas).
+- **E2E:** forma das respostas de `/pipelines` igual à de antes (mais `category`/`outcome`); criar funil cria os passos por omissão com as categorias certas; mudar o `type` de uma fase; mover negócio para fase ganha/perdida (fecho, motivo de perda obrigatório); dashboard (abertos/ganhos/perdidos, valor em aberto, negócios parados); conversão de lead para a primeira fase aberta; automação que move para uma fase; apagar fase com negócios sem destino (400) e com destino (negócios movidos, fase apagada); destino de outro funil (400); webhook `deal.stage_changed` com `to_stage_type`.
+- **Todos os e2e existentes** dos negócios, automações, leads e dashboard têm de passar sem alterações (são a prova de que nada mudou para quem usa).
+- **Prova por mutação:** trocar a regra de «aberto», a conversão `WON`, e o mover-ao-apagar.
+- **Browser:** Kanban igual (cores, colunas), arrastar para ganho/perdido, gerir funil (mudar tipo, apagar fase com negócios escolhendo o destino), dashboard.
+
+### Riscos
+| Risco | Mitigação |
+|---|---|
+| Migração falhar a meio e deixar a base inconsistente | Transação única; verificação dentro da migração; ensaio numa cópia |
+| Algum sítio continuar a ler `type` e mudar de comportamento | Compilador (o campo deixa de existir); e2e existentes sem alterações; procura por `"WON"`/`"LOST"`/`"OPEN"` no código |
+| Precisar de voltar atrás | `down.sql` testado na cópia; cópia de segurança antes de atualizar |
+| Nomes de índices/chaves diferentes dos esperados pelo Prisma | `prisma migrate diff` contra a base migrada tem de dar «sem diferenças» |
+
+### Execução do pacote 0c (2026-11-17)
+
+**Implementado como planeado.** Código novo em `apps/backend/src/workflows/` (regras dos passos, registo de tipos, serviço genérico); `PipelinesService` passou a fachada da API dos negócios. Pormenores decididos na implementação:
+- **Reordenar** passou a recusar ids de fases de outro funil (antes eram aceites em silêncio).
+- **Mover ao apagar** respeita as regras dos negócios: fecho/reabertura (`closedAt`) conforme o destino, e destino de perda só se todos os negócios tiverem motivo de perda. **Não** dispara webhooks/automações por cada negócio movido (é uma operação de arrumação, como apagar uma fase).
+- Um passo `DONE` sem resultado ou `CANCELLED` conta como «perdido» na visão dos negócios (coerente com «não está aberto»); hoje nenhum passo de negócios fica assim.
+- A reversão ficou em `apps/backend/prisma/rollbacks/20261117170000_fluxos_genericos.down.sql` (fora da pasta de migrações, para o Prisma nunca a aplicar sozinho).
+
+**Ensaio da migração numa cópia da base de desenvolvimento** (3 funis, 13 fases, 1 negócio): fotografia → migração → **nenhum id, nome, ordem, ligação ou tipo mudou**; `prisma migrate diff` sem diferenças; a restrição CHECK recusou um resultado num passo aberto; `down.sql` → dados iguais aos iniciais e **esquema idêntico** ao original (mesma impressão digital de colunas, índices e chaves); cópia apagada. A sessão foi interrompida a meio do primeiro ensaio; a cópia foi apagada e o ensaio repetido do início.
+
+**Validação:**
+- **Os 324 e2e que já existiam passam sem alterações nas expectativas** (só o *fixture* do teste dos campos personalizados, que criava um funil diretamente na base, foi adaptado aos nomes novos). Com os novos: 252 unitários e 339 e2e; builds OK.
+- **Prova por mutação:** tirar `IN_PROGRESS` de «aberto», estragar a conversão de `WON` e não mover os itens ao apagar → falham seis testes.
+- **Base de desenvolvimento migrada** com fotografia antes/depois igual (e uma cópia de segurança em `/tmp/opencrm-antes-0c.dump` dentro do contentor do Postgres).
+- **Browser** (base de testes): Kanban com as cores de sempre; gerir funil → apagar fase com 2 negócios mostra a pergunta; destino «Perdido» recusado com a mensagem do motivo de perda; destino «Em negociação» move os negócios e apaga a fase; dashboard com os valores certos.
+
+**Não testado:** arrastar cartões no Kanban no browser (coberto pelos e2e de `move`); a reversão na base de desenvolvimento (só na cópia).
+
+### Pacote 0d
+Será detalhado no seu próprio plano quando chegar a vez.
 
 ## Registo de execução
 - [x] 0a — Registo de módulos (ver decisoes.md)
 - [x] 0b — Campos personalizados genéricos (ver «Execução do pacote 0b»)
-- [ ] 0c — Fluxos genéricos
+- [x] 0c — Fluxos genéricos (ver «Execução do pacote 0c»)
 - [ ] 0d — Permissões em base de dados

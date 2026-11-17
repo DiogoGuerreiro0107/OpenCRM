@@ -112,7 +112,7 @@ No `.env` tens de definir, antes de arrancar:
 - As credenciais de email (`EMAIL_*`, `IMAP_*`, `SMTP_*`) se quiseres a caixa de email.
 - **`SECRETS_KEY`** (mínimo 32 caracteres; `openssl rand -base64 32`) cifra na base de dados a password do email e o segredo da Zadarma. **Guarda-a à parte, junto do `.env`**: uma cópia de segurança da base de dados sem esta chave não recupera essas credenciais (têm de ser reintroduzidas). Ao atualizar uma instalação que já tinha credenciais guardadas, corre uma vez `docker compose exec backend node dist/cli/encrypt-secrets.js` (o backend avisa nos logs enquanto houver segredos em claro). Para trocar a chave: põe a antiga em `SECRETS_KEY_PREVIOUS`, a nova em `SECRETS_KEY` e corre o mesmo comando.
 
-O `migrate` corre sozinho em cada arranque e aplica as migrações pendentes antes do backend subir. Depois de atualizar o código: `git pull && docker compose up -d --build`. A base de dados (`127.0.0.1:5432`) e a consola do MinIO (`127.0.0.1:9001`) só são acessíveis a partir do próprio servidor; o frontend (5173), a API (3000) e o MinIO (9000) ficam na rede local.
+O `migrate` corre sozinho em cada arranque e aplica as migrações pendentes antes do backend subir. Depois de atualizar o código: `git pull && docker compose up -d --build`. Antes de uma atualização que mexa em dados (as notas do PR/versão dizem-no), confirma que existe uma cópia recente: `docker compose run --rm backup list`. A base de dados (`127.0.0.1:5432`) e a consola do MinIO (`127.0.0.1:9001`) só são acessíveis a partir do próprio servidor; o frontend (5173), a API (3000) e o MinIO (9000) ficam na rede local.
 
 ## Roadmap
 
