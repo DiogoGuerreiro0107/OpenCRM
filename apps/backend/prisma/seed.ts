@@ -19,18 +19,19 @@ async function main() {
     },
   });
 
-  const pipelineExists = await prisma.pipeline.findFirst();
+  const pipelineExists = await prisma.workflow.findFirst({ where: { entityType: "DEAL" } });
   if (!pipelineExists) {
-    await prisma.pipeline.create({
+    await prisma.workflow.create({
       data: {
+        entityType: "DEAL",
         name: "Vendas",
-        stages: {
+        steps: {
           create: [
-            { name: "Novo", type: "OPEN", order: 0 },
-            { name: "Em negociação", type: "OPEN", order: 1 },
-            { name: "Proposta enviada", type: "OPEN", order: 2 },
-            { name: "Ganho", type: "WON", order: 3 },
-            { name: "Perdido", type: "LOST", order: 4 },
+            { name: "Novo", category: "OPEN", order: 0 },
+            { name: "Em negociação", category: "OPEN", order: 1 },
+            { name: "Proposta enviada", category: "OPEN", order: 2 },
+            { name: "Ganho", category: "DONE", outcome: "WON", order: 3 },
+            { name: "Perdido", category: "DONE", outcome: "LOST", order: 4 },
           ],
         },
       },

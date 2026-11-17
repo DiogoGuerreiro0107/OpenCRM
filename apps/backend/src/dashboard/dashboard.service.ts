@@ -1,6 +1,7 @@
 import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { ModulesService } from "../modules/modules.service";
+import { OPEN_STEP_WHERE, stageTypeOf } from "../workflows/workflow-steps";
 
 const STALE_DEAL_DAYS = 14;
 
@@ -40,13 +41,13 @@ export class DashboardService {
         where: { status: { not: "DONE" }, dueDate: { lt: startOfToday } },
       }),
       dealsOn
-        ? this.prisma.deal.count({ where: { stage: { type: "OPEN" }, updatedAt: { lt: staleThreshold } } })
+        ? this.prisma.deal.count({ where: { stage: OPEN_STEP_WHERE, updatedAt: { lt: staleThreshold } } })
         : Promise.resolve(null),
       dealsOn ? this.getPipelineBreakdown() : Promise.resolve([]),
     ]);
 
     const openValueAgg = dealsOn
-      ? await this.prisma.deal.aggregate({ where: { stage: { type: "OPEN" } }, _sum: { value: true } })
+      ? await this.prisma.deal.aggregate({ where: { stage: OPEN_STEP_WHERE }, _sum: { value: true } })
       : null;
 
     const dealsOpen = pipelines.reduce((sum, p) => sum + p.open, 0);
@@ -71,15 +72,16 @@ export class DashboardService {
   }
 
   private async getPipelineBreakdown() {
-    const pipelines = await this.prisma.pipeline.findMany({
-      include: { deals: { include: { stage: { select: { type: true } } } } },
+    const pipelines = await this.prisma.workflow.findMany({
+      where: { entityType: "DEAL" },
+      include: { deals: { include: { stage: { select: { category: true, outcome: true } } } } },
       orderBy: { createdAt: "asc" },
     });
 
     return pipelines.map((pipeline) => {
-      const open = pipeline.deals.filter((d) => d.stage.type === "OPEN").length;
-      const won = pipeline.deals.filter((d) => d.stage.type === "WON").length;
-      const lost = pipeline.deals.filter((d) => d.stage.type === "LOST").length;
+      const open = pipeline.deals.filter((d) => stageTypeOf(d.stage) === "OPEN").length;
+      const won = pipeline.deals.filter((d) => stageTypeOf(d.stage) === "WON").length;
+      const lost = pipeline.deals.filter((d) => stageTypeOf(d.stage) === "LOST").length;
       const closed = won + lost;
       const conversionRate = closed > 0 ? Math.round((won / closed) * 100) : 0;
 

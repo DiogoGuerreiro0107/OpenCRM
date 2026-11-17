@@ -10,6 +10,7 @@ import {
   updatePipeline,
   updateStage,
 } from "@/lib/pipelines-api";
+import { errorMessage } from "@/lib/errors";
 import { Dialog, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,6 +36,9 @@ export function ManagePipelineDialog({ open, onClose, pipeline, onDeleted }: Man
   const [newStageName, setNewStageName] = useState("");
   const [newStageType, setNewStageType] = useState<StageType>("OPEN");
   const [error, setError] = useState<string | null>(null);
+  /** Fase com negócios a eliminar: pergunta-se para onde os mover. */
+  const [deleting, setDeleting] = useState<{ stageId: string; name: string; count: number } | null>(null);
+  const [moveTo, setMoveTo] = useState("");
 
   useEffect(() => {
     if (open) {
@@ -78,9 +82,13 @@ export function ManagePipelineDialog({ open, onClose, pipeline, onDeleted }: Man
   });
 
   const deleteStageMutation = useMutation({
-    mutationFn: (stageId: string) => deleteStage(stageId),
-    onSuccess: invalidate,
-    onError: () => setError("Não foi possível eliminar a fase. Move ou elimina os negócios desta fase primeiro."),
+    mutationFn: ({ stageId, moveTo: target }: { stageId: string; moveTo?: string }) => deleteStage(stageId, target),
+    onSuccess: () => {
+      setDeleting(null);
+      setMoveTo("");
+      invalidate();
+    },
+    onError: (err) => setError(errorMessage(err, "Não foi possível eliminar a fase.")),
   });
 
   const reorderMutation = useMutation({
@@ -171,7 +179,13 @@ export function ManagePipelineDialog({ open, onClose, pipeline, onDeleted }: Man
                   size="sm"
                   onClick={() => {
                     setError(null);
-                    deleteStageMutation.mutate(stage.id);
+                    const count = stage._count?.deals ?? 0;
+                    if (count > 0) {
+                      setDeleting({ stageId: stage.id, name: stage.name, count });
+                      setMoveTo("");
+                    } else {
+                      deleteStageMutation.mutate({ stageId: stage.id });
+                    }
                   }}
                 >
                   <Trash2 className="h-4 w-4" />
@@ -179,6 +193,37 @@ export function ManagePipelineDialog({ open, onClose, pipeline, onDeleted }: Man
               </div>
             ))}
           </div>
+          {deleting && (
+            <div className="space-y-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm" role="alert">
+              <p>
+                A fase «{deleting.name}» tem <strong>{deleting.count}</strong> negócio(s). Para a eliminar, escolhe para que fase os
+                mover:
+              </p>
+              <div className="flex items-center gap-2">
+                <Select aria-label="Fase de destino" value={moveTo} onChange={(e) => setMoveTo(e.target.value)} className="flex-1">
+                  <option value="">Escolher fase...</option>
+                  {sortedStages
+                    .filter((s) => s.id !== deleting.stageId)
+                    .map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} ({STAGE_TYPE_LABELS[s.type]})
+                      </option>
+                    ))}
+                </Select>
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={!moveTo || deleteStageMutation.isPending}
+                  onClick={() => deleteStageMutation.mutate({ stageId: deleting.stageId, moveTo })}
+                >
+                  Mover e eliminar
+                </Button>
+                <Button type="button" variant="outline" size="sm" onClick={() => setDeleting(null)}>
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          )}
           <form
             className="flex items-end gap-2 pt-2"
             onSubmit={(e) => {

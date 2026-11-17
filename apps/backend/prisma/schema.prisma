@@ -152,33 +152,49 @@ model Contact {
   @@index([ownerId])
 }
 
-enum StageType {
+/// Categoria fixa de um passo: o que a agenda e os relatórios usam sem conhecer o nome dado pelo utilizador.
+enum WorkflowStepCategory {
   OPEN
+  IN_PROGRESS
+  DONE
+  CANCELLED
+}
+
+/// Resultado de um passo concluído (só com categoria DONE). Nos negócios: ganho ou perdido.
+enum WorkflowOutcome {
   WON
   LOST
 }
 
-model Pipeline {
+// Fluxo genérico (Fase 0c, docs/plano-fase-0-fundacoes.md): era o «funil» (Pipeline) dos negócios; os ids não mudaram.
+model Workflow {
   id              String           @id @default(uuid())
+  /// Tipo de coisa que passa por este fluxo ("DEAL"; os módulos futuros juntam os seus em src/workflows/workflow-registry.ts).
+  entityType      String
   name            String
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
-  stages          Stage[]
+  steps           WorkflowStep[]
   deals           Deal[]
   automationRules AutomationRule[]
+
+  @@index([entityType])
 }
 
-model Stage {
-  id              String           @id @default(uuid())
+// Passo de um fluxo (era a «fase», Stage). Regras de categoria/resultado: src/workflows/workflow-steps.ts.
+model WorkflowStep {
+  id              String               @id @default(uuid())
   name            String
   order           Int
-  type            StageType        @default(OPEN)
-  pipelineId      String
-  pipeline        Pipeline         @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  category        WorkflowStepCategory @default(OPEN)
+  /// Só em passos DONE (há uma restrição CHECK na base de dados).
+  outcome         WorkflowOutcome?
+  workflowId      String
+  workflow        Workflow             @relation(fields: [workflowId], references: [id], onDelete: Cascade)
   deals           Deal[]
   automationRules AutomationRule[]
 
-  @@index([pipelineId])
+  @@index([workflowId])
 }
 
 model Deal {
@@ -191,9 +207,9 @@ model Deal {
   estimatedMargin Float?
   lossReason      String?
   pipelineId      String
-  pipeline        Pipeline      @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  pipeline        Workflow      @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
   stageId         String
-  stage           Stage         @relation(fields: [stageId], references: [id], onDelete: Restrict)
+  stage           WorkflowStep  @relation(fields: [stageId], references: [id], onDelete: Restrict)
   stageEnteredAt  DateTime      @default(now())
   contactId       String?
   contact         Contact?      @relation(fields: [contactId], references: [id], onDelete: SetNull)
@@ -227,9 +243,9 @@ model AutomationRule {
   name          String
   active        Boolean               @default(true)
   pipelineId    String?
-  pipeline      Pipeline?             @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  pipeline      Workflow?             @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
   stageId       String?
-  stage         Stage?                @relation(fields: [stageId], references: [id], onDelete: Cascade)
+  stage         WorkflowStep?         @relation(fields: [stageId], references: [id], onDelete: Cascade)
   triggerType   AutomationTriggerType
   triggerConfig Json
   actionType    AutomationActionType

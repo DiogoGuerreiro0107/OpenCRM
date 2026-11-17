@@ -7,6 +7,7 @@ import { RealtimeService } from "../realtime/realtime.service";
 import { ModulesService } from "../modules/modules.service";
 import { CreateAutomationRuleDto } from "./dto/create-automation-rule.dto";
 import { UpdateAutomationRuleDto } from "./dto/update-automation-rule.dto";
+import { isOpenStep } from "../workflows/workflow-steps";
 
 const RULE_INCLUDE = {
   pipeline: { select: { id: true, name: true } },
@@ -158,7 +159,7 @@ export class AutomationsService {
       if (rule.actionType === "MOVE_STAGE") {
         const config = rule.actionConfig as { targetStageId?: string };
         if (!config.targetStageId) return;
-        const targetStage = await this.prisma.stage.findUnique({ where: { id: config.targetStageId } });
+        const targetStage = await this.prisma.workflowStep.findUnique({ where: { id: config.targetStageId } });
         if (!targetStage) return;
 
         const last = await this.prisma.deal.findFirst({
@@ -170,10 +171,10 @@ export class AutomationsService {
           where: { id: dealId },
           data: {
             stageId: targetStage.id,
-            pipelineId: targetStage.pipelineId,
+            pipelineId: targetStage.workflowId,
             order: (last?.order ?? -1) + 1,
             stageEnteredAt: new Date(),
-            closedAt: targetStage.type === "OPEN" ? null : new Date(),
+            closedAt: isOpenStep(targetStage) ? null : new Date(),
           },
         });
 
@@ -184,7 +185,7 @@ export class AutomationsService {
           ruleId: rule.id,
           ruleName: rule.name,
           toStageId: targetStage.id,
-          toPipelineId: targetStage.pipelineId,
+          toPipelineId: targetStage.workflowId,
         });
       } else if (rule.actionType === "TRIGGER_WEBHOOK") {
         const config = rule.actionConfig as { event?: string };

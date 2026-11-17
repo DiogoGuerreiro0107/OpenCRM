@@ -86,11 +86,17 @@ export interface ContactDetail extends Contact {
 
 export type StageType = "OPEN" | "WON" | "LOST";
 
+/** Categoria fixa de um passo de fluxo (Fase 0c). Nos negócios, OPEN = aberto; DONE + outcome = ganho/perdido. */
+export type WorkflowStepCategory = "OPEN" | "IN_PROGRESS" | "DONE" | "CANCELLED";
+
 export interface Stage {
   id: string;
   name: string;
   order: number;
+  /** Visão dos negócios: OPEN/WON/LOST (calculada a partir de category + outcome). */
   type: StageType;
+  category: WorkflowStepCategory;
+  outcome: "WON" | "LOST" | null;
   pipelineId: string;
 }
 

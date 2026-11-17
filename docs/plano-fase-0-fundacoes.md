@@ -194,11 +194,29 @@ Transformar funis/fases num **fluxo genérico** que os próximos módulos (assis
 | Precisar de voltar atrás | `down.sql` testado na cópia; cópia de segurança antes de atualizar |
 | Nomes de índices/chaves diferentes dos esperados pelo Prisma | `prisma migrate diff` contra a base migrada tem de dar «sem diferenças» |
 
+### Execução do pacote 0c (2026-11-17)
+
+**Implementado como planeado.** Código novo em `apps/backend/src/workflows/` (regras dos passos, registo de tipos, serviço genérico); `PipelinesService` passou a fachada da API dos negócios. Pormenores decididos na implementação:
+- **Reordenar** passou a recusar ids de fases de outro funil (antes eram aceites em silêncio).
+- **Mover ao apagar** respeita as regras dos negócios: fecho/reabertura (`closedAt`) conforme o destino, e destino de perda só se todos os negócios tiverem motivo de perda. **Não** dispara webhooks/automações por cada negócio movido (é uma operação de arrumação, como apagar uma fase).
+- Um passo `DONE` sem resultado ou `CANCELLED` conta como «perdido» na visão dos negócios (coerente com «não está aberto»); hoje nenhum passo de negócios fica assim.
+- A reversão ficou em `apps/backend/prisma/rollbacks/20261117170000_fluxos_genericos.down.sql` (fora da pasta de migrações, para o Prisma nunca a aplicar sozinho).
+
+**Ensaio da migração numa cópia da base de desenvolvimento** (3 funis, 13 fases, 1 negócio): fotografia → migração → **nenhum id, nome, ordem, ligação ou tipo mudou**; `prisma migrate diff` sem diferenças; a restrição CHECK recusou um resultado num passo aberto; `down.sql` → dados iguais aos iniciais e **esquema idêntico** ao original (mesma impressão digital de colunas, índices e chaves); cópia apagada. A sessão foi interrompida a meio do primeiro ensaio; a cópia foi apagada e o ensaio repetido do início.
+
+**Validação:**
+- **Os 324 e2e que já existiam passam sem alterações nas expectativas** (só o *fixture* do teste dos campos personalizados, que criava um funil diretamente na base, foi adaptado aos nomes novos). Com os novos: 252 unitários e 339 e2e; builds OK.
+- **Prova por mutação:** tirar `IN_PROGRESS` de «aberto», estragar a conversão de `WON` e não mover os itens ao apagar → falham seis testes.
+- **Base de desenvolvimento migrada** com fotografia antes/depois igual (e uma cópia de segurança em `/tmp/opencrm-antes-0c.dump` dentro do contentor do Postgres).
+- **Browser** (base de testes): Kanban com as cores de sempre; gerir funil → apagar fase com 2 negócios mostra a pergunta; destino «Perdido» recusado com a mensagem do motivo de perda; destino «Em negociação» move os negócios e apaga a fase; dashboard com os valores certos.
+
+**Não testado:** arrastar cartões no Kanban no browser (coberto pelos e2e de `move`); a reversão na base de desenvolvimento (só na cópia).
+
 ### Pacote 0d
 Será detalhado no seu próprio plano quando chegar a vez.
 
 ## Registo de execução
 - [x] 0a — Registo de módulos (ver decisoes.md)
 - [x] 0b — Campos personalizados genéricos (ver «Execução do pacote 0b»)
-- [ ] 0c — Fluxos genéricos
+- [x] 0c — Fluxos genéricos (ver «Execução do pacote 0c»)
 - [ ] 0d — Permissões em base de dados
