@@ -92,6 +92,23 @@ O plano dizia «gerada a partir do código (`@nestjs/swagger`)». **Proponho o c
 - **E2E:** conformidade de todas as respostas da v1 com a especificação; `external_id`: repetido na mesma chave → 409 com o id existente; noutra chave → cria; ausente → como antes; a ligação desaparece ao apagar o lead; `openapi.json` acessível com qualquer chave e 401 sem chave; descarregar pela página de gestão só para o Administrador.
 - **Prova por mutação:** acrescentar um campo a um mapeador sem o documentar; retirar uma rota da especificação; remover a verificação do `external_id`.
 
+### Execução do pacote E0e (2026-11-17)
+
+**Implementado como planeado** (incluindo o desvio proposto: especificação escrita à mão em `public-api/openapi.ts`, sem `@nestjs/swagger`). Pormenores:
+- As enumerações da especificação (estados, origens, áreas de interesse, códigos de erro, âmbitos) vêm **das mesmas constantes do código** (enums do Prisma, `API_ERROR_CODES`, `API_SCOPES`): um valor novo aparece na especificação sem ninguém se lembrar.
+- O id externo é **reservado antes** de criar o lead (o lead é criado com um id escolhido previamente): dois pedidos simultâneos com o mesmo `external_id` nunca criam dois leads nem disparam dois webhooks. Se a criação falhar, a reserva é desfeita.
+- Dependências novas **só de desenvolvimento** (`ajv` 8.20.0 e `ajv-formats` 2.1.1, já presentes no lockfile como dependências transitivas; nada descarregado).
+
+**Validação:**
+- 234 unitários e 311 e2e a passar; migração sem desvio contra o `schema.prisma`; builds OK.
+- **Conformidade:** todas as operações da v1, com sucesso e com cada erro documentado (400, 401, 403, 404, 409, 422, 429), validadas contra a especificação, incluindo registos com todos os campos preenchidos e com todos os opcionais a `null`.
+- **Prova por mutação:** acrescentar `owner_id` a um mapeador sem o documentar → o e2e de conformidade falha; retirar uma rota da especificação → o teste estrutural falha; retirar a reserva do `external_id` → cinco e2e falham.
+- **Browser:** o botão «Descarregar especificação OpenAPI» faz o pedido (200) sem erros na consola. **Não verifiquei o ficheiro descarregado** (o navegador integrado não mostra transferências); o conteúdo servido é testado nos e2e.
+
+**Não testado:** importar a especificação num Postman/Insomnia real; gerar um cliente a partir dela.
+
+**Fase E0 concluída.** Próximo passo segundo o plano: Fase 0b (campos personalizados genéricos) — ver [plano-fase-0-fundacoes.md](plano-fase-0-fundacoes.md).
+
 ## Pacote E0d — Eventos e webhooks de saída (plano, 2026-11-12)
 
 Hoje o CRM avisa o n8n por **um único URL** (`N8N_WEBHOOK_URL`), sem assinatura, sem repetição e sem registo: se o n8n estiver em baixo, o evento perde-se e ninguém fica a saber. Este pacote generaliza isso para **subscrições de webhook** geridas na interface, que é como os conectores da «forma A» (lojas, faturação, n8n) ficam a saber do que acontece no CRM.
@@ -231,4 +248,4 @@ Base de tudo o que é «forma A» do [sistema de extensões](plano-extensoes-e-a
 - [x] E0b — Registo de auditoria (ver «Pacote E0b» abaixo)
 - [x] E0c — Chaves de API e `/api/v1` (ver «Execução do pacote E0c»)
 - [x] E0d — Eventos e webhooks de saída (ver «Execução do pacote E0d»)
-- [ ] E0e — OpenAPI e `LigaçãoExterna`
+- [x] E0e — OpenAPI e ids externos (ver «Execução do pacote E0e») — **fase E0 concluída**

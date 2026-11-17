@@ -1,15 +1,18 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus, Logger } from "@nestjs/common";
 
 /** Códigos de erro estáveis da API pública (fazem parte do contrato da v1: só se acrescentam). */
-export type ApiErrorCode =
-  | "invalid_request"
-  | "unauthorized"
-  | "insufficient_scope"
-  | "not_found"
-  | "conflict"
-  | "idempotency_key_reuse"
-  | "rate_limited"
-  | "internal_error";
+export const API_ERROR_CODES = [
+  "invalid_request",
+  "unauthorized",
+  "insufficient_scope",
+  "not_found",
+  "conflict",
+  "idempotency_key_reuse",
+  "rate_limited",
+  "internal_error",
+] as const;
+
+export type ApiErrorCode = (typeof API_ERROR_CODES)[number];
 
 const CODE_BY_STATUS: Record<number, ApiErrorCode> = {
   [HttpStatus.BAD_REQUEST]: "invalid_request",

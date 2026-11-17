@@ -425,3 +425,9 @@ O item "limite de tentativas de login por conta" andava no backlog desde o endur
 - Repetição 1 min → 5 min → 30 min → 2 h → 6 h (6 tentativas), reserva atómica contra duplicados, disjuntor às 20 falhas seguidas, reenvio manual, sem seguir redirecionamentos, sem guardar o corpo da resposta.
 - Garantia **pelo menos uma vez** (o consumidor deduplica pelo `id`). **Não é um outbox transacional**: o evento é publicado depois da escrita principal; fica para quando a faturação o exigir.
 - Um *bus* de eventos dentro do processo ficou de fora até haver um consumidor (regra de dois).
+
+## Fase E0e: especificação OpenAPI e ids externos (2026-11-17)
+- **Especificação OpenAPI 3.1 escrita à mão** (`public-api/openapi.ts`) em vez de gerada com `@nestjs/swagger`: as respostas vêm de mapeadores escritos à mão que o gerador não consegue inferir, e a especificação é o contrato que a política de versões protege. Testes impedem a divergência: rotas/métodos/âmbitos nos dois sentidos, e todas as respostas reais dos e2e validadas contra os esquemas (`additionalProperties: false`).
+- Servida em `GET /api/v1/openapi.json` (qualquer chave) e descarregável pelo Administrador. Sem Swagger UI (evita servir JavaScript de terceiros); sem cliente TypeScript gerado (ainda não há consumidor).
+- `ExternalLink` (provider, tipo, id, id externo; único nos dois sentidos). Primeiro uso: `external_id` em `POST /api/v1/leads` — repetido pela mesma chave dá 409 com o lead existente, sem limite de tempo. O id externo é reservado antes de criar o lead (concorrência segura).
+- **Fase E0 (API pública, eventos e segredos) concluída.**

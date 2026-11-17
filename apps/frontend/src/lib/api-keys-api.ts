@@ -29,3 +29,15 @@ export async function revokeApiKey(id: string) {
   const { data } = await api.post<ApiKeyView>(`/api-keys/${id}/revoke`);
   return data;
 }
+
+/** Descarrega a especificação OpenAPI da `/api/v1` como ficheiro (para entregar a quem integra). */
+export async function downloadOpenApiSpec() {
+  const { data } = await api.get<object>("/api-keys/openapi.json");
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "opencrm-api-v1.openapi.json";
+  link.click();
+  URL.revokeObjectURL(url);
+}

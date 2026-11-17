@@ -6,6 +6,7 @@ import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { WRITE_ACCESS } from "../auth/permissions";
 import { Audit } from "../audit/audit.decorator";
 import { API_SCOPES } from "../public-api/scopes";
+import { OPENAPI_SPEC } from "../public-api/openapi";
 import { ApiKeysService } from "./api-keys.service";
 import { CreateApiKeyDto } from "./dto/create-api-key.dto";
 
@@ -27,6 +28,13 @@ export class ApiKeysController {
   @Get("scopes")
   scopes() {
     return Object.entries(API_SCOPES).map(([scope, description]) => ({ scope, description }));
+  }
+
+  /** A especificação OpenAPI da `/api/v1`, para o Administrador a descarregar e entregar a quem integra. */
+  @Roles(...WRITE_ACCESS.adminOnly)
+  @Get("openapi.json")
+  openapi() {
+    return OPENAPI_SPEC;
   }
 
   @Audit("api_key.created", { target: "api_key", fields: ["name", "scopes", "expiresAt", "rateLimitPerMinute"] })
