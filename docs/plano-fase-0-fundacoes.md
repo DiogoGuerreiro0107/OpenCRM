@@ -8,8 +8,8 @@ Primeira fase do [desenho da reorganização modular](plano-reorganizacao-modula
 |---|---|---|---|
 | **0a — Registo de módulos** | Ligar/desligar módulos (leads, funis/negócios, email, telefonia, automações), menu e rotas dependentes do que está ativo, dependências, página de definições | **Nenhum** (só acrescenta uma tabela) | a fazer agora |
 | **0b — Campos personalizados genéricos** | `entityType` deixa de ser um enum fechado (registo de tipos); validação dos valores; limpeza ao apagar; permissões por tipo de registo | Baixo (conversão de enum para texto, valores iguais) | feito |
-| **0c — Fluxos genéricos** | `Pipeline`/`Stage` → `Workflow`/`WorkflowStep` (renomeados, mesmos ids), categoria + resultado, apagar passo movendo os itens | **Médio** (migra dados reais: negócios e regras de automação apontam para as fases) | a fazer agora |
-| **0d — Permissões em base de dados** | Matriz por módulo/tipo guardada na BD, com os valores atuais por omissão; o frontend deixa de ter uma cópia | Baixo | depois |
+| **0c — Fluxos genéricos** | `Pipeline`/`Stage` → `Workflow`/`WorkflowStep` (renomeados, mesmos ids), categoria + resultado, apagar passo movendo os itens | **Médio** (migra dados reais: negócios e regras de automação apontam para as fases) | feito |
+| **0d — Permissões em base de dados** | Matriz por módulo/tipo guardada na BD, com os valores atuais por omissão; o frontend deixa de ter uma cópia | Baixo | a fazer agora |
 
 Cada pacote só avança depois de o anterior estar integrado.
 
@@ -212,8 +212,43 @@ Transformar funis/fases num **fluxo genérico** que os próximos módulos (assis
 
 **Não testado:** arrastar cartões no Kanban no browser (coberto pelos e2e de `move`); a reversão na base de desenvolvimento (só na cópia).
 
-### Pacote 0d
-Será detalhado no seu próprio plano quando chegar a vez.
+## Pacote 0d — Permissões em base de dados (plano, 2026-11-17)
+
+### O que existe hoje
+- A matriz de **escrita por papel** (`WRITE_ACCESS` em `apps/backend/src/auth/permissions.ts`) está **fixa em código**: mudar quem pode editar empresas exige alterar código e publicar uma versão.
+- O frontend tem uma **cópia à mão** da matriz (`apps/frontend/src/lib/permissions.ts`), vigiada por um teste que falha se divergirem.
+- A leitura é aberta a todos os autenticados, exceto nas áreas de administração.
+- Um caso concreto em aberto: no 0b, o **Técnico** deixou de poder preencher campos personalizados de empresas porque não pode editar empresas. Com o 0d, se o Técnico precisar, o Administrador dá-lhe essa permissão na interface.
+
+### Desenho
+1. **Mesma granularidade de hoje: «quem pode escrever» em cada área** (empresas, contactos, leads, negócios, trabalho do dia-a-dia, enviar email, ligar, modelos de email). **Desvio ao desenho da reorganização (§3.11)**, que falava em ver/criar/editar/eliminar por tipo de item: não há ainda nenhum caso que precise dessa divisão, e uma matriz de 4 ações × N tipos × 6 papéis seria difícil de gerir sem ganho. Fica preparado (a área é texto) para dividir quando um módulo novo o pedir.
+2. **O que nunca é configurável:** a área de **administração** (utilizadores, módulos, permissões, chaves de API, webhooks, auditoria, automações, definição de campos, estrutura dos funis, Zadarma) é sempre **só do Administrador**. Tornar isto configurável permitiria a alguém dar-se a si próprio acesso à gestão de utilizadores.
+3. **Invariantes impostas pelo backend:** o **Administrador está sempre** em todas as áreas (não se pode retirar — evita ficar sem ninguém que consiga corrigir); **Leitura apenas nunca** escreve.
+4. **Armazenamento:** `PermissionSetting (area, roles, updatedAt)`. **Sem linha = valor por omissão** (a matriz atual, que fica em código como predefinição). Instalar este pacote **não muda nada** a ninguém. Cache em memória, atualizada a cada alteração (uma só instância do backend, como os módulos).
+5. **Decorador por área:** as rotas passam de `@WriteRoles(...WRITE_ACCESS.companies)` (lista fixa) para `@WriteArea("companies")`, resolvido **em cada pedido** pelo `RolesGuard`. As de administração mantêm `@WriteRoles(ADMIN)`. Um decorador no método sobrepõe-se ao da classe (como hoje). Os testes estruturais continuam a exigir que toda a rota de escrita tenha política, e passam a exigir que as áreas existam.
+6. **Serviços que verificam permissões** (campos personalizados por tipo de registo) passam a perguntar ao `PermissionsService` em vez de lerem a constante.
+7. **API:**
+   - `GET /me/permissions` (qualquer utilizador autenticado): as áreas em que o próprio pode escrever. O frontend **deixa de ter cópia da matriz** e usa isto; o teste de sincronização deixa de ser preciso.
+   - `GET /permissions` (Administrador): a matriz com rótulos, descrições, valores atuais e predefinidos.
+   - `PATCH /permissions/:area` e `DELETE /permissions/:area` (repor a predefinição): só o Administrador, **auditados**.
+   - As alterações chegam às sessões abertas em **tempo real** (como os módulos).
+8. **Interface: Configurações > Permissões** — tabela áreas × papéis com caixas de seleção; coluna do Administrador sempre marcada e bloqueada; Leitura apenas sem caixas; «Repor predefinição» por área; aviso de que a área de administração não é configurável.
+9. **Ecrãs:** enquanto as permissões carregam, os botões de edição ficam escondidos (como os módulos); a ligação «Templates de Email» no menu passa a seguir a área configurável `emailTemplates`.
+
+### Testes e validação
+- **Unitários:** invariantes (Administrador sempre, Leitura apenas nunca, área desconhecida), resolução com e sem linha na base de dados.
+- **E2E:** sem configuração, **todas as permissões ficam iguais às de hoje** (os e2e de permissões existentes têm de passar sem alterações); dar «empresas» ao Técnico → passa a poder criar empresas **e** preencher os campos personalizados delas, sem reiniciar; retirar → volta a 403; repor a predefinição; tentar retirar o Administrador ou dar escrita a Leitura apenas → 400; não-administrador não vê nem altera a matriz; `GET /me/permissions` reflete a mudança; auditoria das alterações.
+- **Estruturais:** todas as rotas de escrita com política; todas as áreas usadas nas rotas existem; as rotas de administração não usam áreas configuráveis.
+- **Prova por mutação:** ignorar a base de dados (usar sempre a predefinição); deixar retirar o Administrador.
+- **Browser:** página de permissões; dar uma área ao Técnico e ver o botão aparecer na sessão dele sem recarregar.
+
+### Riscos
+| Risco | Mitigação |
+|---|---|
+| Alguém ficar sem acesso a nada que o deixe corrigir | Administrador sempre incluído; administração nunca configurável |
+| Uma rota nova ficar sem política | Teste estrutural (como hoje) |
+| Permissões alteradas não chegarem às sessões abertas | Tempo real + leitura por pedido no backend (o frontend é só conforto; o backend decide sempre) |
+| Cache desatualizada | Atualizada a cada escrita; uma só instância |
 
 ## Registo de execução
 - [x] 0a — Registo de módulos (ver decisoes.md)
