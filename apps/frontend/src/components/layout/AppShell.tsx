@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
-import { Building2, CheckSquare, FileText, KanbanSquare, LayoutDashboard, KeyRound, Mail, Phone, Puzzle, ScrollText, Settings, UserCog, UserPlus, Users, Webhook, Zap, type LucideIcon } from "lucide-react";
+import { Building2, CheckSquare, FileText, KanbanSquare, LayoutDashboard, KeyRound, Mail, Phone, ShieldCheck, Puzzle, ScrollText, Settings, UserCog, UserPlus, Users, Webhook, Zap, type LucideIcon } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
 import { PasswordDialog } from "@/components/PasswordDialog";
 import { changeOwnPassword } from "@/lib/users-api";
 import { cn } from "@/lib/utils";
-import { ADMIN_ONLY, EMAIL_TEMPLATE_MANAGERS, hasRole } from "@/lib/permissions";
+import { ADMIN_ONLY, hasRole, type WriteArea } from "@/lib/permissions";
+import { useMyPermissions } from "@/lib/useCanWrite";
 import { useModules } from "@/lib/useModules";
 import type { ModuleId } from "@/lib/modules-api";
 import type { Role } from "@opencrm/shared-types";
@@ -22,14 +23,16 @@ const navItems: Array<{ to: string; label: string; icon: LucideIcon; module?: Mo
   { to: "/contactos", label: "Contactos", icon: Users },
 ];
 
-// `roles`: papéis que veem o item (têm de coincidir com as <RequireRole> em App.tsx e com o backend).
-const settingsItems: Array<{ to: string; label: string; icon: LucideIcon; roles: Role[]; module?: ModuleId }> = [
+// Quem vê cada item: `roles` (lista fixa: administração) OU `writeArea` (área configurável, Fase 0d). Têm de coincidir
+// com as <RequireRole>/<RequireWrite> em App.tsx e com o backend.
+const settingsItems: Array<{ to: string; label: string; icon: LucideIcon; roles?: Role[]; writeArea?: WriteArea; module?: ModuleId }> = [
   { to: "/configuracoes/campos-personalizados", label: "Campos Personalizados", icon: Settings, roles: ADMIN_ONLY },
-  { to: "/configuracoes/templates-email", label: "Templates de Email", icon: FileText, roles: EMAIL_TEMPLATE_MANAGERS, module: "email" },
+  { to: "/configuracoes/templates-email", label: "Templates de Email", icon: FileText, writeArea: "emailTemplates", module: "email" },
   { to: "/configuracoes/automacoes", label: "Automações", icon: Zap, roles: ADMIN_ONLY, module: "automations" },
   { to: "/configuracoes/utilizadores", label: "Utilizadores", icon: UserCog, roles: ADMIN_ONLY },
   { to: "/configuracoes/zadarma", label: "Zadarma", icon: Phone, roles: ADMIN_ONLY, module: "zadarma" },
   { to: "/configuracoes/modulos", label: "Módulos", icon: Puzzle, roles: ADMIN_ONLY },
+  { to: "/configuracoes/permissoes", label: "Permissões", icon: ShieldCheck, roles: ADMIN_ONLY },
   { to: "/configuracoes/chaves-api", label: "Chaves de API", icon: KeyRound, roles: ADMIN_ONLY },
   { to: "/configuracoes/webhooks", label: "Webhooks", icon: Webhook, roles: ADMIN_ONLY },
   { to: "/configuracoes/auditoria", label: "Auditoria", icon: ScrollText, roles: ADMIN_ONLY },
@@ -41,7 +44,10 @@ export function AppShell() {
   const { enabled: enabledModules } = useModules();
   const moduleOn = (id?: ModuleId) => !id || enabledModules.has(id);
   const visibleNavItems = navItems.filter((item) => moduleOn(item.module));
-  const visibleSettingsItems = settingsItems.filter((item) => hasRole(user?.role, item.roles) && moduleOn(item.module));
+  const { data: myPermissions } = useMyPermissions();
+  const allowed = (item: (typeof settingsItems)[number]) =>
+    item.writeArea ? !!myPermissions?.writeAreas.includes(item.writeArea) : hasRole(user?.role, item.roles ?? []);
+  const visibleSettingsItems = settingsItems.filter((item) => allowed(item) && moduleOn(item.module));
 
   return (
     <div className="flex min-h-screen">

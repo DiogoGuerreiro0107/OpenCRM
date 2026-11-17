@@ -9,7 +9,7 @@ Primeira fase do [desenho da reorganização modular](plano-reorganizacao-modula
 | **0a — Registo de módulos** | Ligar/desligar módulos (leads, funis/negócios, email, telefonia, automações), menu e rotas dependentes do que está ativo, dependências, página de definições | **Nenhum** (só acrescenta uma tabela) | a fazer agora |
 | **0b — Campos personalizados genéricos** | `entityType` deixa de ser um enum fechado (registo de tipos); validação dos valores; limpeza ao apagar; permissões por tipo de registo | Baixo (conversão de enum para texto, valores iguais) | feito |
 | **0c — Fluxos genéricos** | `Pipeline`/`Stage` → `Workflow`/`WorkflowStep` (renomeados, mesmos ids), categoria + resultado, apagar passo movendo os itens | **Médio** (migra dados reais: negócios e regras de automação apontam para as fases) | feito |
-| **0d — Permissões em base de dados** | Matriz por módulo/tipo guardada na BD, com os valores atuais por omissão; o frontend deixa de ter uma cópia | Baixo | a fazer agora |
+| **0d — Permissões em base de dados** | Matriz por módulo/tipo guardada na BD, com os valores atuais por omissão; o frontend deixa de ter uma cópia | Baixo | feito |
 
 Cada pacote só avança depois de o anterior estar integrado.
 
@@ -250,8 +250,25 @@ Transformar funis/fases num **fluxo genérico** que os próximos módulos (assis
 | Permissões alteradas não chegarem às sessões abertas | Tempo real + leitura por pedido no backend (o frontend é só conforto; o backend decide sempre) |
 | Cache desatualizada | Atualizada a cada escrita; uma só instância |
 
+### Execução do pacote 0d (2026-11-17)
+
+**Implementado como planeado.** Pormenores:
+- `auth/permissions.ts` passou a ter as **predefinições** (`WRITE_AREAS`) e a administração fixa (`ADMIN_ONLY`); a constante `WRITE_ACCESS` deixou de existir, para nenhum código ler as listas fixas por engano. Um teste garante que as predefinições são exatamente a matriz anterior.
+- O `RolesGuard` resolve `@WriteArea` em cada pedido; a política do método sobrepõe-se à da classe nos dois sentidos (área ↔ lista fixa), com testes unitários para isso. O teste de auditoria passou a seguir a mesma regra.
+- O frontend deixou de ter a cópia da matriz: só os **nomes** das áreas (um teste no backend compara-os). Enquanto as permissões carregam, os botões de edição ficam escondidos.
+- Na preparação dos e2e, a configuração de permissões é limpa no início de cada ficheiro (como os módulos).
+
+**Validação:**
+- **Os 339 e2e que já existiam passam sem alterações** (sem configuração, nada muda). Com os novos: 247 unitários e 347 e2e; migração sem desvio; builds OK.
+- **Prova por mutação:** o guard a usar sempre a predefinição (ignorando a configuração) e deixar retirar o Administrador → falham três testes.
+- **Browser, com duas sessões ao mesmo tempo** (Administrador em `localhost`, Técnico em `127.0.0.1`, base de testes): a página mostra a matriz com as predefinições; ao dar «Empresas» ao Técnico, o botão «Nova empresa» **apareceu na sessão do Técnico sem recarregar**; ao repor a predefinição, desapareceu. Sem erros na consola.
+
+**Não testado:** a página de modelos de email com a área `emailTemplates` dada a outro papel (a lógica é a mesma, coberta por e2e da API).
+
+**Fase 0 concluída** (0a módulos, 0b campos personalizados, 0c fluxos, 0d permissões). Próximo passo segundo a [reorganização](plano-reorganizacao-modular.md): Fase 1 (leads por empresa/pessoa), que começa por um teste de carga.
+
 ## Registo de execução
 - [x] 0a — Registo de módulos (ver decisoes.md)
 - [x] 0b — Campos personalizados genéricos (ver «Execução do pacote 0b»)
 - [x] 0c — Fluxos genéricos (ver «Execução do pacote 0c»)
-- [ ] 0d — Permissões em base de dados
+- [x] 0d — Permissões em base de dados (ver «Execução do pacote 0d») — **Fase 0 concluída**

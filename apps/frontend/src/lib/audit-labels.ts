@@ -30,6 +30,8 @@ const ACTION_LABELS: Record<string, string> = {
   "webhook.test_sent": "Teste de webhook enviado",
   "webhook.delivery_retried": "Entrega de webhook reenviada",
   "webhook.auto_disabled": "Webhook desativado automaticamente (falhas seguidas)",
+  "permission.updated": "Permissões alteradas",
+  "permission.reset": "Permissões repostas na predefinição",
   "secrets.encrypted": "Segredos cifrados (comando do sistema)",
 };
 
@@ -46,5 +48,6 @@ export const ACTION_GROUPS: Array<{ prefix: string; label: string }> = [
   { prefix: "automation.", label: "Automações" },
   { prefix: "api_key.", label: "Chaves de API" },
   { prefix: "webhook.", label: "Webhooks" },
+  { prefix: "permission.", label: "Permissões" },
   { prefix: "secrets.", label: "Segredos (sistema)" },
 ];

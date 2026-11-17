@@ -7,6 +7,7 @@ import { AppModule } from "../src/app.module";
 import { configureApp } from "../src/app.setup";
 import { PrismaService } from "../src/prisma/prisma.service";
 import { ModulesService } from "../src/modules/modules.service";
+import { PermissionsService } from "../src/auth/permissions.service";
 
 export async function createTestApp(): Promise<INestApplication> {
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
@@ -17,6 +18,9 @@ export async function createTestApp(): Promise<INestApplication> {
   // o ficheiro anterior deixou a base de dados. (Só corre em bases de dados de teste: ver env.ts.)
   await app.get(PrismaService).moduleSetting.deleteMany();
   await app.get(ModulesService).reload();
+  // ... e com as permissões predefinidas (Fase 0d).
+  await app.get(PrismaService).permissionSetting.deleteMany();
+  await app.get(PermissionsService).reload();
   return app;
 }
 

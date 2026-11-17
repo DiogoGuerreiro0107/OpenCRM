@@ -8,7 +8,8 @@ import { InternalApiKeyGuard } from "./guards/internal-api-key.guard";
 import { ApiKeyGuard } from "../public-api/api-key.guard";
 import { JwtAuthGuard } from "./guards/jwt-auth.guard";
 import { RolesGuard } from "./guards/roles.guard";
-import { WRITE_ACCESS } from "./permissions";
+import { ADMIN_ONLY, WRITE_AREAS } from "./permissions";
+import { WRITE_AREA_KEY } from "./decorators/roles.decorator";
 
 /**
  * Teste estrutural: percorre TODOS os controllers (descobertos no disco) e falha se existir uma rota que
@@ -51,7 +52,9 @@ function collectRoutes(): RouteInfo[] {
         if (httpMethod === undefined) continue; // não é uma rota
 
         const handlerGuards: unknown[] = Reflect.getMetadata("__guards__", handler) ?? [];
-        const hasPolicy = [ROLES_KEY, WRITE_ROLES_KEY].some(
+        const area = Reflect.getMetadata(WRITE_AREA_KEY, handler) ?? Reflect.getMetadata(WRITE_AREA_KEY, exported);
+        if (area !== undefined && !(area in WRITE_AREAS)) throw new Error(`${exported.name}.${name}: área desconhecida «${area}»`);
+        const hasPolicy = [ROLES_KEY, WRITE_ROLES_KEY, WRITE_AREA_KEY].some(
           (key) => Reflect.getMetadata(key, handler) !== undefined || Reflect.getMetadata(key, exported) !== undefined,
         );
         routes.push({
@@ -103,24 +106,39 @@ describe("cobertura de permissões nos controllers", () => {
   });
 });
 
-describe("matriz WRITE_ACCESS", () => {
+describe("predefinições das permissões (Fase 0d)", () => {
   const validRoles = Object.values(Role) as string[];
+  const defaults = Object.entries(WRITE_AREAS).map(([name, def]) => [name, def.defaultRoles] as const);
 
-  it("só contém papéis que existem", () => {
-    for (const [name, roles] of Object.entries(WRITE_ACCESS)) {
+  it("só contêm papéis que existem", () => {
+    for (const [name, roles] of defaults) {
       for (const role of roles) expect({ name, role, valid: validRoles.includes(role) }).toEqual({ name, role, valid: true });
     }
   });
 
   it("LEITURA_APENAS nunca tem permissão de escrita", () => {
-    for (const roles of Object.values(WRITE_ACCESS)) expect(roles).not.toContain("LEITURA_APENAS");
+    for (const [, roles] of defaults) expect(roles).not.toContain("LEITURA_APENAS");
   });
 
   it("o Administrador pode sempre escrever", () => {
-    for (const roles of Object.values(WRITE_ACCESS)) expect(roles).toContain("ADMINISTRADOR");
+    for (const [, roles] of defaults) expect(roles).toContain("ADMINISTRADOR");
   });
 
-  it("configuração sensível é só do Administrador", () => {
-    expect(WRITE_ACCESS.adminOnly).toEqual(["ADMINISTRADOR"]);
+  it("configuração sensível é só do Administrador (e não é uma área configurável)", () => {
+    expect(ADMIN_ONLY).toEqual(["ADMINISTRADOR"]);
+    expect(Object.keys(WRITE_AREAS)).not.toContain("adminOnly");
+  });
+
+  it("as predefinições são exatamente a matriz de antes da Fase 0d (instalar o 0d não muda nada)", () => {
+    expect(Object.fromEntries(defaults.map(([n, r]) => [n, [...r].sort()]))).toEqual({
+      companies: ["ADMINISTRADOR", "BACKOFFICE", "COMERCIAL", "FINANCEIRO"],
+      contacts: ["ADMINISTRADOR", "BACKOFFICE", "COMERCIAL"],
+      leads: ["ADMINISTRADOR", "BACKOFFICE", "COMERCIAL"],
+      deals: ["ADMINISTRADOR", "BACKOFFICE", "COMERCIAL"],
+      dailyWork: ["ADMINISTRADOR", "BACKOFFICE", "COMERCIAL", "FINANCEIRO", "TECNICO"],
+      sendEmail: ["ADMINISTRADOR", "BACKOFFICE", "COMERCIAL"],
+      makeCall: ["ADMINISTRADOR", "BACKOFFICE", "COMERCIAL", "TECNICO"],
+      emailTemplates: ["ADMINISTRADOR", "BACKOFFICE"],
+    });
   });
 });

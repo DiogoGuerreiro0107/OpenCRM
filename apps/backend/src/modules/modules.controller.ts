@@ -3,7 +3,7 @@ import { IsBoolean } from "class-validator";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles, WriteRoles } from "../auth/decorators/roles.decorator";
-import { WRITE_ACCESS } from "../auth/permissions";
+import { ADMIN_ONLY } from "../auth/permissions";
 import { Audit } from "../audit/audit.decorator";
 import { ModulesService } from "./modules.service";
 
@@ -13,7 +13,7 @@ class SetModuleEnabledDto {
 }
 
 @UseGuards(JwtAuthGuard, RolesGuard)
-@WriteRoles(...WRITE_ACCESS.adminOnly)
+@WriteRoles(...ADMIN_ONLY)
 @Controller("modules")
 export class ModulesController {
   constructor(private readonly modules: ModulesService) {}
@@ -25,7 +25,7 @@ export class ModulesController {
   }
 
   /** Lista completa com dependências, para a página de definições. Só o Administrador. */
-  @Roles(...WRITE_ACCESS.adminOnly)
+  @Roles(...ADMIN_ONLY)
   @Get("manage")
   manage() {
     return this.modules.list();

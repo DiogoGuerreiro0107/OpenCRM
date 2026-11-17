@@ -5,8 +5,7 @@ import { InternalApiKeyGuard } from "../auth/guards/internal-api-key.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { ModuleGuard } from "../modules/module.guard";
 import { RequireModule } from "../modules/require-module.decorator";
-import { WriteRoles } from "../auth/decorators/roles.decorator";
-import { WRITE_ACCESS } from "../auth/permissions";
+import { WriteArea } from "../auth/decorators/roles.decorator";
 import { EmailService } from "./email.service";
 import { IngestEmailDto } from "./dto/ingest-email.dto";
 import { QueryEmailMessagesDto } from "./dto/query-email-messages.dto";
@@ -53,7 +52,7 @@ export class EmailController {
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard, ModuleGuard)
-  @WriteRoles(...WRITE_ACCESS.sendEmail)
+  @WriteArea("sendEmail")
   @Post("send")
   send(@Body() dto: SendEmailDto) {
     return this.emailService.send(dto);

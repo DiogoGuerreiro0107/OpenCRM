@@ -3,7 +3,7 @@ import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
-import { WRITE_ACCESS } from "../auth/permissions";
+import { ADMIN_ONLY } from "../auth/permissions";
 import { Audit } from "../audit/audit.decorator";
 import { EVENT_CATALOG } from "./webhook-core";
 import { WebhookSubscriptionsService } from "./webhook-subscriptions.service";
@@ -14,7 +14,7 @@ import { CreateWebhookDto, QueryDeliveriesDto, UpdateWebhookDto } from "./dto/we
  * tokens). O URL nunca vai para a auditoria pelo mesmo motivo.
  */
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(...WRITE_ACCESS.adminOnly)
+@Roles(...ADMIN_ONLY)
 @Controller("webhooks")
 export class WebhooksController {
   constructor(private readonly subscriptions: WebhookSubscriptionsService) {}

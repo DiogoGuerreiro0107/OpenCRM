@@ -2,6 +2,7 @@ import { BadRequestException, ForbiddenException, Injectable, NotFoundException 
 import { Prisma, Role } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { ModulesService } from "../modules/modules.service";
+import { PermissionsService } from "../auth/permissions.service";
 import { CreateCustomFieldDto } from "./dto/create-custom-field.dto";
 import { UpdateCustomFieldDto } from "./dto/update-custom-field.dto";
 import { QueryCustomFieldsDto } from "./dto/query-custom-fields.dto";
@@ -24,6 +25,7 @@ export class CustomFieldsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly modules: ModulesService,
+    private readonly permissions: PermissionsService,
   ) {}
 
   /** Tipo de registo de um módulo desligado = como se não existisse (404), tal como as rotas do módulo. */
@@ -99,7 +101,7 @@ export class CustomFieldsService {
    */
   async upsertValues(dto: UpsertCustomFieldValuesDto, user: { role: Role }) {
     const entity = this.entity(dto.entityType);
-    if (!(entity.writeRoles as readonly Role[]).includes(user.role)) {
+    if (!this.permissions.canWrite(user.role, entity.writeArea)) {
       throw new ForbiddenException(`Sem permissão para alterar campos personalizados de ${entity.label.toLowerCase()}`);
     }
     if (!(await entity.exists(this.prisma, dto.entityId))) throw new NotFoundException("Registo não encontrado");

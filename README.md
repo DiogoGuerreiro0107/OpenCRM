@@ -146,6 +146,7 @@ Estado atual: **todas as fases do roadmap consolidado e a revisão final conclu�
   - [x] Cópias de segurança automáticas e restauro validado — ver [docs/plano-backups.md](docs/plano-backups.md)
   - [x] Interface por papel: fichas só de consulta e botões escondidos conforme o papel — ver [docs/plano-ux-permissoes.md](docs/plano-ux-permissoes.md)
   - [x] Atualizações em tempo real (Socket.io): Kanban, tarefas, leads, dashboard, timeline e email atualizam sem recarregar — ver [docs/plano-tempo-real.md](docs/plano-tempo-real.md)
+  - [x] Fase 0 da reorganização concluída: campos personalizados genéricos com validação (0b), funis sobre fluxos genéricos (0c) e permissões de escrita configuráveis em Configurações > Permissões (0d) — ver [docs/plano-fase-0-fundacoes.md](docs/plano-fase-0-fundacoes.md)
   - [x] Módulos opcionais (Fase 0a da [reorganização modular](docs/plano-reorganizacao-modular.md)): leads, funis/negócios, email, telefonia e automações podem ser ligados/desligados em Configurações > Módulos, sem apagar dados — ver [docs/plano-fase-0-fundacoes.md](docs/plano-fase-0-fundacoes.md)
 
 ### Por fazer (backlog)

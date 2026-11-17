@@ -3,8 +3,8 @@ import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { ModuleGuard } from "../modules/module.guard";
 import { RequireModule } from "../modules/require-module.decorator";
-import { Roles, WriteRoles } from "../auth/decorators/roles.decorator";
-import { WRITE_ACCESS } from "../auth/permissions";
+import { Roles, WriteArea, WriteRoles } from "../auth/decorators/roles.decorator";
+import { ADMIN_ONLY } from "../auth/permissions";
 import { Audit } from "../audit/audit.decorator";
 import { ZadarmaService } from "./zadarma.service";
 import { SaveZadarmaAccountDto } from "./dto/save-zadarma-account.dto";
@@ -13,12 +13,12 @@ import { QueryCallRecordsDto } from "./dto/query-call-records.dto";
 
 @UseGuards(JwtAuthGuard, RolesGuard, ModuleGuard)
 @RequireModule("zadarma")
-@WriteRoles(...WRITE_ACCESS.adminOnly)
+@WriteRoles(...ADMIN_ONLY)
 @Controller("zadarma")
 export class ZadarmaController {
   constructor(private readonly zadarmaService: ZadarmaService) {}
 
-  @Roles(...WRITE_ACCESS.adminOnly)
+  @Roles(...ADMIN_ONLY)
   @Get("account")
   getAccount() {
     return this.zadarmaService.getAccount();
@@ -30,7 +30,7 @@ export class ZadarmaController {
     return this.zadarmaService.saveAccount(dto);
   }
 
-  @WriteRoles(...WRITE_ACCESS.makeCall)
+  @WriteArea("makeCall")
   @Post("call")
   makeCall(@Body() dto: MakeCallDto) {
     return this.zadarmaService.makeCall(dto);

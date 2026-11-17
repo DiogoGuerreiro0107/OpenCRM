@@ -13,8 +13,7 @@ import {
 } from "@nestjs/common";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
-import { WriteRoles } from "../auth/decorators/roles.decorator";
-import { WRITE_ACCESS } from "../auth/permissions";
+import { WriteArea } from "../auth/decorators/roles.decorator";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { CompaniesService } from "./companies.service";
 import { CreateCompanyDto } from "./dto/create-company.dto";
@@ -22,7 +21,7 @@ import { UpdateCompanyDto } from "./dto/update-company.dto";
 import { QueryCompaniesDto } from "./dto/query-companies.dto";
 
 @UseGuards(JwtAuthGuard, RolesGuard)
-@WriteRoles(...WRITE_ACCESS.companies)
+@WriteArea("companies")
 @Controller("companies")
 export class CompaniesController {
   constructor(private readonly companiesService: CompaniesService) {}

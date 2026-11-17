@@ -4,7 +4,7 @@ import { RolesGuard } from "../auth/guards/roles.guard";
 import { ModuleGuard } from "../modules/module.guard";
 import { RequireModule } from "../modules/require-module.decorator";
 import { Roles } from "../auth/decorators/roles.decorator";
-import { WRITE_ACCESS } from "../auth/permissions";
+import { ADMIN_ONLY } from "../auth/permissions";
 import { Audit } from "../audit/audit.decorator";
 import { AutomationsService } from "./automations.service";
 import { CreateAutomationRuleDto } from "./dto/create-automation-rule.dto";
@@ -12,7 +12,7 @@ import { UpdateAutomationRuleDto } from "./dto/update-automation-rule.dto";
 
 @UseGuards(JwtAuthGuard, RolesGuard, ModuleGuard)
 @RequireModule("automations")
-@Roles(...WRITE_ACCESS.adminOnly)
+@Roles(...ADMIN_ONLY)
 @Controller("automation-rules")
 export class AutomationsController {
   constructor(private readonly automationsService: AutomationsService) {}

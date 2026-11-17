@@ -3,7 +3,7 @@ import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { Roles, WriteRoles } from "../auth/decorators/roles.decorator";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
-import { WRITE_ACCESS } from "../auth/permissions";
+import { ADMIN_ONLY } from "../auth/permissions";
 import { Audit } from "../audit/audit.decorator";
 import { UsersService } from "./users.service";
 import { CreateUserDto } from "./dto/create-user.dto";
@@ -11,7 +11,7 @@ import { UpdateUserDto } from "./dto/update-user.dto";
 import { SetPasswordDto } from "./dto/set-password.dto";
 
 @UseGuards(JwtAuthGuard, RolesGuard)
-@WriteRoles(...WRITE_ACCESS.adminOnly)
+@WriteRoles(...ADMIN_ONLY)
 @Controller("users")
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
@@ -23,7 +23,7 @@ export class UsersController {
   }
 
   /** Lista completa (inclui desativados) para a página de gestão — só Administrador. */
-  @Roles(...WRITE_ACCESS.adminOnly)
+  @Roles(...ADMIN_ONLY)
   @Get("manage")
   findAllManaged() {
     return this.usersService.findAllManaged();

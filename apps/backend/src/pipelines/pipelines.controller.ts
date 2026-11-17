@@ -17,7 +17,7 @@ import { RolesGuard } from "../auth/guards/roles.guard";
 import { ModuleGuard } from "../modules/module.guard";
 import { RequireModule } from "../modules/require-module.decorator";
 import { WriteRoles } from "../auth/decorators/roles.decorator";
-import { WRITE_ACCESS } from "../auth/permissions";
+import { ADMIN_ONLY } from "../auth/permissions";
 import { PipelinesService } from "./pipelines.service";
 import { CreatePipelineDto } from "./dto/create-pipeline.dto";
 import { UpdatePipelineDto } from "./dto/update-pipeline.dto";
@@ -27,7 +27,7 @@ import { ReorderStagesDto } from "./dto/reorder-stages.dto";
 
 @UseGuards(JwtAuthGuard, RolesGuard, ModuleGuard)
 @RequireModule("deals")
-@WriteRoles(...WRITE_ACCESS.adminOnly)
+@WriteRoles(...ADMIN_ONLY)
 @Controller()
 export class PipelinesController {
   constructor(private readonly pipelinesService: PipelinesService) {}

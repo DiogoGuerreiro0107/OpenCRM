@@ -444,3 +444,10 @@ O item "limite de tentativas de login por conta" andava no backlog desde o endur
 - **A API dos negócios não mudou** (`/pipelines` e `/stages` com `type`; ganham `category`/`outcome`). Novo: apagar uma fase com negócios escolhendo para onde os mover.
 - Migração ensaiada numa cópia da base real, com reversão (`prisma/rollbacks/…down.sql`) testada até ao esquema idêntico.
 - Fora (regra de dois): transições, portões, rotas `/workflows` genéricas e ações por passo — entram com o segundo módulo com fluxos.
+
+## Fase 0d: permissões de escrita configuráveis (2026-11-17)
+- A matriz de escrita por área passa a ser **configurável pelo Administrador** (Configurações > Permissões), guardada em `PermissionSetting`; sem configuração vale a predefinição em código, **igual à matriz anterior**.
+- **Mesma granularidade de antes** (escrita por área), não ver/criar/editar/eliminar por tipo como dizia a reorganização (§3.11): sem caso que o peça; a área é texto, para dividir quando um módulo o exigir.
+- **A administração nunca é configurável** (só Administrador), e o backend impõe: Administrador sempre incluído; Leitura apenas nunca escreve. Alterações auditadas e propagadas em tempo real.
+- Rotas: `@WriteArea("…")` (resolvida em cada pedido) ou `@WriteRoles(...ADMIN_ONLY)`. O frontend deixou de copiar a matriz e usa `GET /me/permissions`.
+- **Fase 0 concluída.**

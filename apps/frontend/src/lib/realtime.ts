@@ -26,6 +26,8 @@ const KEYS_BY_RESOURCE: Record<string, string[]> = {
   modules: ["modules", "dashboard-summary"],
   "api-keys": ["api-keys"],
   webhooks: ["webhooks"],
+  // Um administrador mudou permissões: os botões de todas as sessões ajustam-se sem recarregar.
+  permissions: ["permissions"],
 };
 
 /** Junta rajadas de eventos (ex.: uma automação + o pedido que a causou) num só refrescamento. */

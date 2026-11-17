@@ -1,12 +1,15 @@
 import { Role } from "@prisma/client";
 
 /**
- * Matriz de permissões de ESCRITA (POST/PATCH/PUT/DELETE) por papel — fonte única de verdade.
- * A leitura é aberta a qualquer utilizador autenticado (CRM interno), exceto onde um
- * controller usar @Roles() explicitamente (ex.: regras de automação, conta Zadarma).
+ * Permissões de ESCRITA (POST/PATCH/PUT/DELETE) por papel. A leitura é aberta a qualquer utilizador autenticado
+ * (CRM interno), exceto onde um controller usar @Roles() explicitamente.
  *
- * `LEITURA_APENAS` não aparece em nenhuma lista: nunca escreve.
- * Documentação e justificação: docs/plano-endurecimento.md (pacote B).
+ * Desde a Fase 0d (docs/plano-fase-0-fundacoes.md):
+ *  - a ADMINISTRAÇÃO é fixa: `ADMIN_ONLY` (nunca configurável, para ninguém se dar acesso à gestão de utilizadores);
+ *  - as restantes áreas são CONFIGURÁVEIS pelo Administrador; o que está aqui é a PREDEFINIÇÃO (sem configuração
+ *    na base de dados, vale isto — igual ao que existia antes). Usar `@WriteArea("...")` nas rotas e o
+ *    `PermissionsService` nos serviços, nunca as listas daqui diretamente.
+ *  - invariantes: o Administrador está sempre em todas as áreas; `LEITURA_APENAS` nunca escreve.
  */
 const ADMIN: Role = "ADMINISTRADOR";
 const COMERCIAL: Role = "COMERCIAL";
@@ -14,16 +17,61 @@ const TECNICO: Role = "TECNICO";
 const BACKOFFICE: Role = "BACKOFFICE";
 const FINANCEIRO: Role = "FINANCEIRO";
 
-export const WRITE_ACCESS = {
-  /** Só o Administrador: estrutura de funis, definição de campos, automações, credenciais Zadarma. */
-  adminOnly: [ADMIN],
-  companies: [ADMIN, COMERCIAL, BACKOFFICE, FINANCEIRO],
-  contacts: [ADMIN, COMERCIAL, BACKOFFICE],
-  leads: [ADMIN, COMERCIAL, BACKOFFICE],
-  deals: [ADMIN, COMERCIAL, BACKOFFICE],
-  /** Trabalho do dia-a-dia de toda a equipa: tarefas, notas na timeline, valores de campos personalizados. */
-  dailyWork: [ADMIN, COMERCIAL, TECNICO, BACKOFFICE, FINANCEIRO],
-  sendEmail: [ADMIN, COMERCIAL, BACKOFFICE],
-  makeCall: [ADMIN, COMERCIAL, TECNICO, BACKOFFICE],
-  emailTemplates: [ADMIN, BACKOFFICE],
-} satisfies Record<string, Role[]>;
+/** Configuração sensível (utilizadores, módulos, permissões, chaves, webhooks, auditoria...): só o Administrador. */
+export const ADMIN_ONLY: Role[] = [ADMIN];
+
+export interface WriteAreaDefinition {
+  label: string;
+  description: string;
+  defaultRoles: Role[];
+}
+
+export const WRITE_AREAS = {
+  companies: {
+    label: "Empresas",
+    description: "Criar, alterar e eliminar empresas e preencher os seus campos personalizados.",
+    defaultRoles: [ADMIN, COMERCIAL, BACKOFFICE, FINANCEIRO],
+  },
+  contacts: {
+    label: "Contactos",
+    description: "Criar, alterar e eliminar contactos e preencher os seus campos personalizados.",
+    defaultRoles: [ADMIN, COMERCIAL, BACKOFFICE],
+  },
+  leads: {
+    label: "Leads",
+    description: "Criar, alterar, converter e eliminar leads e preencher os seus campos personalizados.",
+    defaultRoles: [ADMIN, COMERCIAL, BACKOFFICE],
+  },
+  deals: {
+    label: "Negócios",
+    description: "Criar, mover e eliminar negócios e preencher os seus campos personalizados.",
+    defaultRoles: [ADMIN, COMERCIAL, BACKOFFICE],
+  },
+  dailyWork: {
+    label: "Trabalho do dia-a-dia",
+    description: "Tarefas e notas na timeline.",
+    defaultRoles: [ADMIN, COMERCIAL, TECNICO, BACKOFFICE, FINANCEIRO],
+  },
+  sendEmail: {
+    label: "Enviar email",
+    description: "Enviar emails a partir do CRM.",
+    defaultRoles: [ADMIN, COMERCIAL, BACKOFFICE],
+  },
+  makeCall: {
+    label: "Ligar (telefonia)",
+    description: "Iniciar chamadas pela Zadarma.",
+    defaultRoles: [ADMIN, COMERCIAL, TECNICO, BACKOFFICE],
+  },
+  emailTemplates: {
+    label: "Modelos de email",
+    description: "Criar, alterar e eliminar modelos de email.",
+    defaultRoles: [ADMIN, BACKOFFICE],
+  },
+} satisfies Record<string, WriteAreaDefinition>;
+
+export type WriteArea = keyof typeof WRITE_AREAS;
+
+export const WRITE_AREA_KEYS = Object.keys(WRITE_AREAS) as WriteArea[];
+
+export const isWriteArea = (value: unknown): value is WriteArea =>
+  typeof value === "string" && Object.prototype.hasOwnProperty.call(WRITE_AREAS, value);

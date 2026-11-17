@@ -2,7 +2,7 @@ import "reflect-metadata";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { RequestMethod } from "@nestjs/common";
-import { ROLES_KEY, WRITE_ROLES_KEY } from "../auth/decorators/roles.decorator";
+import { ROLES_KEY, WRITE_AREA_KEY, WRITE_ROLES_KEY } from "../auth/decorators/roles.decorator";
 import { AUDIT_KEY } from "./audit.decorator";
 
 /**
@@ -48,7 +48,13 @@ function collectRoutes(): Route[] {
         routes.push({
           label: `${RequestMethod[method]} ${controllerPath}/${Reflect.getMetadata("path", handler)} (${exported.name}.${name})`,
           method,
-          effectiveRoles: roles(WRITE_ROLES_KEY) ?? roles(ROLES_KEY),
+          // Como o RolesGuard: a política do método (área ou lista fixa) sobrepõe-se à da classe. Uma área é
+          // configurável, por isso nunca conta como «só do Administrador».
+          effectiveRoles: Reflect.getMetadata(WRITE_AREA_KEY, handler)
+            ? undefined
+            : (Reflect.getMetadata(WRITE_ROLES_KEY, handler) ??
+              (Reflect.getMetadata(WRITE_AREA_KEY, exported) ? undefined : Reflect.getMetadata(WRITE_ROLES_KEY, exported)) ??
+              roles(ROLES_KEY)),
           audit: Reflect.getMetadata(AUDIT_KEY, handler) ?? Reflect.getMetadata(AUDIT_KEY, exported),
         });
       }
