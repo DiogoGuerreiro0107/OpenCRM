@@ -259,7 +259,8 @@ Transformar funis/fases num **fluxo genérico** que os próximos módulos (assis
 - Na preparação dos e2e, a configuração de permissões é limpa no início de cada ficheiro (como os módulos).
 
 **Validação:**
-- **Os 339 e2e que já existiam passam sem alterações** (sem configuração, nada muda). Com os novos: 247 unitários e 347 e2e; migração sem desvio; builds OK.
+- **Os 339 e2e que já existiam passam sem alterações** (sem configuração, nada muda). Com os novos: 248 unitários e 347 e2e; migração sem desvio; builds OK.
+- **Teste estrutural:** as rotas de escrita dos controllers de administração não podem usar áreas configuráveis (exceções explícitas: preencher campos personalizados e ligar). Provado por mutação (pôr a gestão de utilizadores numa área configurável faz o teste falhar).
 - **Prova por mutação:** o guard a usar sempre a predefinição (ignorando a configuração) e deixar retirar o Administrador → falham três testes.
 - **Browser, com duas sessões ao mesmo tempo** (Administrador em `localhost`, Técnico em `127.0.0.1`, base de testes): a página mostra a matriz com as predefinições; ao dar «Empresas» ao Técnico, o botão «Nova empresa» **apareceu na sessão do Técnico sem recarregar**; ao repor a predefinição, desapareceu. Sem erros na consola.
 

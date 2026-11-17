@@ -31,6 +31,10 @@ interface RouteInfo {
   httpMethod: RequestMethod;
   guards: unknown[];
   hasPolicy: boolean;
+  controller: string;
+  handlerName: string;
+  /** Área configurável que decide a escrita (método antes da classe, como o RolesGuard), se houver. */
+  writeArea: string | undefined;
 }
 
 function collectRoutes(): RouteInfo[] {
@@ -63,6 +67,10 @@ function collectRoutes(): RouteInfo[] {
           httpMethod,
           guards: [...classGuards, ...handlerGuards],
           hasPolicy,
+          controller: exported.name,
+          handlerName: name,
+          writeArea: Reflect.getMetadata(WRITE_AREA_KEY, handler) ??
+            (Reflect.getMetadata(WRITE_ROLES_KEY, handler) ? undefined : Reflect.getMetadata(WRITE_AREA_KEY, exported)),
         });
       }
     }
@@ -91,6 +99,31 @@ describe("cobertura de permissões nos controllers", () => {
       if (!route.hasPolicy) problems.push(`${route.label}: falta @WriteRoles/@Roles`);
     }
     expect(problems).toEqual([]);
+  });
+
+  // Fase 0d: a administração NUNCA pode depender de uma área configurável (senão alguém poderia dar-se a si próprio
+  // acesso à gestão de utilizadores, permissões, chaves...). Só as exceções listadas (trabalho do dia-a-dia dentro de
+  // controllers de administração) podem usar uma área.
+  it("as rotas de escrita dos controllers de administração não usam áreas configuráveis", () => {
+    const ADMIN_CONTROLLERS = [
+      "UsersController",
+      "ModulesController",
+      "PermissionsController",
+      "ApiKeysController",
+      "WebhooksController",
+      "AuditController",
+      "AutomationsController",
+      "PipelinesController",
+      "CustomFieldsController",
+      "ZadarmaController",
+    ];
+    const ALLOWED = ["CustomFieldsController.upsertValues", "ZadarmaController.makeCall"];
+    const found = new Set(routes.map((r) => r.controller));
+    expect(ADMIN_CONTROLLERS.filter((c) => !found.has(c))).toEqual([]); // a lista não tem nomes que já não existem
+    const offenders = writes
+      .filter((r) => ADMIN_CONTROLLERS.includes(r.controller) && r.writeArea && !ALLOWED.includes(`${r.controller}.${r.handlerName}`))
+      .map((r) => `${r.label}: usa a área «${r.writeArea}»`);
+    expect(offenders).toEqual([]);
   });
 
   it("nenhuma rota de leitura autenticada fica sem JwtAuthGuard (exceto as públicas conhecidas)", () => {
