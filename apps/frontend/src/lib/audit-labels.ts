@@ -23,6 +23,13 @@ const ACTION_LABELS: Record<string, string> = {
   "automation.deleted": "Automação eliminada",
   "api_key.created": "Chave de API criada",
   "api_key.revoked": "Chave de API revogada",
+  "webhook.created": "Webhook criado",
+  "webhook.updated": "Webhook alterado",
+  "webhook.deleted": "Webhook apagado",
+  "webhook.secret_rotated": "Segredo de webhook renovado",
+  "webhook.test_sent": "Teste de webhook enviado",
+  "webhook.delivery_retried": "Entrega de webhook reenviada",
+  "webhook.auto_disabled": "Webhook desativado automaticamente (falhas seguidas)",
   "secrets.encrypted": "Segredos cifrados (comando do sistema)",
 };
 
@@ -38,5 +45,6 @@ export const ACTION_GROUPS: Array<{ prefix: string; label: string }> = [
   { prefix: "custom_field.", label: "Campos personalizados" },
   { prefix: "automation.", label: "Automações" },
   { prefix: "api_key.", label: "Chaves de API" },
+  { prefix: "webhook.", label: "Webhooks" },
   { prefix: "secrets.", label: "Segredos (sistema)" },
 ];

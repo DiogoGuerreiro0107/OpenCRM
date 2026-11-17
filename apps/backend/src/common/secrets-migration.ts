@@ -24,6 +24,11 @@ const ACCESSORS = {
       (await db.zadarmaAccount.findMany({ select: { id: true, apiSecret: true } })).map((r) => ({ id: r.id, value: r.apiSecret })),
     save: (db: PrismaClient, id: string, value: string) => db.zadarmaAccount.update({ where: { id }, data: { apiSecret: value } }),
   },
+  "WebhookSubscription.secret": {
+    list: async (db: PrismaClient): Promise<Row[]> =>
+      (await db.webhookSubscription.findMany({ select: { id: true, secret: true } })).map((r) => ({ id: r.id, value: r.secret })),
+    save: (db: PrismaClient, id: string, value: string) => db.webhookSubscription.update({ where: { id }, data: { secret: value } }),
+  },
 } as const;
 
 type FieldKey = keyof typeof ACCESSORS;

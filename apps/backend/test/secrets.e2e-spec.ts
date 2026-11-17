@@ -154,16 +154,23 @@ describe("Segredos em repouso (e2e)", () => {
       expect(await countPlaintextSecrets(prisma)).toBe(2);
 
       const first = await encryptStoredSecrets(prisma, [keyA]);
-      expect(first.map((r) => [r.field, r.encrypted, r.recrypted, r.unchanged])).toEqual([
+      // Só os dois campos semeados aqui (a lista cresce com cada segredo novo, p. ex. os dos webhooks).
+      const seeded = ["EmailAccount.password", "ZadarmaAccount.apiSecret"];
+      const counts = (report: typeof first) => report.filter((r) => seeded.includes(r.field)).map((r) => [r.field, r.encrypted, r.recrypted, r.unchanged]);
+      expect(counts(first)).toEqual([
         ["EmailAccount.password", 1, 0, 0],
         ["ZadarmaAccount.apiSecret", 1, 0, 0],
       ]);
+      expect(first.filter((r) => !seeded.includes(r.field)).every((r) => r.encrypted + r.recrypted + r.unchanged === 0)).toBe(true);
       expect(JSON.stringify(first)).not.toMatch(/em-claro/);
       expect(await countPlaintextSecrets(prisma)).toBe(0);
 
       const snapshot = (await prisma.zadarmaAccount.findFirstOrThrow()).apiSecret;
       const second = await encryptStoredSecrets(prisma, [keyA]);
-      expect(second.every((r) => r.encrypted === 0 && r.recrypted === 0 && r.unchanged === 1)).toBe(true);
+      expect(counts(second)).toEqual([
+        ["EmailAccount.password", 0, 0, 1],
+        ["ZadarmaAccount.apiSecret", 0, 0, 1],
+      ]);
       expect((await prisma.zadarmaAccount.findFirstOrThrow()).apiSecret).toBe(snapshot); // nem sequer é regravado
     });
 

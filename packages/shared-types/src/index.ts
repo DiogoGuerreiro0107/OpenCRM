@@ -416,3 +416,44 @@ export interface ApiScopeInfo {
   scope: string;
   description: string;
 }
+
+/** Subscrição de webhook de saída (Administrador). Nunca inclui o segredo. */
+export interface WebhookSubscriptionView {
+  id: string;
+  name: string;
+  url: string;
+  events: string[];
+  active: boolean;
+  disabledReason: string | null;
+  consecutiveFailures: number;
+  lastSuccessAt: string | null;
+  lastFailureAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Resposta de criar ou de rodar o segredo: o segredo só existe aqui, uma única vez. */
+export interface WebhookSubscriptionWithSecret extends WebhookSubscriptionView {
+  secret: string;
+}
+
+export type WebhookDeliveryStatus = "PENDING" | "DELIVERED" | "FAILED";
+
+export interface WebhookDeliveryView {
+  id: string;
+  subscriptionId: string;
+  eventId: string;
+  eventType: string;
+  status: WebhookDeliveryStatus;
+  attempts: number;
+  nextAttemptAt: string | null;
+  lastStatusCode: number | null;
+  lastError: string | null;
+  createdAt: string;
+  deliveredAt: string | null;
+}
+
+export interface WebhookEventInfo {
+  type: string;
+  description: string;
+}
