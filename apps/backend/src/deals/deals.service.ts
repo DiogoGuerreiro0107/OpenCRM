@@ -100,7 +100,11 @@ export class DealsService {
 
   async remove(id: string) {
     await this.ensureExists(id);
-    await this.prisma.deal.delete({ where: { id } });
+    // Os valores dos campos personalizados não têm chave estrangeira (polimórficos): apagam-se juntamente.
+    await this.prisma.$transaction([
+      this.prisma.customFieldValue.deleteMany({ where: { entityType: "DEAL", entityId: id } }),
+      this.prisma.deal.delete({ where: { id } }),
+    ]);
   }
 
   async move(id: string, dto: MoveDealDto) {

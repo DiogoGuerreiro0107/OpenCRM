@@ -80,6 +80,7 @@ export class LeadsService {
     // Ligações a ids externos (E0e) não têm chave estrangeira (são polimórficas): apagam-se juntamente.
     await this.prisma.$transaction([
       this.prisma.externalLink.deleteMany({ where: { entityType: "lead", entityId: id } }),
+      this.prisma.customFieldValue.deleteMany({ where: { entityType: "LEAD", entityId: id } }),
       this.prisma.lead.delete({ where: { id } }),
     ]);
   }

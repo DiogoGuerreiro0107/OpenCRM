@@ -1,8 +1,9 @@
-import { CustomFieldEntityType, CustomFieldType } from "@prisma/client";
-import { IsArray, IsBoolean, IsEnum, IsInt, IsOptional, IsString, MinLength } from "class-validator";
+import { CustomFieldType } from "@prisma/client";
+import { IsArray, IsBoolean, IsEnum, IsIn, IsInt, IsOptional, IsString, MinLength } from "class-validator";
+import { CUSTOM_FIELD_ENTITY_TYPES, CustomFieldEntityType } from "../entity-registry";
 
 export class CreateCustomFieldDto {
-  @IsEnum(CustomFieldEntityType)
+  @IsIn(CUSTOM_FIELD_ENTITY_TYPES, { message: `entityType tem de ser um destes: ${CUSTOM_FIELD_ENTITY_TYPES.join(", ")}` })
   entityType!: CustomFieldEntityType;
 
   @IsOptional()
