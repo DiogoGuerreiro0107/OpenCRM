@@ -1,10 +1,13 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query, UseGuards } from "@nestjs/common";
+import { Role } from "@prisma/client";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { Audit } from "../audit/audit.decorator";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { WriteRoles } from "../auth/decorators/roles.decorator";
 import { WRITE_ACCESS } from "../auth/permissions";
+import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { CustomFieldsService } from "./custom-fields.service";
+import { CustomFieldEntityType } from "./entity-registry";
 import { CreateCustomFieldDto } from "./dto/create-custom-field.dto";
 import { UpdateCustomFieldDto } from "./dto/update-custom-field.dto";
 import { QueryCustomFieldsDto } from "./dto/query-custom-fields.dto";
@@ -40,14 +43,15 @@ export class CustomFieldsController {
   }
 
   @Get("values")
-  getValues(@Query("entityType") entityType: QueryCustomFieldsDto["entityType"], @Query("entityId") entityId: string) {
-    return this.customFieldsService.getValues(entityType, entityId);
+  getValues(@Query() query: QueryCustomFieldsDto, @Query("entityId") entityId: string) {
+    return this.customFieldsService.getValues(query.entityType as CustomFieldEntityType, entityId);
   }
 
-  // Preencher valores numa ficha é trabalho normal; só a DEFINIÇÃO dos campos é do Administrador.
+  // Preencher valores é trabalho normal (só a DEFINIÇÃO dos campos é do Administrador). Filtro largo aqui; o serviço
+  // exige ainda poder editar ESTE tipo de registo (a mesma regra que a edição do próprio registo).
   @WriteRoles(...WRITE_ACCESS.dailyWork)
   @Post("values")
-  upsertValues(@Body() dto: UpsertCustomFieldValuesDto) {
-    return this.customFieldsService.upsertValues(dto);
+  upsertValues(@Body() dto: UpsertCustomFieldValuesDto, @CurrentUser() user: { role: Role }) {
+    return this.customFieldsService.upsertValues(dto, user);
   }
 }

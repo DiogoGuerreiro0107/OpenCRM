@@ -49,7 +49,11 @@ export class ContactsService {
 
   async remove(id: string) {
     await this.ensureExists(id);
-    await this.prisma.contact.delete({ where: { id } });
+    // Os valores dos campos personalizados não têm chave estrangeira (polimórficos): apagam-se juntamente.
+    await this.prisma.$transaction([
+      this.prisma.customFieldValue.deleteMany({ where: { entityType: "CONTACT", entityId: id } }),
+      this.prisma.contact.delete({ where: { id } }),
+    ]);
   }
 
   private async ensureExists(id: string) {

@@ -1,6 +1,6 @@
 import { Type } from "class-transformer";
-import { CustomFieldEntityType } from "@prisma/client";
-import { IsArray, IsEnum, IsOptional, IsString, ValidateNested } from "class-validator";
+import { IsArray, IsIn, IsOptional, IsString, ValidateNested } from "class-validator";
+import { CUSTOM_FIELD_ENTITY_TYPES, CustomFieldEntityType } from "../entity-registry";
 
 class CustomFieldValueInputDto {
   @IsString()
@@ -11,7 +11,7 @@ class CustomFieldValueInputDto {
 }
 
 export class UpsertCustomFieldValuesDto {
-  @IsEnum(CustomFieldEntityType)
+  @IsIn(CUSTOM_FIELD_ENTITY_TYPES, { message: `entityType tem de ser um destes: ${CUSTOM_FIELD_ENTITY_TYPES.join(", ")}` })
   entityType!: CustomFieldEntityType;
 
   @IsString()

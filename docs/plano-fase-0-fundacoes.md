@@ -128,11 +128,28 @@ Assistente de primeira instalação (fica para depois dos módulos novos existir
 | Técnicos que hoje editam campos de empresas deixam de poder | É a correção de uma inconsistência; dito no PR e nas decisões. Se for preciso, a matriz `WRITE_ACCESS.companies` é que deve incluir o Técnico |
 | Validação mais estrita recusar valores que a interface envia | A interface já envia os formatos certos; e2e com os formatos da interface |
 
+### Execução do pacote 0b (2026-11-17)
+
+**Implementado como planeado.** Pormenores:
+- O registo de tipos está em `apps/backend/src/custom-fields/entity-registry.ts`; a validação dos valores em `custom-field-values.ts` (funções puras).
+- Gravar valores é **tudo ou nada**: todos os valores são validados antes de gravar algum. Enviar o mesmo campo duas vezes no mesmo pedido é recusado.
+- Ler valores devolve só os de campos do próprio tipo de registo (um valor gravado por engano noutro tipo, antes desta correção, não aparece).
+- Datas impossíveis (ex.: 2026-02-30) são recusadas em vez de «corrigidas» para outro dia.
+- A interface passa a mostrar o erro do servidor quando a gravação falha (antes falhava em silêncio).
+
+**Validação:**
+- 246 unitários e 324 e2e a passar; migração sem desvio contra o `schema.prisma`; builds OK.
+- **Migração com dados reais** (base de desenvolvimento: 1 campo «Segmento» e 1 valor «Grossista»): as colunas passaram de enum a texto e os dados ficaram **idênticos** (comparação antes/depois).
+- **Prova por mutação:** retirar a verificação do tipo de registo, a validação de números e a limpeza ao apagar uma empresa → falham os três testes correspondentes. (Uma primeira tentativa de mutação partiu a compilação e não provava nada; foi refeita com mutações que compilam.)
+- **Browser** (base de testes): como Administrador, um URL sem `https://` mostra ««Portal»: tem de ser um endereço http:// ou https://» e, corrigido, grava; como Técnico, a ficha mostra os valores mas sem edição nem botão de guardar.
+
+**Não testado:** a interface com leads/negócios desligados (só a API, por e2e); a edição de campos personalizados dentro dos diálogos de lead e negócio (o componente é o mesmo).
+
 ### Pacotes 0c, 0d
 Serão detalhados no seu próprio plano quando chegar a vez de cada um. O 0c (fluxos) é o mais delicado e terá um plano de migração específico com **teste sobre uma cópia da base real**.
 
 ## Registo de execução
 - [x] 0a — Registo de módulos (ver decisoes.md)
-- [ ] 0b — Campos personalizados genéricos
+- [x] 0b — Campos personalizados genéricos (ver «Execução do pacote 0b»)
 - [ ] 0c — Fluxos genéricos
 - [ ] 0d — Permissões em base de dados

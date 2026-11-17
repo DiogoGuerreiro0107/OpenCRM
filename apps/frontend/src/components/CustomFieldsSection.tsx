@@ -9,6 +9,19 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { useCanWrite } from "@/lib/useCanWrite";
 import { ReadOnlyFieldset } from "@/components/ReadOnly";
+import { errorMessage } from "@/lib/errors";
+import type { WriteArea } from "@/lib/permissions";
+
+/**
+ * Quem pode preencher os campos personalizados de cada tipo de registo: a MESMA regra que edita o próprio registo
+ * (o backend aplica-a em custom-fields/entity-registry.ts; isto é só para a interface não oferecer o que vai falhar).
+ */
+const WRITE_AREA_BY_ENTITY: Record<CustomFieldEntityType, WriteArea> = {
+  COMPANY: "companies",
+  CONTACT: "contacts",
+  LEAD: "leads",
+  DEAL: "deals",
+};
 
 interface CustomFieldsSectionProps {
   entityType: CustomFieldEntityType;
@@ -17,7 +30,7 @@ interface CustomFieldsSectionProps {
 
 export function CustomFieldsSection({ entityType, entityId }: CustomFieldsSectionProps) {
   const queryClient = useQueryClient();
-  const canEdit = useCanWrite("dailyWork");
+  const canEdit = useCanWrite(WRITE_AREA_BY_ENTITY[entityType]);
   const { data: fields } = useQuery({
     queryKey: ["custom-fields", entityType],
     queryFn: () => listCustomFields(entityType),
@@ -156,6 +169,9 @@ export function CustomFieldsSection({ entityType, entityId }: CustomFieldsSectio
         );
       })}
 
+      {saveMutation.isError && (
+        <p className="text-sm text-red-600">{errorMessage(saveMutation.error, "Não foi possível guardar os campos.")}</p>
+      )}
       {canEdit && (
         <Button type="button" size="sm" disabled={saveMutation.isPending} onClick={() => saveMutation.mutate()}>
           {saveMutation.isPending ? "A guardar..." : "Guardar campos"}

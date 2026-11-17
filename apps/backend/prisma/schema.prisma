@@ -451,13 +451,6 @@ model Lead {
   @@index([status])
 }
 
-enum CustomFieldEntityType {
-  COMPANY
-  CONTACT
-  LEAD
-  DEAL
-}
-
 enum CustomFieldType {
   TEXT
   TEXTAREA
@@ -474,7 +467,9 @@ enum CustomFieldType {
 
 model CustomField {
   id                  String                @id @default(uuid())
-  entityType          CustomFieldEntityType
+  /// Tipo de registo ("COMPANY", "LEAD"...). Texto, não enum: os tipos válidos estão em
+  /// src/custom-fields/entity-registry.ts e cada módulo novo junta o seu (Fase 0b).
+  entityType          String
   sectionName         String?
   fieldName           String
   fieldLabel          String
@@ -498,7 +493,7 @@ model CustomFieldValue {
   id            String                @id @default(uuid())
   customFieldId String
   customField   CustomField           @relation(fields: [customFieldId], references: [id], onDelete: Cascade)
-  entityType    CustomFieldEntityType
+  entityType    String
   entityId      String
   valueText     String?
   valueNumber   Float?

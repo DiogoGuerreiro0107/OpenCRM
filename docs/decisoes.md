@@ -431,3 +431,9 @@ O item "limite de tentativas de login por conta" andava no backlog desde o endur
 - Servida em `GET /api/v1/openapi.json` (qualquer chave) e descarregável pelo Administrador. Sem Swagger UI (evita servir JavaScript de terceiros); sem cliente TypeScript gerado (ainda não há consumidor).
 - `ExternalLink` (provider, tipo, id, id externo; único nos dois sentidos). Primeiro uso: `external_id` em `POST /api/v1/leads` — repetido pela mesma chave dá 409 com o lead existente, sem limite de tempo. O id externo é reservado antes de criar o lead (concorrência segura).
 - **Fase E0 (API pública, eventos e segredos) concluída.**
+
+## Fase 0b: campos personalizados genéricos (2026-11-17)
+- `entityType` dos campos personalizados passa de enum a **texto com os mesmos valores**; os tipos válidos vêm de um **registo em código** (`custom-fields/entity-registry.ts`) com módulo, permissões de escrita e verificação de existência. Um módulo novo junta uma linha.
+- Corrigidos problemas encontrados na revisão: campo de outro tipo de registo aceite; valores sem validação por tipo (números, datas, opções, email, URL, telefone, obrigatório); registos inexistentes; **valores órfãos ao apagar** empresas/contactos/leads/negócios; mudar o tipo de um campo com valores.
+- **Mudança de comportamento deliberada:** escrever valores exige poder editar esse tipo de registo (mesma matriz `WRITE_ACCESS`). O **Técnico** deixa de poder preencher campos personalizados de empresas, contactos, leads e negócios (já não podia editar esses registos); o Financeiro deixa de poder nos contactos. Se o Técnico precisar, a matriz da entidade é que deve mudar.
+- Órfãos antigos não são apagados pela migração (nenhum na base de desenvolvimento). Âmbito por tipo e filtros por campos personalizados ficam para quando houver tipos e listagens que os usem.
