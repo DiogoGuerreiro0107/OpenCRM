@@ -2,7 +2,9 @@
 
 API para sistemas externos (loja online, formulários do site, n8n, programas de faturação) falarem com o CRM. É **separada** da API que a interface usa: outras credenciais, outras rotas, outras garantias. Desenho e decisões: [plano-e0-api-publica.md](plano-e0-api-publica.md) (pacote E0c).
 
-> **Estado:** primeira versão, só com o enquadramento e três recursos (`companies`, `contacts`, `leads`). Cada módulo novo acrescenta as suas rotas aqui. Os webhooks de saída estão descritos abaixo; a especificação OpenAPI gerada chega no pacote E0e.
+> **Estado:** primeira versão, com três recursos (`companies`, `contacts`, `leads`) e webhooks de saída. Cada módulo novo acrescenta as suas rotas aqui.
+>
+> **Especificação OpenAPI 3.1:** `GET /api/v1/openapi.json` (com qualquer chave) ou o botão «Descarregar especificação OpenAPI» em Configurações > Chaves de API. Importa-se diretamente no Postman ou Insomnia e serve para gerar clientes. Testes automáticos garantem que a especificação corresponde ao que a API faz (rotas, âmbitos e a forma de todas as respostas).
 
 ## Autenticação
 
@@ -88,7 +90,7 @@ curl -X POST http://IP-DO-CRM:3000/api/v1/leads \
   -d '{ "name": "Maria Silva", "email": "maria@exemplo.pt", "phone": "912345678", "company_name": "Exemplo Lda", "interest": "IMPRESSAO", "notes": "Pediu orçamento" }'
 ```
 
-Corpo: `name` (obrigatório), `company_name`, `phone`, `email`, `source` (por omissão «API: <nome da chave>»), `interest`, `notes`. Outros campos são ignorados: uma integração **não escolhe** o estado nem o responsável (o lead entra como `NOVO`). Resposta `201` com o lead (`id`, `name`, `company_name`, `phone`, `email`, `source`, `interest`, `status`, `notes`, `created_at`, `updated_at`).
+Corpo: `name` (obrigatório), `company_name`, `phone`, `email`, `source` (por omissão «API: <nome da chave>»), `interest`, `notes`, `external_id`. Outros campos são ignorados: uma integração **não escolhe** o estado nem o responsável (o lead entra como `NOVO`). Resposta `201` com o lead (`id`, `name`, `company_name`, `phone`, `email`, `source`, `interest`, `status`, `notes`, `created_at`, `updated_at`).
 
 Efeitos (iguais a criar um lead na interface): fica criada a tarefa «Contactar lead», atribuída a **quem criou a chave**; é disparado o webhook `lead.created` para o n8n (se configurado); a lista de leads atualiza-se nos browsers abertos.
 
@@ -149,6 +151,18 @@ Usa o corpo **em bruto** (antes de o converteres de JSON): reserializar muda os 
 
 ### Variável antiga `N8N_WEBHOOK_URL`
 Continua a funcionar como antes (um só URL, **sem assinatura nem repetição**, formato `{ event, payload, triggeredAt }`). É um modo **legado**: o recomendado é criar um webhook para o n8n na página e retirar a variável.
+
+#### Não duplicar: `external_id`
+
+Se o teu sistema tem um id próprio para o objeto (número do pedido da loja, id da submissão do formulário), envia-o em `external_id`. Se a **mesma chave** voltar a enviar o mesmo `external_id` — mesmo dias depois, fora das 24 h da idempotência —, nada é criado e a resposta é:
+
+```json
+{ "error": { "code": "conflict", "message": "Já existe um lead com este external_id", "details": { "existing_id": "…" } } }
+```
+
+Cada chave tem o seu próprio espaço de ids (duas lojas podem ter ambas um pedido «1001»). A resposta do lead inclui `external_id` (`null` se não foi enviado). Se o lead for apagado no CRM, o `external_id` fica livre.
+
+**Idempotência ou `external_id`?** Os dois: o `Idempotency-Key` protege as repetições de um mesmo pedido (*timeouts*, 24 h); o `external_id` protege contra o mesmo objeto enviado de novo em pedidos diferentes, sem limite de tempo.
 
 ## Política de versões
 

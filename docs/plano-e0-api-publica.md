@@ -62,6 +62,53 @@ Quem consiga ler a base de dados (uma cópia de segurança, um *dump*, um acesso
 | Rotação mal feita deixa valores indecifráveis | O comando só grava depois de decifrar com sucesso; falha por campo sem alterar o resto |
 | Falsa sensação de segurança | A cifra protege **cópias da base de dados**, não um atacante com o ambiente do backend (que tem a chave). Escrito no documento de segurança |
 
+## Pacote E0e — Especificação OpenAPI e ids externos (plano, 2026-11-17)
+
+Último pacote da E0. Duas peças pequenas que tornam a `/api/v1` utilizável por quem integra: uma **descrição formal** da API (para importar no Postman/Insomnia ou gerar clientes) e uma forma de uma integração **não duplicar registos** quando volta a enviar o mesmo objeto dias depois.
+
+### 1. Especificação OpenAPI — escrita à mão e verificada por testes (desvio ao plano)
+O plano dizia «gerada a partir do código (`@nestjs/swagger`)». **Proponho o contrário: especificação escrita à mão (OpenAPI 3.1) e testes que impedem que ela e o código divirjam.** Porquê:
+- As respostas da v1 são construídas por **mapeadores escritos à mão** (`public-api/mappers.ts`), não por classes; o `@nestjs/swagger` não as consegue inferir — teríamos de duplicar cada campo em decoradores, ou seja, escrever a especificação à mão na mesma, mas espalhada pelo código.
+- A especificação **é o contrato** que a política de versões protege; tê-la num só ficheiro revisto em cada PR torna visível qualquer alteração ao contrato.
+- Evita uma dependência nova em produção.
+
+**Garantias (testes):**
+- **Estrutural:** toda a rota `/api/v1` existe na especificação e toda a operação da especificação existe no código (método + caminho); os âmbitos declarados na especificação coincidem com os `@Scopes()` de cada rota; os códigos de erro da especificação coincidem com os do `V1ExceptionFilter`.
+- **Conformidade das respostas:** nos testes e2e, as respostas reais (sucesso e erro) são **validadas contra os esquemas da especificação** (com `ajv`, só em desenvolvimento; já está no `pnpm-lock` como dependência transitiva). Um campo novo nos mapeadores sem estar na especificação faz falhar o teste (`additionalProperties: false` nas respostas).
+- A especificação é ela própria validada como JSON Schema 2020-12 bem formado.
+
+**Onde fica disponível:** `GET /api/v1/openapi.json` (qualquer chave válida, como o `ping`) e um botão «Descarregar especificação OpenAPI» na página Chaves de API (Administrador, com sessão). **Sem** página Swagger UI/Redoc nesta fase (exigiria servir JavaScript de terceiros); o ficheiro importa-se diretamente no Postman/Insomnia.
+
+**Cliente TypeScript gerado: fica de fora** (regra de dois — ainda não há nenhum consumidor em TypeScript; qualquer gerador OpenAPI o produz a partir do ficheiro quando for preciso).
+
+### 2. Ids externos (`ExternalLink`)
+- Tabela `ExternalLink (provider, entityType, entityId, externalId, createdAt)` com **unicidade em `(provider, entityType, externalId)`** e em `(provider, entityType, entityId)`: um objeto de um sistema externo corresponde a, no máximo, um registo do CRM, e vice-versa.
+- **Provider** = a integração que criou a ligação. Para a API pública é **a chave de API** (`api_key:<id>`): duas integrações podem usar os mesmos ids sem colidir. Os adaptadores futuros (faturação, lojas) usam nomes próprios (`billing:<id>`, …).
+- **Primeiro uso real (o que justifica a tabela agora):** `POST /api/v1/leads` aceita `external_id` opcional. Se a mesma chave voltar a enviar o mesmo `external_id` (por exemplo, a loja reenvia o formulário três dias depois, fora da janela de 24 h da idempotência), a resposta é **`409 conflict`** com o `id` do lead que já existe em `details`, e nada é criado. A resposta do lead passa a incluir `external_id` quando existir. Ao apagar o lead no CRM a ligação desaparece.
+- **Fora:** procurar por id externo (`GET …?external_id=`) e ids externos em empresas/contactos — entram com o primeiro conector que os use.
+
+### Testes e validação
+- **Unitários:** validação da especificação; estrutural especificação ↔ rotas ↔ âmbitos ↔ códigos de erro.
+- **E2E:** conformidade de todas as respostas da v1 com a especificação; `external_id`: repetido na mesma chave → 409 com o id existente; noutra chave → cria; ausente → como antes; a ligação desaparece ao apagar o lead; `openapi.json` acessível com qualquer chave e 401 sem chave; descarregar pela página de gestão só para o Administrador.
+- **Prova por mutação:** acrescentar um campo a um mapeador sem o documentar; retirar uma rota da especificação; remover a verificação do `external_id`.
+
+### Execução do pacote E0e (2026-11-17)
+
+**Implementado como planeado** (incluindo o desvio proposto: especificação escrita à mão em `public-api/openapi.ts`, sem `@nestjs/swagger`). Pormenores:
+- As enumerações da especificação (estados, origens, áreas de interesse, códigos de erro, âmbitos) vêm **das mesmas constantes do código** (enums do Prisma, `API_ERROR_CODES`, `API_SCOPES`): um valor novo aparece na especificação sem ninguém se lembrar.
+- O id externo é **reservado antes** de criar o lead (o lead é criado com um id escolhido previamente): dois pedidos simultâneos com o mesmo `external_id` nunca criam dois leads nem disparam dois webhooks. Se a criação falhar, a reserva é desfeita.
+- Dependências novas **só de desenvolvimento** (`ajv` 8.20.0 e `ajv-formats` 2.1.1, já presentes no lockfile como dependências transitivas; nada descarregado).
+
+**Validação:**
+- 234 unitários e 311 e2e a passar; migração sem desvio contra o `schema.prisma`; builds OK.
+- **Conformidade:** todas as operações da v1, com sucesso e com cada erro documentado (400, 401, 403, 404, 409, 422, 429), validadas contra a especificação, incluindo registos com todos os campos preenchidos e com todos os opcionais a `null`.
+- **Prova por mutação:** acrescentar `owner_id` a um mapeador sem o documentar → o e2e de conformidade falha; retirar uma rota da especificação → o teste estrutural falha; retirar a reserva do `external_id` → cinco e2e falham.
+- **Browser:** o botão «Descarregar especificação OpenAPI» faz o pedido (200) sem erros na consola. **Não verifiquei o ficheiro descarregado** (o navegador integrado não mostra transferências); o conteúdo servido é testado nos e2e.
+
+**Não testado:** importar a especificação num Postman/Insomnia real; gerar um cliente a partir dela.
+
+**Fase E0 concluída.** Próximo passo segundo o plano: Fase 0b (campos personalizados genéricos) — ver [plano-fase-0-fundacoes.md](plano-fase-0-fundacoes.md).
+
 ## Pacote E0d — Eventos e webhooks de saída (plano, 2026-11-12)
 
 Hoje o CRM avisa o n8n por **um único URL** (`N8N_WEBHOOK_URL`), sem assinatura, sem repetição e sem registo: se o n8n estiver em baixo, o evento perde-se e ninguém fica a saber. Este pacote generaliza isso para **subscrições de webhook** geridas na interface, que é como os conectores da «forma A» (lojas, faturação, n8n) ficam a saber do que acontece no CRM.
@@ -201,4 +248,4 @@ Base de tudo o que é «forma A» do [sistema de extensões](plano-extensoes-e-a
 - [x] E0b — Registo de auditoria (ver «Pacote E0b» abaixo)
 - [x] E0c — Chaves de API e `/api/v1` (ver «Execução do pacote E0c»)
 - [x] E0d — Eventos e webhooks de saída (ver «Execução do pacote E0d»)
-- [ ] E0e — OpenAPI e `LigaçãoExterna`
+- [x] E0e — OpenAPI e ids externos (ver «Execução do pacote E0e») — **fase E0 concluída**

@@ -634,3 +634,20 @@ model WebhookDelivery {
   @@index([status, nextAttemptAt])
   @@index([subscriptionId, createdAt(sort: Desc)])
 }
+
+// Ligação entre um registo do CRM e o mesmo objeto num sistema externo (E0e, docs/plano-e0-api-publica.md).
+// Polimórfica (entityType + entityId), por isso sem chave estrangeira: quem apaga o registo apaga a ligação.
+model ExternalLink {
+  id         String   @id @default(uuid())
+  /// Quem criou a ligação: "api_key:<id>" para a API pública; os adaptadores futuros usam nomes próprios.
+  provider   String
+  /// "lead" (e outros, à medida que os conectores os usarem).
+  entityType String
+  entityId   String
+  externalId String
+  createdAt  DateTime @default(now())
+
+  @@unique([provider, entityType, externalId])
+  @@unique([provider, entityType, entityId])
+  @@index([entityType, entityId])
+}

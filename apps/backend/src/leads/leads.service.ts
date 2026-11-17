@@ -42,8 +42,9 @@ export class LeadsService {
     return lead;
   }
 
-  async create(dto: CreateLeadDto, creatorId: string) {
-    const lead = await this.prisma.lead.create({ data: dto, include: LEAD_INCLUDE });
+  /** `options.id`: id escolhido por quem chama (a API pública reserva o id externo antes de criar o lead). */
+  async create(dto: CreateLeadDto, creatorId: string, options: { id?: string } = {}) {
+    const lead = await this.prisma.lead.create({ data: { ...dto, id: options.id }, include: LEAD_INCLUDE });
 
     const dueDate = new Date();
     dueDate.setDate(dueDate.getDate() + 1);
@@ -76,7 +77,11 @@ export class LeadsService {
 
   async remove(id: string) {
     await this.ensureExists(id);
-    await this.prisma.lead.delete({ where: { id } });
+    // Ligações a ids externos (E0e) não têm chave estrangeira (são polimórficas): apagam-se juntamente.
+    await this.prisma.$transaction([
+      this.prisma.externalLink.deleteMany({ where: { entityType: "lead", entityId: id } }),
+      this.prisma.lead.delete({ where: { id } }),
+    ]);
   }
 
   async convert(id: string, actingUserId: string) {

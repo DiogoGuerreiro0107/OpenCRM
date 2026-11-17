@@ -44,7 +44,8 @@ export function publicContact(c: Contact) {
   };
 }
 
-export function publicLead(l: Lead) {
+/** `externalId`: o id externo desta integração para o lead, se houver (ExternalLink). */
+export function publicLead(l: Lead, externalId: string | null = null) {
   return {
     id: l.id,
     name: l.name,
@@ -55,6 +56,7 @@ export function publicLead(l: Lead) {
     interest: l.interest,
     status: l.status,
     notes: l.notes,
+    external_id: externalId,
     created_at: iso(l.createdAt),
     updated_at: iso(l.updatedAt),
   };

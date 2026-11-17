@@ -39,4 +39,14 @@ export class V1CreateLeadDto {
   @IsString()
   @MaxLength(5000)
   notes?: string;
+
+  /**
+   * Id deste lead no sistema de origem (loja, formulário...). Se a MESMA chave de API voltar a enviar o mesmo
+   * `external_id`, nada é criado e a resposta é 409 com o id do lead que já existe (ver docs/api-publica.md).
+   */
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(200)
+  external_id?: string;
 }

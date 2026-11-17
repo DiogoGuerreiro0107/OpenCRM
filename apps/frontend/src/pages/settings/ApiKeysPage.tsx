@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { ApiKeyView, CreatedApiKey } from "@opencrm/shared-types";
-import { createApiKey, listApiKeys, listApiScopes, revokeApiKey } from "@/lib/api-keys-api";
+import { createApiKey, downloadOpenApiSpec, listApiKeys, listApiScopes, revokeApiKey } from "@/lib/api-keys-api";
 import { errorMessage } from "@/lib/errors";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -47,6 +47,8 @@ export function ApiKeysPage() {
     },
   });
 
+  const download = useMutation({ mutationFn: downloadOpenApiSpec });
+
   const revoke = useMutation({
     mutationFn: (id: string) => revokeApiKey(id),
     onSuccess: () => {
@@ -85,10 +87,16 @@ export function ApiKeysPage() {
           <p className="text-sm text-muted-foreground">
             Credenciais para sistemas externos (loja online, formulários, n8n...) falarem com o CRM pela API pública{" "}
             <code>/api/v1</code>. Cada chave só pode fazer o que lhe deres (âmbitos) e revoga-se a qualquer momento. A
-            chave completa só se vê <strong>uma vez</strong>, ao criar.
+            chave completa só se vê <strong>uma vez</strong>, ao criar. A especificação OpenAPI descreve todas as rotas e
+            importa-se no Postman ou Insomnia.
           </p>
         </div>
-        <Button onClick={openCreate}>Nova chave</Button>
+        <div className="flex shrink-0 flex-col items-end gap-2">
+          <Button onClick={openCreate}>Nova chave</Button>
+          <Button variant="outline" size="sm" disabled={download.isPending} onClick={() => download.mutate()}>
+            {download.isPending ? "A preparar..." : "Descarregar especificação OpenAPI"}
+          </Button>
+        </div>
       </div>
 
       <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
@@ -96,6 +104,11 @@ export function ApiKeysPage() {
         pode lê-la. Usa estas chaves só em redes de confiança até haver HTTPS.
       </p>
 
+      {download.isError && (
+        <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+          {errorMessage(download.error, "Não foi possível descarregar a especificação.")}
+        </p>
+      )}
       {keys.isError && (
         <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
           {errorMessage(keys.error, "Não foi possível carregar as chaves.")}
