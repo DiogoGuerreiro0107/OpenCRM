@@ -451,3 +451,8 @@ O item "limite de tentativas de login por conta" andava no backlog desde o endur
 - **A administração nunca é configurável** (só Administrador), e o backend impõe: Administrador sempre incluído; Leitura apenas nunca escreve. Alterações auditadas e propagadas em tempo real.
 - Rotas: `@WriteArea("…")` (resolvida em cada pedido) ou `@WriteRoles(...ADMIN_ONLY)`. O frontend deixou de copiar a matriz e usa `GET /me/permissions`.
 - **Fase 0 concluída.**
+
+## Fase 1a: leads numa só tabela, decidido por teste de carga (2026-11-18)
+- 200 000 leads sintéticas nas duas formas, com os mesmos dados e índices. Pelo critério fixado antes de medir, fica **B (uma tabela com tipo)**: as primeiras páginas de B ficaram abaixo de 1 ms e nenhuma consulta de B foi mais lenta do que a de A.
+- Comparação justa: A escrita à mão (ordenar e limitar em cada tabela antes de juntar) é **tão rápida como B**; a diferença é de **simplicidade** (uma consulta em vez de duas combinadas), não de desempenho.
+- Confirmado: paginação por **cursor** (página funda = primeira página), e índice `(responsável, estado)` para as contagens por responsável (~24 ms → ~3 ms). Detalhes e números: `docs/plano-fase-1-leads.md`.

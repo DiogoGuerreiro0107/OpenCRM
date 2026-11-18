@@ -42,6 +42,33 @@ As duas com os índices que o desenho prevê (compostos por estado/responsável/
 
 **Entregável:** script reprodutível (`apps/backend/scripts/bench-leads/`), resultados e decisão em `docs/` (este ficheiro, secção «Resultado do 1a») e em `decisoes.md`.
 
+### Resultado do 1a (2026-11-18)
+
+**Ambiente:** Postgres 16.14 (imagem `postgres:16-alpine`) em Docker Desktop no portátil de desenvolvimento (4 CPUs, 7,7 GB atribuídos ao Docker). Os números absolutos valem para esta máquina; o que conta é a **comparação** A vs B com os mesmos dados. 200 000 leads (100 368 empresa, 99 632 pessoa; NOVO 35%, CONTACTADO 30%, SEM_RESPOSTA 15%, CONVERTIDO 10%, PERDIDO 10%; 10 responsáveis; 70% com próxima ação). Scripts em `apps/backend/scripts/bench-leads/`.
+
+**Medição principal** (mediana e p95 de 20 execuções, ms dentro do Postgres; A com a união «direta»):
+
+| Consulta | B mediana | B p95 | A mediana | A p95 | B/A | mesmos resultados |
+|---|---:|---:|---:|---:|---:|---|
+| 1. Separador (estado + responsável), 1.ª página | 0.30 | 0.41 | 10.65 | 11.98 | 0.03× | sim |
+| 2. Página funda por cursor (depois de 10 000) | 0.33 | 0.40 | 32.02 | 33.25 | 0.01× | sim |
+| 2b. A mesma com OFFSET 10 000 (o que NÃO se usa) | 9.61 | 9.90 | 50.95 | 52.23 | 0.19× | sim |
+| 3. Pesquisa «silva», 1.ª página | 3.37 | 4.70 | 35.69 | 44.20 | 0.09× | sim |
+| 3b. Pesquisa rara (poucos resultados) | 1.04 | 1.18 | 1.47 | 1.74 | 0.71× | sim |
+| 4. Contagens por separador (todas) | 35.39 | 44.82 | 48.18 | 56.26 | 0.73× | sim |
+| 4b. Contagens por separador de um responsável | 35.82 | 54.75 | 51.36 | 77.10 | 0.70× | sim |
+| 5. Todos os tipos por próxima ação, 1.ª página | 0.27 | 0.32 | 60.21 | 115.46 | 0.00× | sim |
+
+Em todas as consultas **A e B devolveram exatamente os mesmos resultados** (verificado pelo script).
+
+**Para ser justo com A** (`extra.sql`): escrevendo a união à mão, com ordenação e limite **dentro de cada tabela** antes de juntar, as primeiras páginas de A ficam tão rápidas como as de B (separador: ~0,3 ms de execução; todos os tipos: ~0,5 ms; pesquisa «silva»: ~7 ms contra ~3 ms em B). Ou seja: **em desempenho, A bem escrita e B são equivalentes**; a diferença é que A obriga a escrever cada consulta duas vezes e a combiná-las com cuidado (a versão «natural» é 10× a 200× mais lenta, como mostra a tabela), enquanto B é uma consulta simples.
+
+**Contagens por separador:** ~30–35 ms sobre as 200 000 (leitura completa da tabela) — aceitável para esta escala, sem cache. Com um índice `(responsável, estado)` as contagens de um responsável descem de ~24 ms para ~3 ms: **entra no 1b**.
+
+**Decisão (pelo critério fixado antes de medir): B — uma tabela com tipo.** Nenhuma consulta de B ficou mais de 2× mais lenta do que A (pelo contrário) e todas as primeiras páginas ficaram muito abaixo de 50 ms. A paginação por **cursor** confirma-se: a página funda custa o mesmo que a primeira (0,3 ms), enquanto `OFFSET 10 000` já custa ~10 ms e cresce com a profundidade.
+
+**Limites desta medição:** uma só máquina; dados sintéticos (nomes repetidos com frequência, o que torna «silva» uma pesquisa com muitos resultados — o caso mais pesado); sem escritas concorrentes; tempo dentro do Postgres (a API acrescenta serialização e rede). A base de dados temporária foi apagada no fim.
+
 ---
 
 ## Pacote 1b — Modelo e API (desenho preliminar, a confirmar pelo 1a)
@@ -52,7 +79,7 @@ As duas com os índices que o desenho prevê (compostos por estado/responsável/
 - **Modo do módulo** (`options.mode` do módulo de leads, coluna que já existe desde a 0a): `COMPANY`, `PERSON` ou `BOTH` (por omissão `BOTH`, para não mudar nada). Controla o que a interface oferece ao criar e como converte; **não** muda os dados.
 - **Estado:** mantém-se o enum atual (`NOVO`, `CONTACTADO`, `SEM_RESPOSTA`, `CONVERTIDO`, `PERDIDO`). Passar as leads para um fluxo configurável (Fase 0c) fica para quando for pedido: mudaria a conversão e as automações, e não é preciso para este objetivo.
 - **Listagem:** `GET /leads` passa a **paginação por cursor** (`limit`, `cursor`), ordenação por próxima ação (sem data no fim) e depois criação, filtros por estado, tipo, responsável, pesquisa (`pg_trgm`), e `GET /leads/counts` com as contagens por estado para os separadores (respeitando os outros filtros). Compatibilidade: a forma da resposta muda (`{ items, nextCursor }`); a interface muda no mesmo PR (1c) — o 1b mantém, por isso, a rota antiga como está e acrescenta `GET /leads/page` (removida no 1c).
-- **Índices:** os validados no 1a.
+- **Índices** (validados no 1a): `(status, responsavelId, ordem)`, `(status, ordem)`, `(ordem)`, `(kind, status)`, `(responsavelId, status)` e GIN `pg_trgm` sobre nome/empresa/email/telefone, sendo «ordem» a próxima ação (sem data no fim) e o id. A extensão `pg_trgm` é ativada por migração.
 - **API pública:** `POST /api/v1/leads` aceita `kind` (opcional, por omissão conforme o modo) e `tax_id`. Só acrescenta.
 
 ## Pacote 1c — Página e conversão (desenho preliminar)
