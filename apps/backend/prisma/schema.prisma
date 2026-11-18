@@ -17,27 +17,27 @@ enum Role {
 }
 
 model User {
-  id                  String          @id @default(uuid())
-  email               String          @unique
-  name                String
-  passwordHash        String
-  role                Role            @default(COMERCIAL)
+  id                   String                @id @default(uuid())
+  email                String                @unique
+  name                 String
+  passwordHash         String
+  role                 Role                  @default(COMERCIAL)
   // Desativar em vez de eliminar: o utilizador está ligado a negócios, tarefas, leads e à timeline.
-  active              Boolean         @default(true)
-  refreshToken        String?
+  active               Boolean               @default(true)
+  refreshToken         String?
   // SHA-256 do token enviado por email (nunca o token). Ver docs/plano-e0-api-publica.md.
-  resetTokenHash      String?         @unique
-  resetTokenExpiresAt DateTime?
-  createdAt           DateTime        @default(now())
-  updatedAt           DateTime        @updatedAt
-  timelineEvents      TimelineEvent[]
-  deals               Deal[]
-  tasks               Task[]
-  leads               Lead[]
-  ownedCompanies      Company[]
-  ownedContacts       Contact[]
-  auditEvents         AuditEvent[]
-  apiKeys             ApiKey[]
+  resetTokenHash       String?               @unique
+  resetTokenExpiresAt  DateTime?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  timelineEvents       TimelineEvent[]
+  deals                Deal[]
+  tasks                Task[]
+  leads                Lead[]
+  ownedCompanies       Company[]
+  ownedContacts        Contact[]
+  auditEvents          AuditEvent[]
+  apiKeys              ApiKey[]
   webhookSubscriptions WebhookSubscription[]
 }
 
@@ -121,6 +121,7 @@ model Company {
   tasks       Task[]
   emails      EmailMessage[]
   callRecords CallRecord[]
+  leads       Lead[]
 
   @@index([ownerId])
 }
@@ -147,6 +148,7 @@ model Contact {
   tasks            Task[]
   emails           EmailMessage[]
   callRecords      CallRecord[]
+  leads            Lead[]
 
   @@index([companyId])
   @@index([ownerId])
@@ -444,10 +446,26 @@ enum LeadStatus {
   PERDIDO
 }
 
+/// Lead de uma EMPRESA ou de uma PESSOA (Fase 1, docs/plano-fase-1-leads.md).
+enum LeadKind {
+  COMPANY
+  PERSON
+}
+
 model Lead {
   id              String        @id @default(uuid())
+  kind            LeadKind      @default(PERSON)
   name            String
   companyName     String?
+  /// NIF (leads de empresa), para detetar duplicados na conversão.
+  taxId           String?
+  /// Cargo (leads de pessoa).
+  jobTitle        String?
+  /// Ligação opcional a registos que já existem (a lead pode existir só com dados soltos e ligar-se depois).
+  companyId       String?
+  company         Company?      @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  contactId       String?
+  contact         Contact?      @relation(fields: [contactId], references: [id], onDelete: SetNull)
   phone           String?
   email           String?
   source          String?
@@ -456,6 +474,10 @@ model Lead {
   responsavelId   String?
   responsavel     User?         @relation(fields: [responsavelId], references: [id], onDelete: SetNull)
   nextActionAt    DateTime?
+  /// = nextActionAt, ou 9999-12-31 sem data: chave de ordenação/cursor da listagem (mantida por um trigger).
+  nextActionSort  DateTime      @default(dbgenerated("'9999-12-31 00:00:00'::timestamp without time zone"))
+  /// Nome/empresa/NIF/email/telefone em minúsculas, para a pesquisa com pg_trgm (mantido por um trigger).
+  searchText      String        @default("")
   notes           String?
   convertedDealId String?       @unique
   convertedDeal   Deal?         @relation(fields: [convertedDealId], references: [id], onDelete: SetNull)
@@ -465,6 +487,15 @@ model Lead {
 
   @@index([responsavelId])
   @@index([status])
+  // Validados pelo teste de carga (Fase 1a): listagem por separador, página única, contagens, pesquisa.
+  @@index([status, responsavelId, nextActionSort, id])
+  @@index([status, nextActionSort, id])
+  @@index([nextActionSort, id])
+  @@index([kind, status])
+  @@index([responsavelId, status])
+  @@index([companyId])
+  @@index([contactId])
+  @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin)
 }
 
 enum CustomFieldType {
@@ -482,7 +513,7 @@ enum CustomFieldType {
 }
 
 model CustomField {
-  id                  String                @id @default(uuid())
+  id                  String             @id @default(uuid())
   /// Tipo de registo ("COMPANY", "LEAD"...). Texto, não enum: os tipos válidos estão em
   /// src/custom-fields/entity-registry.ts e cada módulo novo junta o seu (Fase 0b).
   entityType          String
@@ -491,24 +522,24 @@ model CustomField {
   fieldLabel          String
   fieldType           CustomFieldType
   options             Json?
-  isRequired          Boolean               @default(false)
-  isVisible           Boolean               @default(true)
-  isSearchable        Boolean               @default(false)
-  isFilterable        Boolean               @default(false)
-  isAutomationEnabled Boolean               @default(false)
-  sortOrder           Int                   @default(0)
+  isRequired          Boolean            @default(false)
+  isVisible           Boolean            @default(true)
+  isSearchable        Boolean            @default(false)
+  isFilterable        Boolean            @default(false)
+  isAutomationEnabled Boolean            @default(false)
+  sortOrder           Int                @default(0)
   permissions         Json?
-  createdAt           DateTime              @default(now())
-  updatedAt           DateTime              @updatedAt
+  createdAt           DateTime           @default(now())
+  updatedAt           DateTime           @updatedAt
   values              CustomFieldValue[]
 
   @@unique([entityType, fieldName])
 }
 
 model CustomFieldValue {
-  id            String                @id @default(uuid())
+  id            String      @id @default(uuid())
   customFieldId String
-  customField   CustomField           @relation(fields: [customFieldId], references: [id], onDelete: Cascade)
+  customField   CustomField @relation(fields: [customFieldId], references: [id], onDelete: Cascade)
   entityType    String
   entityId      String
   valueText     String?
@@ -516,8 +547,8 @@ model CustomFieldValue {
   valueDate     DateTime?
   valueBoolean  Boolean?
   valueJson     Json?
-  createdAt     DateTime              @default(now())
-  updatedAt     DateTime              @updatedAt
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
 
   @@unique([customFieldId, entityId])
   @@index([entityType, entityId])

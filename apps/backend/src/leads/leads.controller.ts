@@ -15,12 +15,16 @@ import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { ModuleGuard } from "../modules/module.guard";
 import { RequireModule } from "../modules/require-module.decorator";
-import { WriteArea } from "../auth/decorators/roles.decorator";
+import { WriteArea, WriteRoles } from "../auth/decorators/roles.decorator";
+import { ADMIN_ONLY } from "../auth/permissions";
+import { Audit } from "../audit/audit.decorator";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { LeadsService } from "./leads.service";
 import { CreateLeadDto } from "./dto/create-lead.dto";
 import { UpdateLeadDto } from "./dto/update-lead.dto";
 import { QueryLeadsDto } from "./dto/query-leads.dto";
+import { QueryLeadPageDto } from "./dto/query-lead-page.dto";
+import { LeadSettingsDto } from "./dto/lead-settings.dto";
 
 @UseGuards(JwtAuthGuard, RolesGuard, ModuleGuard)
 @RequireModule("leads")
@@ -32,6 +36,32 @@ export class LeadsController {
   @Get()
   findAll(@Query() query: QueryLeadsDto) {
     return this.leadsService.findAll(query);
+  }
+
+  /** Listagem paginada por cursor, com filtros e pesquisa (Fase 1b). Substitui `GET /leads` quando a página mudar (1c). */
+  @Get("page")
+  page(@Query() query: QueryLeadPageDto) {
+    return this.leadsService.page(query);
+  }
+
+  /** Contagens por estado para os separadores (mesmos filtros da lista, exceto o estado). */
+  @Get("counts")
+  counts(@Query() query: QueryLeadPageDto) {
+    return this.leadsService.counts(query);
+  }
+
+  /** Modo do módulo (empresa, pessoa ou ambos): todos leem (a interface precisa dele para criar). */
+  @Get("settings")
+  settings() {
+    return { mode: this.leadsService.mode() };
+  }
+
+  /** Mudar o modo é configuração: só o Administrador, auditado. */
+  @Audit("lead_settings.updated", { target: "module", fields: ["mode"] })
+  @WriteRoles(...ADMIN_ONLY)
+  @Patch("settings")
+  updateSettings(@Body() dto: LeadSettingsDto) {
+    return this.leadsService.setMode(dto.mode);
   }
 
   @Get(":id")
