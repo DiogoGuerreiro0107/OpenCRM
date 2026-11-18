@@ -40,3 +40,18 @@ automações), estados, tipos, interesses.
 
 ## Fora deste pacote
 - Paginação das **páginas de listagem** de empresas e contactos, que continuam a carregar tudo. Fica para quando forem revistas, como as leads foram no 1c.
+
+## Pesquisa sem acentos (acrescento, 2026-11-19)
+
+Pedido: a pesquisa no servidor deve ignorar acentos («joao» encontra «João», «grafica» encontra «Gráfica»).
+
+- **Colunas de pesquisa mantidas pela base de dados**, como `Lead.searchText` no 1b: `Company.searchText` (nome, nome fiscal, NIF, telefone, email) e `Contact.searchText` (nome, email, telefone, telemóvel).
+  - Guardam `lower(unaccent(...))`, preenchidas por um trigger em qualquer escrita, com índice GIN `pg_trgm`.
+  - Usa-se um trigger e não um índice sobre uma expressão porque `unaccent` não é `IMMUTABLE` e porque o Prisma não representa índices sobre expressões.
+  - O `Lead.searchText` passa a usar também `unaccent`; as linhas existentes são recalculadas na migração.
+- **Extensão `unaccent`** (vem com o Postgres; a imagem `postgres:16-alpine` já a inclui), ativada por migração.
+- **O termo pesquisado é normalizado em TypeScript da mesma forma** (`foldSearch`: minúsculas, sem marcas diacríticas, e um pequeno mapa para letras como ß→ss, æ→ae, ø→o).
+  - Medido antes de implementar: em 190 letras latinas (U+00C0–U+017F) só uma diferia de `unaccent`, e foi acertada.
+  - Um e2e compara as duas normalizações para todo esse intervalo, para não se afastarem.
+- **A coluna não sai na API:** é escondida globalmente no cliente Prisma (pré-funcionalidade `omitApi` do Prisma 5.22), para não aparecer em nenhuma resposta que inclua empresas ou contactos.
+- A pesquisa continua a ser «contém». Além de ignorar acentos, passa a usar o índice: antes era `ILIKE` em várias colunas, sem índice.
