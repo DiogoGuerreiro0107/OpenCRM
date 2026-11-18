@@ -462,3 +462,10 @@ O item "limite de tentativas de login por conta" andava no backlog desde o endur
 - **Colunas derivadas por trigger** (`nextActionSort`, `searchText`) para a paginação por cursor e a pesquisa `pg_trgm`, com os índices validados no teste de carga — todos representáveis no Prisma.
 - **Modo do módulo** (COMPANY/PERSON/BOTH, predefinição BOTH) nas opções do módulo; só restringe o que se cria; não mexe em leads existentes.
 - Novas rotas `GET /leads/page` (cursor) e `GET /leads/counts`; a página continua a usar `GET /leads` até ao 1c.
+
+## Fase 1c: página das leads e conversão por tipo (2026-11-18)
+- **Campos por tipo sem mudar o esquema:** numa lead de empresa, `companyName` é a empresa e `name` o contacto principal (o nome da empresa quando não há contacto, e então a conversão não cria contacto). A API pública não muda.
+- **Conversão:** registos ligados primeiro; senão duplicados (empresa pelo NIF normalizado, contacto pelo email sem maiúsculas e depois pelo telefone normalizado); senão cria. Em registos que já existiam só se preenche a empresa de um contacto que não tinha nenhuma. O resultado indica `LINKED`/`MATCHED`/`CREATED`, e a timeline da lead também.
+- **Conversão concorrente:** a marcação como convertida é condicional dentro da transação; a segunda conversão falha e desfaz o que criou.
+- `GET /leads` (lista sem limite) **removida**; a página usa `GET /leads/page` e `GET /leads/counts`. Medido por HTTP com 200 mil leads: p95 ≤ 49 ms em todos os pedidos da página.
+- O tipo de leads (empresa/pessoa/ambos) configura-se no cartão do módulo, na página Módulos.

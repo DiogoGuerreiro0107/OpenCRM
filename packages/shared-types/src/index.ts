@@ -232,10 +232,27 @@ export type BusinessArea =
 
 export type LeadStatus = "NOVO" | "CONTACTADO" | "SEM_RESPOSTA" | "CONVERTIDO" | "PERDIDO";
 
+/** Lead de empresa ou de pessoa (Fase 1). */
+export type LeadKind = "COMPANY" | "PERSON";
+
+/** Modo do módulo de leads: só empresas, só pessoas, ou os dois. */
+export type LeadMode = "COMPANY" | "PERSON" | "BOTH";
+
+/**
+ * Numa lead de empresa, `companyName` é a empresa e `name` o contacto principal (igual ao nome da empresa quando não
+ * há contacto). Numa lead de pessoa, `name` é a pessoa e a empresa é opcional.
+ */
 export interface Lead {
   id: string;
+  kind: LeadKind;
   name: string;
   companyName: string | null;
+  taxId: string | null;
+  jobTitle: string | null;
+  companyId: string | null;
+  company: { id: string; name: string } | null;
+  contactId: string | null;
+  contact: { id: string; name: string } | null;
   phone: string | null;
   email: string | null;
   source: string | null;
@@ -251,11 +268,27 @@ export interface Lead {
   updatedAt: string;
 }
 
+export interface LeadPage {
+  items: Lead[];
+  nextCursor: string | null;
+}
+
+export interface LeadCounts {
+  total: number;
+  byStatus: Partial<Record<LeadStatus, number>>;
+}
+
+/** Como cada registo da conversão foi obtido: já ligado à lead, duplicado encontrado, ou criado. */
+export type ConversionOutcome = "LINKED" | "MATCHED" | "CREATED";
+
 export interface LeadConversionResult {
   lead: Lead;
   company: { id: string; name: string } | null;
-  contact: { id: string; name: string };
-  deal: { id: string; title: string };
+  /** `null` numa lead de empresa sem contacto principal. */
+  contact: { id: string; name: string } | null;
+  /** `null` sem o módulo de negócios. */
+  deal: { id: string; title: string } | null;
+  outcome: { company: ConversionOutcome | null; contact: ConversionOutcome | null };
 }
 
 export type CustomFieldEntityType = "COMPANY" | "CONTACT" | "LEAD" | "DEAL";

@@ -3,6 +3,7 @@ import { listModules, setModuleEnabled, type ModuleId, type ModuleView } from "@
 import { errorMessage } from "@/lib/errors";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { LeadModeSetting } from "./LeadModeSetting";
 
 export function ModulesSettingsPage() {
   const queryClient = useQueryClient();
@@ -57,6 +58,7 @@ export function ModulesSettingsPage() {
                 </div>
                 <p className="text-sm text-muted-foreground">{module.description}</p>
                 {hint(module) && <p className="text-xs text-muted-foreground">{hint(module)}</p>}
+                {module.id === "leads" && module.enabled && <LeadModeSetting />}
               </div>
               <label className="flex shrink-0 items-center gap-2 text-sm">
                 <input

@@ -15,19 +15,28 @@ describe("LeadsService.convert é atómica", () => {
     source: "site",
     responsavelId: null,
     convertedDealId: null,
+    kind: "PERSON",
+    taxId: null,
+    companyId: null,
+    contactId: null,
   };
   const pipeline = { id: "p1", entityType: "DEAL", steps: [{ id: "s1", category: "OPEN", outcome: null, order: 0 }] };
 
   function buildMocks(dealCreate: jest.Mock) {
     const tx = {
       company: { create: jest.fn().mockResolvedValue({ id: "c1", name: "Empresa Lda" }) },
-      contact: { create: jest.fn().mockResolvedValue({ id: "ct1", name: "Ana" }) },
+      // sem duplicados: o contacto é criado
+      contact: { findFirst: jest.fn().mockResolvedValue(null), create: jest.fn().mockResolvedValue({ id: "ct1", name: "Ana" }) },
+      $queryRaw: jest.fn().mockResolvedValue([]),
       deal: { create: dealCreate },
       timelineEvent: { createMany: jest.fn().mockResolvedValue({ count: 3 }) },
-      lead: { update: jest.fn().mockResolvedValue({ ...lead, status: "CONVERTIDO" }) },
+      lead: {
+        updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+        findUniqueOrThrow: jest.fn().mockResolvedValue({ ...lead, status: "CONVERTIDO" }),
+      },
     };
     const prisma = {
-      lead: { findUnique: jest.fn().mockResolvedValue(lead), update: jest.fn() },
+      lead: { findUnique: jest.fn().mockResolvedValue(lead), update: jest.fn(), updateMany: jest.fn() },
       workflow: { findFirst: jest.fn().mockResolvedValue(pipeline) },
       // fora da transação não pode ser escrito nada:
       company: { create: jest.fn() },
@@ -50,13 +59,14 @@ describe("LeadsService.convert é atómica", () => {
     expect(tx.contact.create).toHaveBeenCalled();
     expect(tx.deal.create).toHaveBeenCalled();
     expect(tx.timelineEvent.createMany).toHaveBeenCalled();
-    expect(tx.lead.update).toHaveBeenCalled();
+    expect(tx.lead.updateMany).toHaveBeenCalled();
 
     expect(prisma.company.create).not.toHaveBeenCalled();
     expect(prisma.contact.create).not.toHaveBeenCalled();
     expect(prisma.deal.create).not.toHaveBeenCalled();
     expect(prisma.timelineEvent.createMany).not.toHaveBeenCalled();
     expect(prisma.lead.update).not.toHaveBeenCalled();
+    expect(prisma.lead.updateMany).not.toHaveBeenCalled();
   });
 
   it("se um passo falha, o erro propaga-se e o lead não chega a ser marcado como convertido", async () => {
@@ -65,7 +75,7 @@ describe("LeadsService.convert é atómica", () => {
 
     await expect(service.convert("lead-1", "user-1")).rejects.toThrow(failure);
 
-    expect(tx.lead.update).not.toHaveBeenCalled();
+    expect(tx.lead.updateMany).not.toHaveBeenCalled();
     expect(tx.timelineEvent.createMany).not.toHaveBeenCalled();
   });
 });

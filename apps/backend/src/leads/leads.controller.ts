@@ -22,7 +22,6 @@ import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { LeadsService } from "./leads.service";
 import { CreateLeadDto } from "./dto/create-lead.dto";
 import { UpdateLeadDto } from "./dto/update-lead.dto";
-import { QueryLeadsDto } from "./dto/query-leads.dto";
 import { QueryLeadPageDto } from "./dto/query-lead-page.dto";
 import { LeadSettingsDto } from "./dto/lead-settings.dto";
 
@@ -33,12 +32,7 @@ import { LeadSettingsDto } from "./dto/lead-settings.dto";
 export class LeadsController {
   constructor(private readonly leadsService: LeadsService) {}
 
-  @Get()
-  findAll(@Query() query: QueryLeadsDto) {
-    return this.leadsService.findAll(query);
-  }
-
-  /** Listagem paginada por cursor, com filtros e pesquisa (Fase 1b). Substitui `GET /leads` quando a página mudar (1c). */
+  /** Listagem paginada por cursor, com filtros e pesquisa (Fase 1b). Substituiu a lista sem paginação no 1c. */
   @Get("page")
   page(@Query() query: QueryLeadPageDto) {
     return this.leadsService.page(query);

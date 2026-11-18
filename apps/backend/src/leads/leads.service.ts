@@ -1,15 +1,15 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
-import { Prisma } from "@prisma/client";
+import { Company, Contact, Lead, Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { WebhooksService } from "../webhooks/webhooks.service";
 import { ModulesService } from "../modules/modules.service";
 import { CreateLeadDto } from "./dto/create-lead.dto";
 import { UpdateLeadDto } from "./dto/update-lead.dto";
-import { QueryLeadsDto } from "./dto/query-leads.dto";
 import { isOpenStep } from "../workflows/workflow-steps";
 import { decodeCursor, encodeCursor } from "../common/cursor";
 import { QueryLeadPageDto } from "./dto/query-lead-page.dto";
 import { assertKindAllowed, defaultKind, LeadMode, leadModeFrom } from "./lead-mode";
+import { companyNameOf, ConversionOutcome, hasPerson, MIN_PHONE_DIGITS, normalizePhone, normalizeTaxId, PHONE_SQL, TAX_ID_SQL } from "./lead-conversion";
 
 const LEAD_INCLUDE = {
   responsavel: { select: { id: true, name: true } },
@@ -27,6 +27,9 @@ function withoutInternal<T extends { nextActionSort?: Date; searchText?: string 
 
 const PAGE_SIZE = 50;
 
+const COMPANY_OUTCOME_LABEL: Record<ConversionOutcome, string> = { LINKED: "já ligada à lead", MATCHED: "já existia, mesmo NIF", CREATED: "nova" };
+const CONTACT_OUTCOME_LABEL: Record<ConversionOutcome, string> = { LINKED: "já ligado à lead", MATCHED: "já existia, mesmo email ou telefone", CREATED: "novo" };
+
 @Injectable()
 export class LeadsService {
   constructor(
@@ -34,22 +37,6 @@ export class LeadsService {
     private readonly webhooks: WebhooksService,
     private readonly modules: ModulesService,
   ) {}
-
-  async findAll(query: QueryLeadsDto) {
-    const where: Prisma.LeadWhereInput = {};
-    if (query.status) where.status = query.status;
-    if (query.responsavelId) where.responsavelId = query.responsavelId;
-    if (query.search) {
-      where.OR = [
-        { name: { contains: query.search, mode: "insensitive" } },
-        { companyName: { contains: query.search, mode: "insensitive" } },
-        { email: { contains: query.search, mode: "insensitive" } },
-        { phone: { contains: query.search, mode: "insensitive" } },
-      ];
-    }
-
-    return (await this.prisma.lead.findMany({ where, orderBy: { createdAt: "desc" }, include: LEAD_INCLUDE })).map(withoutInternal);
-  }
 
   async findOne(id: string) {
     const lead = await this.prisma.lead.findUnique({ where: { id }, include: LEAD_INCLUDE });
@@ -187,6 +174,10 @@ export class LeadsService {
     ]);
   }
 
+  /**
+   * Conversão por tipo (Fase 1c, docs/plano-fase-1-leads.md): usa os registos ligados; senão procura duplicados
+   * (empresa pelo NIF; contacto pelo email e depois pelo telefone) e liga-os; senão cria. Tudo numa transação.
+   */
   async convert(id: string, actingUserId: string) {
     const lead = await this.prisma.lead.findUnique({ where: { id } });
     if (!lead) throw new NotFoundException("Lead não encontrado");
@@ -206,52 +197,128 @@ export class LeadsService {
     // Tudo ou nada: sem transação, uma falha a meio deixava empresa/contacto órfãos e o lead por converter
     // (e uma nova tentativa duplicava os registos).
     return this.prisma.$transaction(async (tx) => {
-      const company = lead.companyName
-        ? await tx.company.create({ data: { name: lead.companyName } })
-        : null;
+      const { company, outcome: companyOutcome } = await this.resolveCompany(tx, lead);
+      const { contact, outcome: contactOutcome } = await this.resolveContact(tx, lead, company?.id ?? null);
 
-      const contact = await tx.contact.create({
-        data: {
-          name: lead.name,
-          email: lead.email,
-          phone: lead.phone,
-          companyId: company?.id,
-        },
-      });
-
+      const dealName = company?.name ?? contact?.name ?? lead.name;
       const deal =
         pipeline && firstOpenStage
           ? await tx.deal.create({
-        data: {
-          title: lead.companyName ? `Oportunidade — ${lead.companyName}` : `Oportunidade — ${lead.name}`,
-          pipelineId: pipeline.id,
-          stageId: firstOpenStage.id,
-          contactId: contact.id,
-          companyId: company?.id,
-          ownerId: lead.responsavelId ?? actingUserId,
-        },
-      })
+              data: {
+                title: `Oportunidade — ${dealName}`,
+                pipelineId: pipeline.id,
+                stageId: firstOpenStage.id,
+                contactId: contact?.id,
+                companyId: company?.id,
+                ownerId: lead.responsavelId ?? actingUserId,
+              },
+            })
           : null;
 
       const noteContent = `Convertido a partir do lead "${lead.name}"${lead.source ? ` (origem: ${lead.source})` : ""}.`;
+      // Na timeline da lead fica o que aconteceu a cada registo (ligado, duplicado encontrado ou criado).
+      const parts = [
+        company ? `empresa "${company.name}" (${COMPANY_OUTCOME_LABEL[companyOutcome]})` : null,
+        contact ? `contacto "${contact.name}" (${CONTACT_OUTCOME_LABEL[contactOutcome]})` : null,
+      ].filter(Boolean);
       await tx.timelineEvent.createMany({
         data: [
-          { entityType: "CONTACT", entityId: contact.id, type: "SYSTEM", description: noteContent, userId: actingUserId },
-          ...(company
-            ? [{ entityType: "COMPANY" as const, entityId: company.id, type: "SYSTEM" as const, description: noteContent, userId: actingUserId }]
-            : []),
-          { entityType: "LEAD", entityId: lead.id, type: "SYSTEM", description: `Convertido para contacto "${contact.name}".`, userId: actingUserId },
+          ...(contact ? [{ entityType: "CONTACT" as const, entityId: contact.id, type: "SYSTEM" as const, description: noteContent, userId: actingUserId }] : []),
+          ...(company ? [{ entityType: "COMPANY" as const, entityId: company.id, type: "SYSTEM" as const, description: noteContent, userId: actingUserId }] : []),
+          { entityType: "LEAD", entityId: lead.id, type: "SYSTEM", description: `Convertido: ${parts.join("; ")}.`, userId: actingUserId },
         ],
       });
 
-      const updatedLead = await tx.lead.update({
-        where: { id },
-        data: { status: "CONVERTIDO", convertedDealId: deal?.id ?? null },
-        include: LEAD_INCLUDE,
+      // Marcação CONDICIONAL: duas conversões ao mesmo tempo passam ambas a verificação de cima; só uma marca a lead,
+      // e a outra falha aqui e desfaz tudo o que criou.
+      const marked = await tx.lead.updateMany({
+        where: { id, status: { not: "CONVERTIDO" }, convertedDealId: null },
+        data: { status: "CONVERTIDO", convertedDealId: deal?.id ?? null, companyId: company?.id ?? null, contactId: contact?.id ?? null },
       });
+      if (marked.count !== 1) throw new BadRequestException("Este lead já foi convertido");
+      const updatedLead = await tx.lead.findUniqueOrThrow({ where: { id }, include: LEAD_INCLUDE });
 
-      return { lead: updatedLead, company, contact, deal };
+      return {
+        lead: withoutInternal(updatedLead),
+        company,
+        contact,
+        deal,
+        outcome: { company: company ? companyOutcome : null, contact: contact ? contactOutcome : null },
+      };
     });
+  }
+
+  /** Empresa da conversão: a ligada; senão uma com o mesmo NIF; senão cria (se a lead tiver empresa). */
+  private async resolveCompany(tx: Prisma.TransactionClient, lead: Lead): Promise<{ company: Company | null; outcome: ConversionOutcome }> {
+    if (lead.companyId) {
+      const linked = await tx.company.findUnique({ where: { id: lead.companyId } });
+      if (linked) return { company: linked, outcome: "LINKED" };
+    }
+    const taxId = normalizeTaxId(lead.taxId);
+    if (taxId) {
+      const [match] = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT "id" FROM "Company" WHERE ${Prisma.raw(TAX_ID_SQL('"taxId"'))} = ${taxId} ORDER BY "createdAt" ASC, "id" ASC LIMIT 1`;
+      if (match) return { company: await tx.company.findUniqueOrThrow({ where: { id: match.id } }), outcome: "MATCHED" };
+    }
+    const name = companyNameOf(lead);
+    if (!name) return { company: null, outcome: "CREATED" };
+    const isCompanyLead = lead.kind === "COMPANY";
+    const company = await tx.company.create({
+      data: {
+        name,
+        taxId: lead.taxId?.trim() || null,
+        // Numa lead de empresa o telefone/email são da empresa (e também do contacto principal, se houver).
+        phone: isCompanyLead ? lead.phone : null,
+        email: isCompanyLead ? lead.email : null,
+        ownerId: lead.responsavelId,
+      },
+    });
+    return { company, outcome: "CREATED" };
+  }
+
+  /** Contacto da conversão: o ligado; senão um com o mesmo email, ou telefone; senão cria (se a lead tiver pessoa). */
+  private async resolveContact(
+    tx: Prisma.TransactionClient,
+    lead: Lead,
+    companyId: string | null,
+  ): Promise<{ contact: Contact | null; outcome: ConversionOutcome }> {
+    if (lead.contactId) {
+      const linked = await tx.contact.findUnique({ where: { id: lead.contactId } });
+      if (linked) return { contact: await this.fillCompany(tx, linked, companyId), outcome: "LINKED" };
+    }
+    if (!hasPerson(lead)) return { contact: null, outcome: "CREATED" };
+
+    const email = lead.email?.trim();
+    let match = email
+      ? await tx.contact.findFirst({ where: { email: { equals: email, mode: "insensitive" } }, orderBy: [{ createdAt: "asc" }, { id: "asc" }] })
+      : null;
+    const phone = normalizePhone(lead.phone);
+    if (!match && phone.length >= MIN_PHONE_DIGITS) {
+      const [row] = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT "id" FROM "Contact"
+        WHERE ${Prisma.raw(PHONE_SQL('"phone"'))} = ${phone} OR ${Prisma.raw(PHONE_SQL('"mobilePhone"'))} = ${phone}
+        ORDER BY "createdAt" ASC, "id" ASC LIMIT 1`;
+      if (row) match = await tx.contact.findUniqueOrThrow({ where: { id: row.id } });
+    }
+    if (match) return { contact: await this.fillCompany(tx, match, companyId), outcome: "MATCHED" };
+
+    const contact = await tx.contact.create({
+      data: {
+        name: lead.name.trim(),
+        email: lead.email,
+        phone: lead.phone,
+        jobTitle: lead.jobTitle,
+        companyId,
+        ownerId: lead.responsavelId,
+      },
+    });
+    return { contact, outcome: "CREATED" };
+  }
+
+  /** Um contacto que já existia só ganha empresa se não tiver nenhuma; com outra empresa, fica como está. */
+  private async fillCompany(tx: Prisma.TransactionClient, contact: Contact, companyId: string | null) {
+    if (contact.companyId || !companyId) return contact;
+    return tx.contact.update({ where: { id: contact.id }, data: { companyId } });
   }
 
   private async ensureExists(id: string) {

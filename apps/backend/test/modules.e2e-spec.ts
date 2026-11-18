@@ -65,7 +65,7 @@ describe("Módulos opcionais (e2e)", () => {
   describe("rotas de um módulo desligado respondem 404 (e voltam ao ligar)", () => {
     // [módulo a desligar, módulos que é preciso desligar antes, rota de leitura]
     const CASES: Array<[string, string[], string]> = [
-      ["leads", [], "/leads"],
+      ["leads", [], "/leads/page"],
       ["deals", ["automations"], "/deals"],
       ["deals", ["automations"], "/pipelines"],
       ["email", [], "/email/messages"],
@@ -95,15 +95,15 @@ describe("Módulos opcionais (e2e)", () => {
 
     it("sem sessão continua a ser 401: não se revela que módulos estão desligados", async () => {
       await setModule("leads", false);
-      await api().get("/leads").expect(401);
-      await api().get("/leads").set(as("Bearer lixo")).expect(401);
+      await api().get("/leads/page").expect(401);
+      await api().get("/leads/page").set(as("Bearer lixo")).expect(401);
     });
 
     it("os dados ficam: desligar e voltar a ligar devolve tudo", async () => {
       const lead = (await api().post("/leads").set(as(admin)).send({ name: "Lead que fica" }).expect(201)).body;
       await setModule("leads", false);
       await setModule("leads", true);
-      const list = (await api().get("/leads").set(as(admin)).expect(200)).body;
+      const list = (await api().get("/leads/page").set(as(admin)).expect(200)).body.items;
       expect(list.map((l: { id: string }) => l.id)).toContain(lead.id);
     });
 
