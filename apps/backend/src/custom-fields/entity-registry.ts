@@ -1,5 +1,4 @@
-import { Role } from "@prisma/client";
-import { WRITE_ACCESS } from "../auth/permissions";
+import { WriteArea } from "../auth/permissions";
 import { ModuleId } from "../modules/module-manifest";
 import { PrismaService } from "../prisma/prisma.service";
 
@@ -15,8 +14,8 @@ export interface CustomFieldEntity {
   label: string;
   /** Módulo opcional a que pertence; `null` = núcleo (sempre ativo). */
   module: ModuleId | null;
-  /** Quem pode preencher/alterar valores destes registos. */
-  writeRoles: readonly Role[];
+  /** Área de permissões que decide quem pode preencher/alterar valores (a mesma da edição do registo; configurável). */
+  writeArea: WriteArea;
   exists: (prisma: PrismaService, id: string) => Promise<boolean>;
 }
 
@@ -24,25 +23,25 @@ export const CUSTOM_FIELD_ENTITIES = {
   COMPANY: {
     label: "Empresas",
     module: null,
-    writeRoles: WRITE_ACCESS.companies,
+    writeArea: "companies",
     exists: async (prisma, id) => (await prisma.company.count({ where: { id } })) > 0,
   },
   CONTACT: {
     label: "Contactos",
     module: null,
-    writeRoles: WRITE_ACCESS.contacts,
+    writeArea: "contacts",
     exists: async (prisma, id) => (await prisma.contact.count({ where: { id } })) > 0,
   },
   LEAD: {
     label: "Leads",
     module: "leads",
-    writeRoles: WRITE_ACCESS.leads,
+    writeArea: "leads",
     exists: async (prisma, id) => (await prisma.lead.count({ where: { id } })) > 0,
   },
   DEAL: {
     label: "Negócios",
     module: "deals",
-    writeRoles: WRITE_ACCESS.deals,
+    writeArea: "deals",
     exists: async (prisma, id) => (await prisma.deal.count({ where: { id } })) > 0,
   },
 } satisfies Record<string, CustomFieldEntity>;

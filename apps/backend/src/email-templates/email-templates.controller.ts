@@ -3,15 +3,14 @@ import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { ModuleGuard } from "../modules/module.guard";
 import { RequireModule } from "../modules/require-module.decorator";
-import { WriteRoles } from "../auth/decorators/roles.decorator";
-import { WRITE_ACCESS } from "../auth/permissions";
+import { WriteArea } from "../auth/decorators/roles.decorator";
 import { EmailTemplatesService } from "./email-templates.service";
 import { CreateEmailTemplateDto } from "./dto/create-email-template.dto";
 import { UpdateEmailTemplateDto } from "./dto/update-email-template.dto";
 
 @UseGuards(JwtAuthGuard, RolesGuard, ModuleGuard)
 @RequireModule("email")
-@WriteRoles(...WRITE_ACCESS.emailTemplates)
+@WriteArea("emailTemplates")
 @Controller("email-templates")
 export class EmailTemplatesController {
   constructor(private readonly emailTemplatesService: EmailTemplatesService) {}

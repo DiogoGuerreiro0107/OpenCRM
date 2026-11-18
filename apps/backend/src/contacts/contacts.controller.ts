@@ -13,15 +13,14 @@ import {
 } from "@nestjs/common";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
-import { WriteRoles } from "../auth/decorators/roles.decorator";
-import { WRITE_ACCESS } from "../auth/permissions";
+import { WriteArea } from "../auth/decorators/roles.decorator";
 import { ContactsService } from "./contacts.service";
 import { CreateContactDto } from "./dto/create-contact.dto";
 import { UpdateContactDto } from "./dto/update-contact.dto";
 import { QueryContactsDto } from "./dto/query-contacts.dto";
 
 @UseGuards(JwtAuthGuard, RolesGuard)
-@WriteRoles(...WRITE_ACCESS.contacts)
+@WriteArea("contacts")
 @Controller("contacts")
 export class ContactsController {
   constructor(private readonly contactsService: ContactsService) {}

@@ -662,3 +662,11 @@ model ExternalLink {
   @@unique([provider, entityType, entityId])
   @@index([entityType, entityId])
 }
+
+// Permissões de escrita configuráveis por área (Fase 0d, docs/plano-fase-0-fundacoes.md). Sem linha = predefinição
+// em código (src/auth/permissions.ts). A administração nunca é configurável.
+model PermissionSetting {
+  area      String   @id
+  roles     Role[]
+  updatedAt DateTime @updatedAt
+}

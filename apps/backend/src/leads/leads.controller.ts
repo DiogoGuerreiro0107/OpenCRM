@@ -15,8 +15,7 @@ import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { ModuleGuard } from "../modules/module.guard";
 import { RequireModule } from "../modules/require-module.decorator";
-import { WriteRoles } from "../auth/decorators/roles.decorator";
-import { WRITE_ACCESS } from "../auth/permissions";
+import { WriteArea } from "../auth/decorators/roles.decorator";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { LeadsService } from "./leads.service";
 import { CreateLeadDto } from "./dto/create-lead.dto";
@@ -25,7 +24,7 @@ import { QueryLeadsDto } from "./dto/query-leads.dto";
 
 @UseGuards(JwtAuthGuard, RolesGuard, ModuleGuard)
 @RequireModule("leads")
-@WriteRoles(...WRITE_ACCESS.leads)
+@WriteArea("leads")
 @Controller("leads")
 export class LeadsController {
   constructor(private readonly leadsService: LeadsService) {}

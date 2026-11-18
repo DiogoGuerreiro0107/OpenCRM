@@ -13,6 +13,7 @@ import { MODULE_KEY } from "./require-module.decorator";
 const CORE_CONTROLLERS = [
   "AuditController",
   "ApiKeysController",
+  "PermissionsController",
   "WebhooksController",
   "V1MetaController",
   "V1CrmController",

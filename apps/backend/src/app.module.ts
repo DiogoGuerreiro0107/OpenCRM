@@ -9,6 +9,7 @@ import { AuditModule } from "./audit/audit.module";
 import { ApiKeysModule } from "./api-keys/api-keys.module";
 import { PublicApiModule } from "./public-api/public-api.module";
 import { AuthModule } from "./auth/auth.module";
+import { PermissionsModule } from "./auth/permissions.module";
 import { UsersModule } from "./users/users.module";
 import { CompaniesModule } from "./companies/companies.module";
 import { ContactsModule } from "./contacts/contacts.module";
@@ -43,6 +44,7 @@ import { RealtimeInterceptor } from "./realtime/realtime.interceptor";
     PublicApiModule,
     WebhooksModule,
     UsersModule,
+    PermissionsModule,
     AuthModule,
     CompaniesModule,
     ContactsModule,

@@ -3,8 +3,8 @@ import { Role } from "@prisma/client";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { Audit } from "../audit/audit.decorator";
 import { RolesGuard } from "../auth/guards/roles.guard";
-import { WriteRoles } from "../auth/decorators/roles.decorator";
-import { WRITE_ACCESS } from "../auth/permissions";
+import { WriteArea, WriteRoles } from "../auth/decorators/roles.decorator";
+import { ADMIN_ONLY } from "../auth/permissions";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { CustomFieldsService } from "./custom-fields.service";
 import { CustomFieldEntityType } from "./entity-registry";
@@ -14,7 +14,7 @@ import { QueryCustomFieldsDto } from "./dto/query-custom-fields.dto";
 import { UpsertCustomFieldValuesDto } from "./dto/upsert-custom-field-values.dto";
 
 @UseGuards(JwtAuthGuard, RolesGuard)
-@WriteRoles(...WRITE_ACCESS.adminOnly)
+@WriteRoles(...ADMIN_ONLY)
 @Controller("custom-fields")
 export class CustomFieldsController {
   constructor(private readonly customFieldsService: CustomFieldsService) {}
@@ -49,7 +49,7 @@ export class CustomFieldsController {
 
   // Preencher valores é trabalho normal (só a DEFINIÇÃO dos campos é do Administrador). Filtro largo aqui; o serviço
   // exige ainda poder editar ESTE tipo de registo (a mesma regra que a edição do próprio registo).
-  @WriteRoles(...WRITE_ACCESS.dailyWork)
+  @WriteArea("dailyWork")
   @Post("values")
   upsertValues(@Body() dto: UpsertCustomFieldValuesDto, @CurrentUser() user: { role: Role }) {
     return this.customFieldsService.upsertValues(dto, user);

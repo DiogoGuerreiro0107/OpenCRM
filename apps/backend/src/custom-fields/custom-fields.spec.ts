@@ -1,6 +1,7 @@
 import { BadRequestException } from "@nestjs/common";
 import { CustomFieldType, Prisma, Role } from "@prisma/client";
 import { MODULE_IDS } from "../modules/module-manifest";
+import { isWriteArea } from "../auth/permissions";
 import { fromValueColumns, FieldForValidation, toValueColumns } from "./custom-field-values";
 import { CUSTOM_FIELD_ENTITIES, CUSTOM_FIELD_ENTITY_TYPES, isCustomFieldEntityType } from "./entity-registry";
 
@@ -104,9 +105,8 @@ describe("registo de tipos de registo com campos personalizados", () => {
     for (const [type, entity] of Object.entries(CUSTOM_FIELD_ENTITIES)) {
       expect({ type, ok: entity.label.length > 0 }).toEqual({ type, ok: true });
       expect({ type, ok: entity.module === null || MODULE_IDS.includes(entity.module) }).toEqual({ type, ok: true });
-      expect(entity.writeRoles.length).toBeGreaterThan(0);
-      for (const role of entity.writeRoles) expect(roles).toContain(role);
-      expect(entity.writeRoles).not.toContain("LEITURA_APENAS");
+      expect({ type, ok: isWriteArea(entity.writeArea) }).toEqual({ type, ok: true });
+      void roles;
       expect(typeof entity.exists).toBe("function");
     }
   });

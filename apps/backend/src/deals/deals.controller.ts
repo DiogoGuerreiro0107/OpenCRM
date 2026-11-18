@@ -15,8 +15,7 @@ import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../auth/guards/roles.guard";
 import { ModuleGuard } from "../modules/module.guard";
 import { RequireModule } from "../modules/require-module.decorator";
-import { WriteRoles } from "../auth/decorators/roles.decorator";
-import { WRITE_ACCESS } from "../auth/permissions";
+import { WriteArea } from "../auth/decorators/roles.decorator";
 import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { DealsService } from "./deals.service";
 import { CreateDealDto } from "./dto/create-deal.dto";
@@ -25,7 +24,7 @@ import { MoveDealDto } from "./dto/move-deal.dto";
 
 @UseGuards(JwtAuthGuard, RolesGuard, ModuleGuard)
 @RequireModule("deals")
-@WriteRoles(...WRITE_ACCESS.deals)
+@WriteArea("deals")
 @Controller("deals")
 export class DealsController {
   constructor(private readonly dealsService: DealsService) {}

@@ -9,7 +9,9 @@ import { ModulesSettingsPage } from "@/pages/settings/ModulesSettingsPage";
 import { AuditPage } from "@/pages/settings/AuditPage";
 import { ApiKeysPage } from "@/pages/settings/ApiKeysPage";
 import { WebhooksPage } from "@/pages/settings/WebhooksPage";
-import { ADMIN_ONLY, EMAIL_TEMPLATE_MANAGERS } from "@/lib/permissions";
+import { ADMIN_ONLY } from "@/lib/permissions";
+import { RequireWrite } from "@/components/RequireWrite";
+import { PermissionsSettingsPage } from "@/pages/settings/PermissionsSettingsPage";
 import { AppShell } from "@/components/layout/AppShell";
 import { CompaniesListPage } from "@/pages/companies/CompaniesListPage";
 import { NewCompanyPage } from "@/pages/companies/NewCompanyPage";
@@ -50,11 +52,12 @@ export default function App() {
           <Route path="/email" element={<RequireModule id="email"><EmailInboxPage /></RequireModule>} />
           <Route path="/leads" element={<RequireModule id="leads"><LeadsListPage /></RequireModule>} />
           <Route path="/configuracoes/campos-personalizados" element={<RequireRole roles={ADMIN_ONLY}><CustomFieldsSettingsPage /></RequireRole>} />
-          <Route path="/configuracoes/templates-email" element={<RequireRole roles={EMAIL_TEMPLATE_MANAGERS}><RequireModule id="email"><EmailTemplatesSettingsPage /></RequireModule></RequireRole>} />
+          <Route path="/configuracoes/templates-email" element={<RequireWrite area="emailTemplates"><RequireModule id="email"><EmailTemplatesSettingsPage /></RequireModule></RequireWrite>} />
           <Route path="/configuracoes/automacoes" element={<RequireRole roles={ADMIN_ONLY}><RequireModule id="automations"><AutomationsSettingsPage /></RequireModule></RequireRole>} />
           <Route path="/configuracoes/chaves-api" element={<RequireRole roles={ADMIN_ONLY}><ApiKeysPage /></RequireRole>} />
           <Route path="/configuracoes/webhooks" element={<RequireRole roles={ADMIN_ONLY}><WebhooksPage /></RequireRole>} />
           <Route path="/configuracoes/auditoria" element={<RequireRole roles={ADMIN_ONLY}><AuditPage /></RequireRole>} />
+          <Route path="/configuracoes/permissoes" element={<RequireRole roles={ADMIN_ONLY}><PermissionsSettingsPage /></RequireRole>} />
           <Route path="/configuracoes/modulos" element={<RequireRole roles={ADMIN_ONLY}><ModulesSettingsPage /></RequireRole>} />
           <Route
             path="/configuracoes/utilizadores"

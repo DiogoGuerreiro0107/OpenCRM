@@ -1,15 +1,10 @@
-import { WRITE_ACCESS as backend } from "./permissions";
-// O frontend mantém um espelho desta matriz só para esconder botões. Este teste garante que não divergem.
-import { WRITE_ACCESS as frontend } from "../../../frontend/src/lib/permissions";
+import { WRITE_AREA_KEYS } from "./permissions";
+// Desde a Fase 0d o frontend NÃO tem cópia dos papéis (pergunta ao backend em GET /me/permissions); só conhece os
+// NOMES das áreas, para os usar em useCanWrite("..."). Este teste garante que os nomes coincidem.
+import { WRITE_AREA_NAMES } from "../../../frontend/src/lib/permissions";
 
-describe("matriz de permissões: backend e espelho do frontend", () => {
-  const sorted = (roles: readonly string[]) => [...roles].sort();
-
-  it("têm exatamente as mesmas áreas", () => {
-    expect(Object.keys(frontend).sort()).toEqual(Object.keys(backend).sort());
-  });
-
-  it.each(Object.keys(backend))("área %s: mesmos papéis nos dois lados", (area) => {
-    expect(sorted(frontend[area as keyof typeof frontend])).toEqual(sorted(backend[area as keyof typeof backend]));
+describe("áreas de permissões: backend e frontend", () => {
+  it("têm exatamente os mesmos nomes", () => {
+    expect([...WRITE_AREA_NAMES].sort()).toEqual([...WRITE_AREA_KEYS].sort());
   });
 });
