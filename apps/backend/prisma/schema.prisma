@@ -1,5 +1,7 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  // omitApi: esconder colunas internas (searchText) de todas as respostas — ver src/prisma/prisma.service.ts.
+  previewFeatures = ["omitApi"]
 }
 
 datasource db {
@@ -114,6 +116,8 @@ model Company {
   ownerId     String?
   owner       User?          @relation(fields: [ownerId], references: [id], onDelete: SetNull)
   notes       String?
+  /// Nome, nome fiscal, NIF, telefone e email, em minúsculas e sem acentos (unaccent), para a pesquisa com pg_trgm (mantido por um trigger; não sai na API).
+  searchText  String         @default("")
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
   contacts    Contact[]
@@ -124,6 +128,7 @@ model Company {
   leads       Lead[]
 
   @@index([ownerId])
+  @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin)
 }
 
 model Contact {
@@ -138,6 +143,8 @@ model Contact {
   isDecisionMaker  Boolean           @default(false)
   marketingConsent Boolean           @default(false)
   notes            String?
+  /// Nome, email, telefone e telemóvel, em minúsculas e sem acentos (unaccent), para a pesquisa com pg_trgm (mantido por um trigger; não sai na API).
+  searchText       String            @default("")
   companyId        String?
   company          Company?          @relation(fields: [companyId], references: [id], onDelete: SetNull)
   ownerId          String?
@@ -152,6 +159,7 @@ model Contact {
 
   @@index([companyId])
   @@index([ownerId])
+  @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin)
 }
 
 /// Categoria fixa de um passo: o que a agenda e os relatórios usam sem conhecer o nome dado pelo utilizador.
@@ -476,7 +484,7 @@ model Lead {
   nextActionAt    DateTime?
   /// = nextActionAt, ou 9999-12-31 sem data: chave de ordenação/cursor da listagem (mantida por um trigger).
   nextActionSort  DateTime      @default(dbgenerated("'9999-12-31 00:00:00'::timestamp without time zone"))
-  /// Nome/empresa/NIF/email/telefone em minúsculas, para a pesquisa com pg_trgm (mantido por um trigger).
+  /// Nome/empresa/NIF/email/telefone em minúsculas e sem acentos (unaccent), para a pesquisa com pg_trgm (mantido por um trigger).
   searchText      String        @default("")
   notes           String?
   convertedDealId String?       @unique

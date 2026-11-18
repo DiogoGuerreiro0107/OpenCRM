@@ -469,3 +469,13 @@ O item "limite de tentativas de login por conta" andava no backlog desde o endur
 - **Conversão concorrente:** a marcação como convertida é condicional dentro da transação; a segunda conversão falha e desfaz o que criou.
 - `GET /leads` (lista sem limite) **removida**; a página usa `GET /leads/page` e `GET /leads/counts`. Medido por HTTP com 200 mil leads: p95 ≤ 49 ms em todos os pedidos da página.
 - O tipo de leads (empresa/pessoa/ambos) configura-se no cartão do módulo, na página Módulos.
+
+## Seletores de registos com pesquisa e pesquisa sem acentos (2026-11-19)
+- **Regra:** escolher uma empresa, um contacto ou um utilizador faz-se sempre com pesquisa, nunca com uma lista completa.
+  - Componente único `RecordPicker` (combobox acessível).
+  - Empresas e contactos pesquisam no servidor, com `limit` (máx. 20 no seletor); utilizadores filtram-se localmente (lista curta).
+- **Pesquisa sem acentos** em empresas, contactos e leads:
+  - Colunas `searchText` mantidas por trigger com `lower(unaccent(...))` e índice GIN `pg_trgm`.
+  - O termo é normalizado em TypeScript (`foldSearch`), e um e2e garante que dá o mesmo que o Postgres.
+  - A coluna está escondida globalmente no cliente Prisma (`omitApi`, pré-funcionalidade do Prisma 5.22; passa a estável no Prisma 6).
+- **Limpar ao editar envia `null`** (antes enviava `undefined`, e a ligação ficava). Campos opcionais vazios das fichas de empresa e contacto vão como `null`.

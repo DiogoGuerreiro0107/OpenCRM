@@ -55,3 +55,28 @@ Pedido: a pesquisa no servidor deve ignorar acentos («joao» encontra «João»
   - Um e2e compara as duas normalizações para todo esse intervalo, para não se afastarem.
 - **A coluna não sai na API:** é escondida globalmente no cliente Prisma (pré-funcionalidade `omitApi` do Prisma 5.22), para não aparecer em nenhuma resposta que inclua empresas ou contactos.
 - A pesquisa continua a ser «contém». Além de ignorar acentos, passa a usar o índice: antes era `ILIKE` em várias colunas, sem índice.
+
+## Execução (2026-11-19)
+
+**Implementado como planeado.** Pormenores:
+- **Componente `RecordPicker`** e três seletores: `CompanyPicker`, `ContactPicker` (com filtro opcional por empresa) e `UserPicker` (com `includeInactive` para a auditoria).
+  - Aplicados em todos os ecrãs do levantamento.
+  - A lista abre em posição fixa no ecrã: dentro dos diálogos com scroll ficava cortada. Abre para cima quando falta espaço em baixo.
+  - Com texto escrito, fica destacado o primeiro resultado, e um Enter antes de chegarem os resultados novos não escolhe nada.
+- **Encontrado e corrigido na verificação** (já existia antes):
+  - Limpar uma ligação ao editar (empresa, contacto, responsável) não ficava guardado, porque se enviava `undefined`.
+  - Uma empresa sem email não se podia guardar: enviava-se `email: ""`, o servidor recusava e a página não mostrava erro.
+  - Os formulários passam a enviar `null` para campos opcionais vazios (`blankToNull`), e as fichas de empresa e contacto mostram o erro quando o servidor recusa.
+- **Pesquisa sem acentos:** migração `20261119100000_pesquisa_sem_acentos`, aplicada também à base de desenvolvimento, com cópia de segurança antes.
+  - As colunas existentes foram recalculadas; as leads também passaram a ignorar acentos.
+
+**Validação:**
+- 10 e2e novos em `test/record-search.e2e-spec.ts`:
+  - `limit` e filtro por empresa;
+  - limpar ligações com `null`;
+  - pesquisa sem acentos em empresas, contactos e leads;
+  - a coluna interna não sai nas respostas (listas, fichas e includes);
+  - normalização TS = Postgres para as 188 letras de U+00C0 a U+017F.
+- 3 testes unitários de `foldSearch`. Migração sem desvio face ao esquema.
+- **Prova por mutação:** 3 mutações (termo só em minúsculas, sem omissão global, sem o mapa de letras especiais), todas apanhadas.
+- **Browser** (base de testes, 300 empresas): pesquisa por NIF e por nome, teclado, rato, limpar, reabrir com o nome já escolhido, e a empresa preenchida a partir do contacto escolhido, com o nome pedido ao servidor. Só há pedidos com `limit=20`; abrir um diálogo já não descarrega listas.

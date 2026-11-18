@@ -4,6 +4,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { CreateCompanyDto } from "./dto/create-company.dto";
 import { UpdateCompanyDto } from "./dto/update-company.dto";
 import { QueryCompaniesDto } from "./dto/query-companies.dto";
+import { foldSearch } from "../common/search-text";
 
 @Injectable()
 export class CompaniesService {
@@ -11,15 +12,9 @@ export class CompaniesService {
 
   findAll(query: QueryCompaniesDto) {
     const where: Prisma.CompanyWhereInput = {};
-    if (query.search) {
-      where.OR = [
-        { name: { contains: query.search, mode: "insensitive" } },
-        { legalName: { contains: query.search, mode: "insensitive" } },
-        { taxId: { contains: query.search, mode: "insensitive" } },
-        { phone: { contains: query.search, mode: "insensitive" } },
-        { email: { contains: query.search, mode: "insensitive" } },
-      ];
-    }
+    // searchText = nome, nome fiscal, NIF, telefone e email sem acentos (trigger); «contém» usa o índice pg_trgm.
+    const term = query.search ? foldSearch(query.search.trim()) : "";
+    if (term) where.searchText = { contains: term };
     if (query.status) where.status = query.status;
     if (query.source) where.source = query.source;
     if (query.ownerId) where.ownerId = query.ownerId;

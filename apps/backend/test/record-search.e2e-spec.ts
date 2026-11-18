@@ -1,6 +1,7 @@
 import { INestApplication } from "@nestjs/common";
 import * as request from "supertest";
 import { bearerFor, createTestApp, createUser, prismaOf, resetDatabase } from "./helpers";
+import { foldSearch } from "../src/common/search-text";
 
 /** Pesquisa usada pelos seletores de empresa/contacto (docs/plano-seletores-com-pesquisa.md). */
 describe("Pesquisa de empresas e contactos para os seletores (e2e)", () => {
@@ -90,6 +91,55 @@ describe("Pesquisa de empresas e contactos para os seletores (e2e)", () => {
       const task = (await request(app.getHttpServer()).post("/tasks").set("Authorization", auth).send({ title: "T", companyId: company.id, contactId: contact.id }).expect(201)).body;
       const clearedTask = (await patch(`/tasks/${task.id}`, { companyId: null, contactId: null }).expect(200)).body;
       expect(clearedTask).toMatchObject({ companyId: null, contactId: null });
+    });
+  });
+  describe("pesquisa sem acentos (unaccent)", () => {
+    beforeEach(async () => {
+      const prisma = prismaOf(app);
+      const sj = await prisma.company.create({ data: { name: "Gráfica São João", legalName: "Artes Gráficas Ç Lda" } });
+      await prisma.contact.create({ data: { name: "João Gonçalves", email: "JOAO@Exemplo.pt", companyId: sj.id } });
+      await prisma.lead.create({ data: { name: "Inês Conceição", companyName: "Pão Quente" } });
+    });
+
+    it("empresas e contactos: sem acentos, com acentos e em maiúsculas dão o mesmo", async () => {
+      for (const term of ["sao joao", "São João", "GRAFICA", "graficas c"]) {
+        const names = (await get("/companies", { search: term, limit: 20 }).expect(200)).body.map((c: { name: string }) => c.name);
+        expect({ term, names }).toEqual({ term, names: ["Gráfica São João"] });
+      }
+      for (const term of ["joao goncalves", "JOÃO", "joao@exemplo"]) {
+        const names = (await get("/contacts", { search: term, limit: 20 }).expect(200)).body.map((c: { name: string }) => c.name);
+        expect({ term, names }).toEqual({ term, names: ["João Gonçalves"] });
+      }
+    });
+
+    it("leads (página): também sem acentos", async () => {
+      for (const term of ["ines conceicao", "pao quente", "CONCEIÇÃO"]) {
+        const items = (await get("/leads/page", { search: term }).expect(200)).body.items.map((l: { name: string }) => l.name);
+        expect({ term, items }).toEqual({ term, items: ["Inês Conceição"] });
+      }
+    });
+
+    it("a coluna interna de pesquisa não sai nas respostas (listas, fichas e includes)", async () => {
+      const prisma = prismaOf(app);
+      const company = await prisma.company.findFirstOrThrow({ where: { name: "Gráfica São João" } });
+      const contact = await prisma.contact.findFirstOrThrow({ where: { name: "João Gonçalves" } });
+      const bodies = [
+        (await get("/companies").expect(200)).text,
+        (await get(`/companies/${company.id}`).expect(200)).text, // inclui os contactos
+        (await get("/contacts").expect(200)).text,
+        (await get(`/contacts/${contact.id}`).expect(200)).text, // inclui a empresa
+        (await get("/leads/page").expect(200)).text,
+      ];
+      for (const body of bodies) expect(body).not.toContain("searchText");
+    });
+
+    it("a normalização do termo (TypeScript) é igual à das colunas (Postgres) em todas as letras latinas U+00C0–U+017F", async () => {
+      const chars: string[] = [];
+      for (let c = 0xc0; c <= 0x17f; c++) if (c !== 0xd7 && c !== 0xf7) chars.push(String.fromCodePoint(c));
+      const rows = await prismaOf(app).$queryRaw<Array<{ c: string; f: string }>>`SELECT c, lower(unaccent(c)) AS f FROM unnest(${chars}::text[]) AS c`;
+      const different = rows.filter((r) => r.f !== foldSearch(r.c)).map((r) => `${r.c}: postgres=${r.f} ts=${foldSearch(r.c)}`);
+      expect(different).toEqual([]);
+      expect(rows).toHaveLength(chars.length);
     });
   });
 });
