@@ -1,6 +1,8 @@
 import { IsOptional, IsString } from "class-validator";
+import { PageQueryDto } from "../../common/pagination";
 
-export class QueryCallRecordsDto {
+/** Chamadas paginadas (mais recente primeiro). */
+export class QueryCallRecordsDto extends PageQueryDto {
   @IsOptional()
   @IsString()
   contactId?: string;

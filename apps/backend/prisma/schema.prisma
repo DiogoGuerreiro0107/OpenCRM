@@ -72,7 +72,7 @@ model TimelineEvent {
   metadata    Json?
   createdAt   DateTime           @default(now())
 
-  @@index([entityType, entityId])
+  @@index([entityType, entityId, createdAt(sort: Desc), id(sort: Desc)])
 }
 
 enum CompanyStatus {
@@ -128,6 +128,7 @@ model Company {
   leads       Lead[]
 
   @@index([ownerId])
+  @@index([name, id])
   @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin)
 }
 
@@ -159,6 +160,7 @@ model Contact {
 
   @@index([companyId])
   @@index([ownerId])
+  @@index([name, id])
   @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin)
 }
 
@@ -228,6 +230,8 @@ model Deal {
   ownerId         String
   owner           User          @relation(fields: [ownerId], references: [id])
   closedAt        DateTime?
+  /// Coluna interna de pesquisa (título sem acentos), mantida por trigger.
+  searchText      String        @default("")
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
   tasks           Task[]
@@ -235,6 +239,8 @@ model Deal {
 
   @@index([pipelineId])
   @@index([stageId])
+  @@index([stageId, order, id])
+  @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin)
 }
 
 enum AutomationTriggerType {
@@ -311,11 +317,17 @@ model Task {
   leadId      String?
   lead        Lead?        @relation(fields: [leadId], references: [id], onDelete: SetNull)
   reminders   Reminder[]
+  /// Coluna interna mantida por trigger (prazo, ou 9999-12-31 sem prazo).
+  dueSort     DateTime     @default(dbgenerated("'9999-12-31 00:00:00'::timestamp without time zone"))
+  /// Coluna interna de pesquisa (título e descrição sem acentos), mantida por trigger.
+  searchText  String       @default("")
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
   @@index([assigneeId])
   @@index([dueDate])
+  @@index([dueSort, createdAt(sort: Desc), id(sort: Desc)])
+  @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin)
 }
 
 model Reminder {
@@ -368,11 +380,15 @@ model EmailMessage {
   company     Company?       @relation(fields: [companyId], references: [id], onDelete: SetNull)
   attachments Attachment[]
   sentAt      DateTime
+  /// Coluna interna de pesquisa (assunto, remetente, destinatários sem acentos), mantida por trigger.
+  searchText  String         @default("")
   createdAt   DateTime       @default(now())
 
   @@index([accountId])
   @@index([contactId])
   @@index([companyId])
+  @@index([sentAt(sort: Desc), id(sort: Desc)])
+  @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin)
 }
 
 model Attachment {
@@ -433,7 +449,7 @@ model CallRecord {
 
   @@index([contactId])
   @@index([companyId])
-  @@index([startedAt])
+  @@index([startedAt(sort: Desc), id(sort: Desc)])
 }
 
 enum BusinessArea {

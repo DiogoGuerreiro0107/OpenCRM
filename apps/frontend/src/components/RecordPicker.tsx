@@ -2,6 +2,7 @@ import { useEffect, useId, useLayoutEffect, useRef, useState } from "react";
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 import { ChevronDown, X } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useDebounced } from "@/lib/pagination";
 
 /**
  * Seletor de um registo com pesquisa (docs/plano-seletores-com-pesquisa.md): caixa de texto que abre uma lista de
@@ -38,15 +39,6 @@ export interface RecordPickerProps<T> {
 }
 
 const LIST_MAX_HEIGHT = 256;
-
-function useDebounced<T>(value: T, delay: number) {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const timer = setTimeout(() => setDebounced(value), delay);
-    return () => clearTimeout(timer);
-  }, [value, delay]);
-  return debounced;
-}
 
 export function RecordPicker<T>({
   id,

@@ -37,7 +37,7 @@ export function CompanyPicker({ emptyLabel = "Nenhuma", ...props }: PickerBase<C
       emptyLabel={emptyLabel}
       placeholder="Nome, NIF ou email..."
       queryKey={["companies"]}
-      search={(search) => listCompanies({ search: search || undefined, limit: PAGE })}
+      search={(search) => listCompanies({ search: search || undefined, limit: PAGE }).then((page) => page.items)}
       resolve={getCompany}
       getId={(c) => c.id}
       getLabel={(c) => c.name}
@@ -55,7 +55,7 @@ export function ContactPicker({ emptyLabel = "Nenhum", companyId, ...props }: Pi
       emptyLabel={emptyLabel}
       placeholder="Nome, email ou telefone..."
       queryKey={["contacts", companyId ?? null]}
-      search={(search) => listContacts({ search: search || undefined, companyId: companyId || undefined, limit: PAGE })}
+      search={(search) => listContacts({ search: search || undefined, companyId: companyId || undefined, limit: PAGE }).then((page) => page.items)}
       resolve={getContact}
       getId={(c) => c.id}
       getLabel={(c) => c.name}

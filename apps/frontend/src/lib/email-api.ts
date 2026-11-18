@@ -1,9 +1,11 @@
-import type { EmailMessage } from "@opencrm/shared-types";
+import type { EmailMessage, Page } from "@opencrm/shared-types";
+import type { PageParams } from "./pagination";
 import { api } from "./api";
 
 export interface EmailFilters {
   contactId?: string;
   companyId?: string;
+  search?: string;
 }
 
 export interface SendEmailInput {
@@ -14,8 +16,9 @@ export interface SendEmailInput {
   companyId?: string;
 }
 
-export async function listEmailMessages(filters: EmailFilters = {}) {
-  const { data } = await api.get<EmailMessage[]>("/email/messages", { params: filters });
+/** Uma página de mensagens (mais recentes primeiro). */
+export async function listEmailMessages(filters: EmailFilters & PageParams = {}) {
+  const { data } = await api.get<Page<EmailMessage>>("/email/messages", { params: filters });
   return data;
 }
 

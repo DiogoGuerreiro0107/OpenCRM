@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { Building2, User } from "lucide-react";
 import type { Lead, LeadKind, LeadStatus } from "@opencrm/shared-types";
 import { getLeadCounts, getLeadSettings, listLeadPage, type LeadFilters } from "@/lib/leads-api";
+import { useDebounced } from "@/lib/pagination";
 import { UserPicker } from "@/components/pickers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,16 +32,6 @@ const STATUS_BADGE_CLASS: Record<LeadStatus, string> = {
 };
 
 const dateFormat = new Intl.DateTimeFormat("pt-PT", { day: "2-digit", month: "2-digit", year: "numeric" });
-
-/** O valor só muda depois de `delay` ms sem alterações (evita um pedido por tecla na pesquisa). */
-function useDebounced<T>(value: T, delay = 300) {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const timer = setTimeout(() => setDebounced(value), delay);
-    return () => clearTimeout(timer);
-  }, [value, delay]);
-  return debounced;
-}
 
 function isOverdue(lead: Lead) {
   if (!lead.nextActionAt || lead.status === "CONVERTIDO" || lead.status === "PERDIDO") return false;

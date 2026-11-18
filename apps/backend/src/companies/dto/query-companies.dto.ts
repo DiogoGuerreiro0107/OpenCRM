@@ -1,10 +1,12 @@
 import { CompanySource, CompanyStatus } from "@prisma/client";
-import { Type } from "class-transformer";
-import { IsEnum, IsInt, IsOptional, IsString, Max, Min } from "class-validator";
+import { IsEnum, IsOptional, IsString, MaxLength } from "class-validator";
+import { PageQueryDto } from "../../common/pagination";
 
-export class QueryCompaniesDto {
+/** Filtros da listagem paginada (docs/plano-paginacao-listagens.md); `limit` e `cursor` vêm de PageQueryDto. */
+export class QueryCompaniesDto extends PageQueryDto {
   @IsOptional()
   @IsString()
+  @MaxLength(100)
   search?: string;
 
   @IsOptional()
@@ -18,12 +20,4 @@ export class QueryCompaniesDto {
   @IsOptional()
   @IsString()
   ownerId?: string;
-
-  /** Máximo de resultados (seletores com pesquisa). Sem valor, devolve todos (páginas de listagem). */
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(100)
-  limit?: number;
 }

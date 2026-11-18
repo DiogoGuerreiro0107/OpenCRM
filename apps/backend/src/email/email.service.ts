@@ -1,6 +1,9 @@
+import { Prisma } from "@prisma/client";
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import * as nodemailer from "nodemailer";
 import { PrismaService } from "../prisma/prisma.service";
+import { KeyField, orderByKey, readPage } from "../common/pagination";
+import { foldSearch } from "../common/search-text";
 import { MinioService } from "./minio.service";
 import { SecretsService } from "../common/secrets.service";
 import { IngestEmailDto } from "./dto/ingest-email.dto";
@@ -13,6 +16,12 @@ const MESSAGE_INCLUDE = {
   company: { select: { id: true, name: true } },
 };
 
+/** Mais recente primeiro (sentAt, id): cursor e ordem das mensagens. */
+const SENT_RECENT_FIRST: KeyField[] = [
+  { field: "sentAt", dir: "desc", kind: "date" },
+  { field: "id", dir: "desc", kind: "string" },
+];
+
 @Injectable()
 export class EmailService {
   constructor(
@@ -22,14 +31,17 @@ export class EmailService {
   ) {}
 
   findAll(query: QueryEmailMessagesDto) {
-    return this.prisma.emailMessage.findMany({
-      where: {
-        contactId: query.contactId,
-        companyId: query.companyId,
-      },
-      orderBy: { sentAt: "desc" },
-      include: MESSAGE_INCLUDE,
-    });
+    const where: Prisma.EmailMessageWhereInput = { contactId: query.contactId, companyId: query.companyId };
+    const term = query.search ? foldSearch(query.search.trim()) : "";
+    if (term) where.searchText = { contains: term };
+    return readPage(SENT_RECENT_FIRST, query, (after, take) =>
+      this.prisma.emailMessage.findMany({
+        where: after ? { AND: [where, after] } : where,
+        orderBy: orderByKey(SENT_RECENT_FIRST),
+        take,
+        include: MESSAGE_INCLUDE,
+      }),
+    );
   }
 
   async findOne(id: string) {

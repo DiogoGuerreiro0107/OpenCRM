@@ -1,6 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
 import { PhoneIncoming, PhoneOutgoing } from "lucide-react";
 import { listCallRecords } from "@/lib/zadarma-api";
+import { LoadMore, usePagedList } from "@/lib/pagination";
 
 interface CallHistorySectionProps {
   contactId?: string;
@@ -14,14 +14,13 @@ function formatDuration(seconds: number) {
 }
 
 export function CallHistorySection({ contactId, companyId }: CallHistorySectionProps) {
-  const { data: calls, isLoading } = useQuery({
-    queryKey: ["call-records", { contactId, companyId }],
-    queryFn: () => listCallRecords({ contactId, companyId }),
-  });
+  // Paginado (mais recentes primeiro): um registo com anos de chamadas não as descarrega todas.
+  const list = usePagedList(["call-records", { contactId, companyId }], (cursor) => listCallRecords({ contactId, companyId, cursor, limit: 20 }));
+  const calls = list.items;
 
-  if (isLoading) return <p className="text-sm text-muted-foreground">A carregar...</p>;
+  if (list.isLoading) return <p className="text-sm text-muted-foreground">A carregar...</p>;
 
-  if (!calls || calls.length === 0) {
+  if (calls.length === 0) {
     return <p className="text-sm text-muted-foreground">Ainda sem chamadas registadas.</p>;
   }
 
@@ -53,6 +52,7 @@ export function CallHistorySection({ contactId, companyId }: CallHistorySectionP
           )}
         </div>
       ))}
+      <LoadMore shown={calls.length} hasMore={list.hasNextPage} loading={list.isFetchingNextPage} onMore={() => list.fetchNextPage()} noun={["chamada", "chamadas"]} label="Ver mais" />
     </div>
   );
 }

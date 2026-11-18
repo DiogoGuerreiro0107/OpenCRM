@@ -66,7 +66,7 @@ describe("Módulos opcionais (e2e)", () => {
     // [módulo a desligar, módulos que é preciso desligar antes, rota de leitura]
     const CASES: Array<[string, string[], string]> = [
       ["leads", [], "/leads/page"],
-      ["deals", ["automations"], "/deals"],
+      ["deals", ["automations"], "/deals?pipelineId=qualquer"],
       ["deals", ["automations"], "/pipelines"],
       ["email", [], "/email/messages"],
       ["email", [], "/email-templates"],
@@ -119,7 +119,7 @@ describe("Módulos opcionais (e2e)", () => {
     it("não se desliga negócios com as automações ativas (diz qual)", async () => {
       const res = await setModule("deals", false, 400);
       expect(res.body.message).toContain("Automações");
-      await api().get("/deals").set(as(admin)).expect(200);
+      await api().get("/deals?pipelineId=qualquer").set(as(admin)).expect(200);
     });
 
     it("não se liga as automações com os negócios desligados (diz qual)", async () => {

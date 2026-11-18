@@ -32,31 +32,32 @@ describe("Pesquisa de empresas e contactos para os seletores (e2e)", () => {
   const get = (path: string, query: Record<string, unknown> = {}) =>
     request(app.getHttpServer()).get(path).query(query).set("Authorization", auth);
 
-  it("empresas: `limit` corta os resultados por ordem alfabética; sem `limit` devolve todas (como antes)", async () => {
-    const limited = (await get("/companies", { limit: 5 }).expect(200)).body as Array<{ name: string }>;
+  it("empresas: `limit` corta os resultados por ordem alfabética; sem `limit`, página de 50 (nunca a tabela toda)", async () => {
+    const limited = (await get("/companies", { limit: 5 }).expect(200)).body.items as Array<{ name: string }>;
     expect(limited.map((c) => c.name)).toEqual(["Acme Lda", "Beta SA", "Empresa 01", "Empresa 02", "Empresa 03"]);
 
-    const all = (await get("/companies").expect(200)).body;
-    expect(all).toHaveLength(32);
+    const page = (await get("/companies").expect(200)).body;
+    expect(page.items).toHaveLength(32);
+    expect(page.nextCursor).toBeNull();
   });
 
   it("empresas: pesquisa por NIF, email ou nome, com limite", async () => {
-    expect((await get("/companies", { search: "501 234", limit: 20 }).expect(200)).body.map((c: { name: string }) => c.name)).toEqual(["Acme Lda"]);
-    expect((await get("/companies", { search: "@beta", limit: 20 }).expect(200)).body.map((c: { name: string }) => c.name)).toEqual(["Beta SA"]);
-    expect((await get("/companies", { search: "empresa", limit: 20 }).expect(200)).body).toHaveLength(20);
+    expect((await get("/companies", { search: "501 234", limit: 20 }).expect(200)).body.items.map((c: { name: string }) => c.name)).toEqual(["Acme Lda"]);
+    expect((await get("/companies", { search: "@beta", limit: 20 }).expect(200)).body.items.map((c: { name: string }) => c.name)).toEqual(["Beta SA"]);
+    expect((await get("/companies", { search: "empresa", limit: 20 }).expect(200)).body.items).toHaveLength(20);
   });
 
   it("contactos: pesquisa, filtro por empresa e limite", async () => {
     const acme = await prismaOf(app).company.findFirstOrThrow({ where: { name: "Acme Lda" } });
-    const anas = (await get("/contacts", { search: "ana", limit: 20 }).expect(200)).body as Array<{ name: string; company: { name: string } }>;
+    const anas = (await get("/contacts", { search: "ana", limit: 20 }).expect(200)).body.items as Array<{ name: string; company: { name: string } }>;
     expect(anas.map((c) => c.name)).toEqual(["Ana Acme", "Ana Beta"]);
     expect(anas[0].company.name).toBe("Acme Lda"); // o seletor mostra a empresa de cada contacto
 
-    const ofAcme = (await get("/contacts", { companyId: acme.id, limit: 20 }).expect(200)).body as Array<{ name: string }>;
+    const ofAcme = (await get("/contacts", { companyId: acme.id, limit: 20 }).expect(200)).body.items as Array<{ name: string }>;
     expect(ofAcme.map((c) => c.name)).toEqual(["Ana Acme", "Bruno Acme"]);
 
-    expect((await get("/contacts", { search: "912000", limit: 20 }).expect(200)).body.map((c: { name: string }) => c.name)).toEqual(["Bruno Acme"]);
-    expect((await get("/contacts", { limit: 1 }).expect(200)).body).toHaveLength(1);
+    expect((await get("/contacts", { search: "912000", limit: 20 }).expect(200)).body.items.map((c: { name: string }) => c.name)).toEqual(["Bruno Acme"]);
+    expect((await get("/contacts", { limit: 1 }).expect(200)).body.items).toHaveLength(1);
   });
 
   it("limites fora do intervalo dão 400", async () => {
@@ -103,11 +104,11 @@ describe("Pesquisa de empresas e contactos para os seletores (e2e)", () => {
 
     it("empresas e contactos: sem acentos, com acentos e em maiúsculas dão o mesmo", async () => {
       for (const term of ["sao joao", "São João", "GRAFICA", "graficas c"]) {
-        const names = (await get("/companies", { search: term, limit: 20 }).expect(200)).body.map((c: { name: string }) => c.name);
+        const names = (await get("/companies", { search: term, limit: 20 }).expect(200)).body.items.map((c: { name: string }) => c.name);
         expect({ term, names }).toEqual({ term, names: ["Gráfica São João"] });
       }
       for (const term of ["joao goncalves", "JOÃO", "joao@exemplo"]) {
-        const names = (await get("/contacts", { search: term, limit: 20 }).expect(200)).body.map((c: { name: string }) => c.name);
+        const names = (await get("/contacts", { search: term, limit: 20 }).expect(200)).body.items.map((c: { name: string }) => c.name);
         expect({ term, names }).toEqual({ term, names: ["João Gonçalves"] });
       }
     });
@@ -125,10 +126,11 @@ describe("Pesquisa de empresas e contactos para os seletores (e2e)", () => {
       const contact = await prisma.contact.findFirstOrThrow({ where: { name: "João Gonçalves" } });
       const bodies = [
         (await get("/companies").expect(200)).text,
-        (await get(`/companies/${company.id}`).expect(200)).text, // inclui os contactos
+        (await get(`/companies/${company.id}`).expect(200)).text,
         (await get("/contacts").expect(200)).text,
         (await get(`/contacts/${contact.id}`).expect(200)).text, // inclui a empresa
         (await get("/leads/page").expect(200)).text,
+        (await get("/contacts", { companyId: company.id }).expect(200)).text, // inclui a empresa
       ];
       for (const body of bodies) expect(body).not.toContain("searchText");
     });

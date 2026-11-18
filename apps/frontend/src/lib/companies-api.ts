@@ -1,4 +1,5 @@
-import type { CompanyDetail, CompanySource, CompanyStatus, CompanySummary } from "@opencrm/shared-types";
+import type { CompanyDetail, CompanySource, CompanyStatus, CompanySummary, Page } from "@opencrm/shared-types";
+import type { PageParams } from "./pagination";
 import { api } from "./api";
 import type { Clearable } from "./forms";
 
@@ -24,12 +25,11 @@ export interface CompanyFilters {
   status?: CompanyStatus;
   source?: CompanySource;
   ownerId?: string;
-  /** Máximo de resultados (seletores com pesquisa). */
-  limit?: number;
 }
 
-export async function listCompanies(filters: CompanyFilters = {}) {
-  const { data } = await api.get<CompanySummary[]>("/companies", { params: filters });
+/** Uma página da lista (por nome). Os seletores pedem só a primeira, com `limit` pequeno. */
+export async function listCompanies(filters: CompanyFilters & PageParams = {}) {
+  const { data } = await api.get<Page<CompanySummary>>("/companies", { params: filters });
   return data;
 }
 

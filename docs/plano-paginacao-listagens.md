@@ -68,3 +68,50 @@ funis e fases, utilizadores, chaves de API, campos personalizados, modelos de em
 
 ## Fora deste pacote
 - `ZadarmaService` lê todos os contactos para identificar o número de uma chamada recebida. É uma pesquisa interna, não uma listagem, e fica anotada para quando a integração for revista.
+
+## Execução (2026-11-19)
+
+**Implementado como planeado**, com estes acertos encontrados na medição e no browser:
+- **Contagem de contactos por empresa:** o `_count` do Prisma agregava a tabela de contactos inteira em cada página (156 ms com 200 000 contactos). Passou a contar só as empresas da página (15 ms).
+- **Calendário:** 6 semanas podiam trazer milhares de tarefas (4 451 no ensaio, 434 ms), para a grelha mostrar 3 por dia.
+  - O servidor devolve só as 3 primeiras de cada dia e a contagem de cada dia (para o «+N»), no fuso horário do browser (47 ms).
+  - Acrescentou-se o filtro por responsável à lista e ao calendário.
+- **Pesquisa no quadro:** o Prisma juntava empresa e contacto com `LEFT JOIN … OR`, o que percorria a coluna inteira (143 ms).
+  - O `searchText` do negócio passou a incluir o da empresa e o do contacto (migração `20261119120000_pesquisa_negocios_empresa_contacto`), mantido por triggers quando estes mudam de nome, são desligados ou apagados (61 ms).
+- **Mover no quadro:** renumerar a coluna fazia um UPDATE por cartão e mexia no `updatedAt` de todos os negócios da coluna, o que estragava as «oportunidades paradas» do dashboard. Passou a ser uma só instrução SQL que só muda o `order`.
+- **dnd-kit:** desligar o arrasto trocava o array de sensores, o que dá aviso do React. Passou a desligar-se nos cartões (`SortableContext disabled`).
+
+**Medição** (`scripts/bench-listagens`, por HTTP, ~1 milhão de linhas, mediana / p95 em ms; no Windows os tempos vêm em degraus de ~15,6 ms):
+
+| Pedido | Mediana | p95 |
+|---|---|---|
+| Empresas, 1.ª página / página funda (10 000) | 15 / 30 | 21 / 34 |
+| Empresas, pesquisa «sao joao» / seletor (20) | 32 / 31 | 32 / 33 |
+| Ficha da empresa com 2 000 contactos | 15 | 23 |
+| Contactos, 1.ª página / da empresa grande / pesquisa | 15 / 15 / 63 | 21 / 20 / 64 |
+| Tarefas, 1.ª página / funda / atrasadas / pesquisa | 30 / 31 / 31 / 29 | 33 / 39 / 32 / 36 |
+| Calendário (6 semanas, 129 tarefas devolvidas) | 47 | 58 |
+| Kanban, coluna de 100 000 (30) / funda / resumo / pesquisa | 15 / 31 / 46 / 61 | 18 / 32 / 49 / 68 |
+| Emails, 1.ª página / pesquisa | 15 / 15 | 22 / 21 |
+| Timeline (50 000 do registo), 1.ª / funda | 15 / 30 | 22 / 33 |
+| Chamadas, 1.ª página | 15 | 17 |
+| Dashboard (contagens) | 109 | 134 |
+
+**Validação:**
+- **e2e:** 16 novos em `test/pagination.e2e-spec.ts`.
+  - Percorrer todas as páginas de cada lista sem repetir nem saltar linhas, com empates na chave.
+  - Pesquisa sem acentos.
+  - Calendário: intervalo, 3 por dia, contagens, fuso e responsável.
+  - Kanban: topo, resumo, mover numa coluna parcial sem mexer no `updatedAt`, pesquisa a acompanhar mudanças da empresa e do contacto.
+  - Dashboard, limites e cursores inválidos.
+  - `record-search` e `modules` atualizados ao novo formato.
+- 4 testes unitários do cursor.
+- **Prova por mutação:** 5 mutações, todas apanhadas (cursor `gte`, direção ignorada, chave das tarefas, negócios novos no fundo, renumerar pelo Prisma).
+- Migrações sem desvio face ao esquema; aplicadas à base de desenvolvimento, com cópia de segurança antes.
+- **Browser** (base de testes), em cada ecrã:
+  - Empresas: 50 → 100 → 121, sem repetidos; pesquisa sem acentos.
+  - Ficha da empresa: contactos, timeline e email com «Ver mais», e pesquisa nos 30 contactos.
+  - Kanban: totais do servidor e «Mostrar mais»; pesquisa por empresa; arrasto bloqueado com pesquisa e ativo sem ela, para uma coluna parcial; negócio novo no topo.
+  - Tarefas: lista paginada e pesquisa; calendário com «+N» e filtro por responsável.
+  - Caixa de email: paginada e com pesquisa.
+  - Contactos: paginados. Seletores a funcionar.

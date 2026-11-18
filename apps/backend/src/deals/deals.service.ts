@@ -1,5 +1,9 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
+import { KeyField, orderByKey, readPage } from "../common/pagination";
+import { foldSearch } from "../common/search-text";
+import { DealFiltersDto, QueryDealsDto } from "./dto/query-deals.dto";
 import { WebhooksService } from "../webhooks/webhooks.service";
 import { AutomationsService } from "../automations/automations.service";
 import { CreateDealDto } from "./dto/create-deal.dto";
@@ -13,6 +17,12 @@ const DEAL_INCLUDE = {
   owner: { select: { id: true, name: true } },
 } as const;
 
+/** Ordem de uma coluna do quadro (order, id): cursor e ordem dos cartões. */
+const COLUMN_KEY: KeyField[] = [
+  { field: "order", dir: "asc", kind: "number" },
+  { field: "id", dir: "asc", kind: "string" },
+];
+
 const WATCHED_FIELDS = ["value", "probability", "type", "estimatedMargin"] as const;
 
 @Injectable()
@@ -23,12 +33,28 @@ export class DealsService {
     private readonly automations: AutomationsService,
   ) {}
 
-  findAllByPipeline(pipelineId: string) {
-    return this.prisma.deal.findMany({
-      where: { pipelineId },
-      orderBy: { order: "asc" },
-      include: DEAL_INCLUDE,
-    });
+  private boardWhere(filters: DealFiltersDto): Prisma.DealWhereInput {
+    const where: Prisma.DealWhereInput = { pipelineId: filters.pipelineId };
+    const term = filters.search ? foldSearch(filters.search.trim()) : "";
+    // searchText = título + texto de pesquisa da empresa e do contacto, sem acentos, mantido por triggers (também quando
+    // a empresa ou o contacto mudam); «contém» usa só o índice pg_trgm do negócio.
+    if (term) where.searchText = { contains: term };
+    return where;
+  }
+
+  /** Cartões de um funil (normalmente de uma coluna), paginados pela ordem da coluna. */
+  findPage(query: QueryDealsDto) {
+    const where = this.boardWhere(query);
+    if (query.stageId) where.stageId = query.stageId;
+    return readPage(COLUMN_KEY, query, (after, take) =>
+      this.prisma.deal.findMany({ where: after ? { AND: [where, after] } : where, orderBy: orderByKey(COLUMN_KEY), take, include: DEAL_INCLUDE }),
+    );
+  }
+
+  /** Número de negócios e valor total por fase, com os mesmos filtros do quadro (cabeçalho de cada coluna). */
+  async summary(filters: DealFiltersDto) {
+    const grouped = await this.prisma.deal.groupBy({ by: ["stageId"], where: this.boardWhere(filters), _count: true, _sum: { value: true } });
+    return grouped.map((g) => ({ stageId: g.stageId, count: g._count, totalValue: g._sum.value ?? 0 }));
   }
 
   async findOne(id: string) {
@@ -44,9 +70,11 @@ export class DealsService {
       throw new BadRequestException("A fase indicada não pertence a este funil");
     }
 
-    const last = await this.prisma.deal.findFirst({
+    // Os negócios novos entram no TOPO da coluna: aparecem logo, mesmo numa coluna com muitas páginas.
+    const first = await this.prisma.deal.findFirst({
       where: { stageId: dto.stageId },
-      orderBy: { order: "desc" },
+      orderBy: { order: "asc" },
+      select: { order: true },
     });
 
     const deal = await this.prisma.deal.create({
@@ -62,7 +90,7 @@ export class DealsService {
         contactId: dto.contactId,
         companyId: dto.companyId,
         ownerId,
-        order: (last?.order ?? -1) + 1,
+        order: (first?.order ?? 1) - 1,
         closedAt: isOpenStep(stage) ? null : new Date(),
       },
       include: DEAL_INCLUDE,
@@ -142,9 +170,12 @@ export class DealsService {
           stageEnteredAt: deal.stageId !== dto.stageId ? new Date() : undefined,
         },
       }),
-      ...orderedIds.map((dealId, index) =>
-        this.prisma.deal.update({ where: { id: dealId }, data: { order: index } }),
-      ),
+      // Renumera a coluna numa só instrução e só as linhas cuja posição muda. Sem passar pelo Prisma, o updatedAt dos
+      // outros negócios não mexe (conta para as «oportunidades paradas» do dashboard).
+      this.prisma.$executeRaw`
+        UPDATE "Deal" AS d SET "order" = (v.ord - 1)::int
+        FROM unnest(${orderedIds}::text[]) WITH ORDINALITY AS v(id, ord)
+        WHERE d.id = v.id AND d."order" <> (v.ord - 1)::int`,
     ]);
 
     if (deal.stageId !== dto.stageId) {

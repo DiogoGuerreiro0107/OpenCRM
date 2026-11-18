@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
 import type { CompanyStatus } from "@opencrm/shared-types";
 import { listCompanies } from "@/lib/companies-api";
 import { Button } from "@/components/ui/button";
@@ -8,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useCanWrite } from "@/lib/useCanWrite";
+import { LoadMore, useDebounced, usePagedList } from "@/lib/pagination";
 
 const STATUS_TABS: { value: CompanyStatus | "ALL"; label: string }[] = [
   { value: "ALL", label: "Todas" },
@@ -35,14 +35,13 @@ export function CompaniesListPage() {
   const canCreate = useCanWrite("companies");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<CompanyStatus | "ALL">("ALL");
-  const { data: companies, isLoading } = useQuery({
-    queryKey: ["companies", search, statusFilter],
-    queryFn: () =>
-      listCompanies({
-        search: search || undefined,
-        status: statusFilter === "ALL" ? undefined : statusFilter,
-      }),
-  });
+  const term = useDebounced(search.trim());
+  // Paginada por nome (docs/plano-paginacao-listagens.md): nunca descarrega a tabela inteira.
+  const list = usePagedList(["companies", "list", term, statusFilter], (cursor) =>
+    listCompanies({ search: term || undefined, status: statusFilter === "ALL" ? undefined : statusFilter, cursor }),
+  );
+  const companies = list.items;
+  const isLoading = list.isLoading;
 
   return (
     <div className="space-y-4">
@@ -56,6 +55,7 @@ export function CompaniesListPage() {
       </div>
 
       <Input
+        aria-label="Pesquisar empresas"
         placeholder="Pesquisar por nome, NIF, telefone, email..."
         value={search}
         onChange={(e) => setSearch(e.target.value)}
@@ -123,6 +123,7 @@ export function CompaniesListPage() {
           </tbody>
         </table>
       </div>
+      <LoadMore shown={companies.length} hasMore={list.hasNextPage} loading={list.isFetchingNextPage} onMore={() => list.fetchNextPage()} noun={["empresa", "empresas"]} />
     </div>
   );
 }

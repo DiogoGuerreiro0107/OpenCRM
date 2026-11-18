@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Trash2 } from "lucide-react";
 import type { TimelineEntityType, TimelineEvent, TimelineEventType } from "@opencrm/shared-types";
 import { createTimelineEvent, deleteTimelineEvent, listTimeline, updateTimelineEvent } from "@/lib/timeline-api";
@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { useCanWrite } from "@/lib/useCanWrite";
+import { LoadMore, usePagedList } from "@/lib/pagination";
 
 const EVENT_LABELS: Record<TimelineEventType, string> = {
   NOTE: "Nota",
@@ -117,10 +118,9 @@ function TimelineEntry({
 export function TimelineSection({ entityType, entityId }: TimelineSectionProps) {
   const queryClient = useQueryClient();
   const canAddNotes = useCanWrite("dailyWork");
-  const { data: events } = useQuery({
-    queryKey: ["timeline", entityType, entityId],
-    queryFn: () => listTimeline(entityType, entityId),
-  });
+  // Paginado (mais recente primeiro): o histórico de um cliente antigo pode ter milhares de entradas.
+  const list = usePagedList(["timeline", entityType, entityId], (cursor) => listTimeline(entityType, entityId, { cursor, limit: 20 }));
+  const events = list.data ? list.items : undefined;
 
   const [type, setType] = useState<TimelineEventType>("NOTE");
   const [description, setDescription] = useState("");
@@ -179,6 +179,7 @@ export function TimelineSection({ entityType, entityId }: TimelineSectionProps) 
         {events?.map((event) => (
           <TimelineEntry key={event.id} event={event} entityType={entityType} entityId={entityId} />
         ))}
+        <LoadMore shown={events?.length ?? 0} hasMore={list.hasNextPage} loading={list.isFetchingNextPage} onMore={() => list.fetchNextPage()} noun={["entrada", "entradas"]} label="Ver mais" />
       </div>
     </div>
   );

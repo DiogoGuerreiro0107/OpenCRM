@@ -1,18 +1,19 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
 import { listContacts } from "@/lib/contacts-api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useCanWrite } from "@/lib/useCanWrite";
+import { LoadMore, useDebounced, usePagedList } from "@/lib/pagination";
 
 export function ContactsListPage() {
   const canCreate = useCanWrite("contacts");
   const [search, setSearch] = useState("");
-  const { data: contacts, isLoading } = useQuery({
-    queryKey: ["contacts", search],
-    queryFn: () => listContacts({ search: search || undefined }),
-  });
+  const term = useDebounced(search.trim());
+  // Paginada por nome (docs/plano-paginacao-listagens.md): nunca descarrega a tabela inteira.
+  const list = usePagedList(["contacts", "list", term], (cursor) => listContacts({ search: term || undefined, cursor }));
+  const contacts = list.items;
+  const isLoading = list.isLoading;
 
   return (
     <div className="space-y-4">
@@ -26,6 +27,7 @@ export function ContactsListPage() {
       </div>
 
       <Input
+        aria-label="Pesquisar contactos"
         placeholder="Pesquisar por nome, email, telefone..."
         value={search}
         onChange={(e) => setSearch(e.target.value)}
@@ -72,6 +74,7 @@ export function ContactsListPage() {
           </tbody>
         </table>
       </div>
+      <LoadMore shown={contacts.length} hasMore={list.hasNextPage} loading={list.isFetchingNextPage} onMore={() => list.fetchNextPage()} noun={["contacto", "contactos"]} />
     </div>
   );
 }

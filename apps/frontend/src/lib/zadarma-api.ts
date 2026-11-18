@@ -1,4 +1,5 @@
-import type { CallRecord, ZadarmaAccount } from "@opencrm/shared-types";
+import type { CallRecord, ZadarmaAccount, Page } from "@opencrm/shared-types";
+import type { PageParams } from "./pagination";
 import { api } from "./api";
 
 export interface SaveZadarmaAccountInput {
@@ -27,7 +28,8 @@ export interface CallRecordFilters {
   companyId?: string;
 }
 
-export async function listCallRecords(filters: CallRecordFilters = {}) {
-  const { data } = await api.get<CallRecord[]>("/zadarma/calls", { params: filters });
+/** Uma página de chamadas (mais recentes primeiro). */
+export async function listCallRecords(filters: CallRecordFilters & PageParams = {}) {
+  const { data } = await api.get<Page<CallRecord>>("/zadarma/calls", { params: filters });
   return data;
 }

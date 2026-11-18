@@ -21,6 +21,7 @@ import { DealsService } from "./deals.service";
 import { CreateDealDto } from "./dto/create-deal.dto";
 import { UpdateDealDto } from "./dto/update-deal.dto";
 import { MoveDealDto } from "./dto/move-deal.dto";
+import { DealFiltersDto, QueryDealsDto } from "./dto/query-deals.dto";
 
 @UseGuards(JwtAuthGuard, RolesGuard, ModuleGuard)
 @RequireModule("deals")
@@ -30,8 +31,13 @@ export class DealsController {
   constructor(private readonly dealsService: DealsService) {}
 
   @Get()
-  findAll(@Query("pipelineId") pipelineId: string) {
-    return this.dealsService.findAllByPipeline(pipelineId);
+  findAll(@Query() query: QueryDealsDto) {
+    return this.dealsService.findPage(query);
+  }
+
+  @Get("summary")
+  summary(@Query() filters: DealFiltersDto) {
+    return this.dealsService.summary(filters);
   }
 
   @Get(":id")

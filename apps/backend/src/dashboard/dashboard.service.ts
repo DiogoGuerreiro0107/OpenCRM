@@ -72,16 +72,23 @@ export class DashboardService {
   }
 
   private async getPipelineBreakdown() {
-    const pipelines = await this.prisma.workflow.findMany({
-      where: { entityType: "DEAL" },
-      include: { deals: { include: { stage: { select: { category: true, outcome: true } } } } },
-      orderBy: { createdAt: "asc" },
-    });
+    // Contagens na base de dados (por fase), em vez de ler todos os negócios de sempre para os contar aqui.
+    const [pipelines, perStage] = await Promise.all([
+      this.prisma.workflow.findMany({
+        where: { entityType: "DEAL" },
+        include: { steps: { select: { id: true, category: true, outcome: true } } },
+        orderBy: { createdAt: "asc" },
+      }),
+      this.prisma.deal.groupBy({ by: ["stageId"], _count: true }),
+    ]);
+    const countByStage = new Map(perStage.map((g) => [g.stageId, g._count]));
 
     return pipelines.map((pipeline) => {
-      const open = pipeline.deals.filter((d) => stageTypeOf(d.stage) === "OPEN").length;
-      const won = pipeline.deals.filter((d) => stageTypeOf(d.stage) === "WON").length;
-      const lost = pipeline.deals.filter((d) => stageTypeOf(d.stage) === "LOST").length;
+      const countOf = (type: "OPEN" | "WON" | "LOST") =>
+        pipeline.steps.filter((s) => stageTypeOf(s) === type).reduce((sum, s) => sum + (countByStage.get(s.id) ?? 0), 0);
+      const open = countOf("OPEN");
+      const won = countOf("WON");
+      const lost = countOf("LOST");
       const closed = won + lost;
       const conversionRate = closed > 0 ? Math.round((won / closed) * 100) : 0;
 

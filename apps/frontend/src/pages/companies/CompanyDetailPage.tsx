@@ -17,6 +17,7 @@ import { EmailSection } from "@/components/email/EmailSection";
 import { CustomFieldsSection } from "@/components/CustomFieldsSection";
 import { CallButton } from "@/components/CallButton";
 import { CallHistorySection } from "@/components/CallHistorySection";
+import { CompanyContactsSection } from "@/components/CompanyContactsSection";
 import { useModuleEnabled } from "@/lib/useModules";
 import { useCanWrite } from "@/lib/useCanWrite";
 import { ReadOnlyFieldset } from "@/components/ReadOnly";
@@ -249,19 +250,7 @@ export function CompanyDetailPage() {
             <CardTitle>Contactos</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {company.contacts.length === 0 && (
-              <p className="text-sm text-muted-foreground">Sem contactos associados.</p>
-            )}
-            {company.contacts.map((contact) => (
-              <Link
-                key={contact.id}
-                to={`/contactos/${contact.id}`}
-                className="block rounded-md border border-border p-2 text-sm hover:bg-muted/30"
-              >
-                <span className="font-medium text-primary">{contact.name}</span>
-                {contact.jobTitle && <span className="text-muted-foreground"> · {contact.jobTitle}</span>}
-              </Link>
-            ))}
+            <CompanyContactsSection companyId={company.id} total={company._count.contacts} />
             {canAddContact && (
               <Button asChild variant="outline" size="sm" className="mt-2">
                 <Link to={`/contactos/novo?companyId=${company.id}`}>Adicionar contacto</Link>

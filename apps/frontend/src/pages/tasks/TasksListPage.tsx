@@ -1,12 +1,15 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import type { Task, TaskPriority, TaskStatus } from "@opencrm/shared-types";
-import { listTasks } from "@/lib/tasks-api";
+import { listCalendarTasks, listTasks, type TaskFilters } from "@/lib/tasks-api";
+import { LoadMore, useDebounced, usePagedList } from "@/lib/pagination";
+import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useCanWrite } from "@/lib/useCanWrite";
-import { MonthCalendar } from "@/components/calendar/MonthCalendar";
+import { MonthCalendar, monthGridRange } from "@/components/calendar/MonthCalendar";
+import { UserPicker } from "@/components/pickers";
 import { TaskDialog } from "./TaskDialog";
 
 type TabValue = TaskStatus | "ALL" | "OVERDUE" | "TODAY";
@@ -58,14 +61,25 @@ export function TasksListPage() {
   const [month, setMonth] = useState(() => new Date());
   const [dialogState, setDialogState] = useState<{ task: Task | null; defaultDueDate?: string } | null>(null);
 
-  const { data: tasks, isLoading } = useQuery({
-    queryKey: ["tasks", statusFilter],
-    queryFn: () => {
-      if (statusFilter === "ALL") return listTasks({});
-      if (statusFilter === "OVERDUE") return listTasks({ overdue: "true" });
-      if (statusFilter === "TODAY") return listTasks({ dueToday: "true" });
-      return listTasks({ status: statusFilter });
-    },
+  const [search, setSearch] = useState("");
+  const term = useDebounced(search.trim());
+  const [assigneeId, setAssigneeId] = useState("");
+
+  // Lista: paginada, com pesquisa (docs/plano-paginacao-listagens.md).
+  const tabFilters: TaskFilters =
+    statusFilter === "ALL" ? {} : statusFilter === "OVERDUE" ? { overdue: "true" } : statusFilter === "TODAY" ? { dueToday: "true" } : { status: statusFilter };
+  const list = usePagedList(["tasks", "list", statusFilter, term, assigneeId], (cursor) => listTasks({ ...tabFilters, search: term || undefined, assigneeId: assigneeId || undefined, cursor }), {
+    enabled: view === "list",
+  });
+  const tasks = list.items;
+  const isLoading = list.isLoading;
+
+  // Calendário: só as tarefas com prazo nas 6 semanas visíveis.
+  const range = monthGridRange(month);
+  const calendar = useQuery({
+    queryKey: ["tasks", "calendar", range.from, range.to, assigneeId],
+    queryFn: () => listCalendarTasks({ ...range, assigneeId: assigneeId || undefined }),
+    enabled: view === "calendar",
   });
 
   return (
@@ -81,6 +95,19 @@ export function TasksListPage() {
           </Button>
           {canCreate && <Button onClick={() => setDialogState({ task: null })}>Nova tarefa</Button>}
         </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        {view === "list" && (
+          <Input
+            aria-label="Pesquisar tarefas"
+            placeholder="Pesquisar por título ou descrição..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="max-w-sm"
+          />
+        )}
+        <UserPicker aria-label="Responsável" value={assigneeId} onChange={(id) => setAssigneeId(id)} emptyLabel="Todos os responsáveis" className="w-56" />
       </div>
 
       {view === "list" && (
@@ -105,7 +132,8 @@ export function TasksListPage() {
       {view === "calendar" ? (
         <MonthCalendar
           month={month}
-          tasks={tasks ?? []}
+          tasks={calendar.data?.items ?? []}
+          countsByDay={calendar.data?.countsByDay}
           onMonthChange={setMonth}
           onDayClick={(dayKey) => {
             if (canCreate) setDialogState({ task: null, defaultDueDate: dayKey });
@@ -133,14 +161,14 @@ export function TasksListPage() {
                   </td>
                 </tr>
               )}
-              {!isLoading && tasks?.length === 0 && (
+              {!isLoading && tasks.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">
                     Nenhuma tarefa encontrada.
                   </td>
                 </tr>
               )}
-              {tasks?.map((task) => (
+              {tasks.map((task) => (
                 <tr
                   key={task.id}
                   className="cursor-pointer border-b border-border last:border-0 hover:bg-muted/30"
@@ -163,6 +191,9 @@ export function TasksListPage() {
             </tbody>
           </table>
         </div>
+      )}
+      {view === "list" && (
+        <LoadMore shown={tasks.length} hasMore={list.hasNextPage} loading={list.isFetchingNextPage} onMore={() => list.fetchNextPage()} noun={["tarefa", "tarefas"]} />
       )}
 
       {dialogState && (

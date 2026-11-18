@@ -16,6 +16,14 @@ import { DealCard } from "./DealCard";
 
 type Columns = Record<string, string[]>;
 
+/** Coluna inteira segundo o servidor (os cartões carregados são só o início dela). */
+export interface ColumnInfo {
+  total: number;
+  totalValue: number;
+  hasMore: boolean;
+  loadingMore: boolean;
+}
+
 function buildColumns(stages: StageWithCount[], deals: Deal[]): Columns {
   const columns: Columns = Object.fromEntries(stages.map((s) => [s.id, [] as string[]]));
   const sorted = [...deals].sort((a, b) => a.order - b.order);
@@ -33,9 +41,13 @@ interface KanbanBoardProps {
   onMove: (dealId: string, stageId: string, index: number) => void;
   /** Sem permissão para alterar negócios: não se arrasta nem se cria (consultar continua a funcionar). */
   readOnly?: boolean;
+  /** Não se arrasta (pesquisa ativa: a posição de um cartão só faz sentido na coluna completa); criar continua. */
+  dragDisabled?: boolean;
+  columns: Record<string, ColumnInfo>;
+  onLoadMore: (stageId: string) => void;
 }
 
-export function KanbanBoard({ stages, deals, onAddDeal, onDealClick, onMove, readOnly = false }: KanbanBoardProps) {
+export function KanbanBoard({ stages, deals, onAddDeal, onDealClick, onMove, readOnly = false, dragDisabled = false, columns: info, onLoadMore }: KanbanBoardProps) {
   const dealsById = Object.fromEntries(deals.map((d) => [d.id, d]));
   const [columns, setColumns] = useState<Columns>(() => buildColumns(stages, deals));
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -110,7 +122,9 @@ export function KanbanBoard({ stages, deals, onAddDeal, onDealClick, onMove, rea
 
   return (
     <DndContext
-      sensors={readOnly ? [] : sensors}
+      // Os sensores são sempre os mesmos (o dnd-kit não aceita mudar o tamanho do array entre renders); desligar o
+      // arrasto faz-se nos cartões (SortableContext disabled).
+      sensors={sensors}
       collisionDetection={closestCorners}
       onDragStart={handleDragStart}
       onDragOver={handleDragOver}
@@ -125,6 +139,9 @@ export function KanbanBoard({ stages, deals, onAddDeal, onDealClick, onMove, rea
             deals={(columns[stage.id] ?? []).map((id) => dealsById[id]).filter(Boolean)}
             onAddDeal={() => onAddDeal(stage.id)}
             onDealClick={onDealClick}
+            info={info[stage.id]}
+            onLoadMore={() => onLoadMore(stage.id)}
+            dragDisabled={readOnly || dragDisabled}
           />
         ))}
       </div>

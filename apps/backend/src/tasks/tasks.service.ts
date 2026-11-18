@@ -1,10 +1,12 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { AutomationsService } from "../automations/automations.service";
 import { CreateTaskDto } from "./dto/create-task.dto";
 import { UpdateTaskDto } from "./dto/update-task.dto";
-import { QueryTasksDto } from "./dto/query-tasks.dto";
+import { QueryTaskCalendarDto, QueryTasksDto } from "./dto/query-tasks.dto";
+import { KeyField, orderByKey, readPage } from "../common/pagination";
+import { foldSearch } from "../common/search-text";
 
 const TASK_INCLUDE = {
   assignee: { select: { id: true, name: true } },
@@ -14,6 +16,30 @@ const TASK_INCLUDE = {
   reminders: { orderBy: { remindAt: "asc" as const } },
 };
 
+/**
+ * Chave da lista de tarefas: prazo (as sem prazo no fim — `dueSort` é o prazo ou 9999-12-31, mantido por trigger),
+ * depois as criadas mais recentemente, depois id.
+ */
+const TASK_KEY: KeyField[] = [
+  { field: "dueSort", dir: "asc", kind: "date" },
+  { field: "createdAt", dir: "desc", kind: "date" },
+  { field: "id", dir: "desc", kind: "string" },
+];
+const NO_DUE_DATE = new Date("9999-12-31T00:00:00.000Z");
+export const CALENDAR_MAX_DAYS = 62;
+/** Tarefas por dia que a grelha do mês mostra (o resto aparece como «+N»). */
+export const CALENDAR_PER_DAY = 3;
+
+/** Fuso horário IANA válido (o mesmo teste que o browser faz). O nome vai como parâmetro, nunca no texto do SQL. */
+function isTimeZone(tz: string) {
+  try {
+    new Intl.DateTimeFormat("en", { timeZone: tz });
+    return /^[A-Za-z0-9_+\-/]+$/.test(tz);
+  } catch {
+    return false;
+  }
+}
+
 @Injectable()
 export class TasksService {
   constructor(
@@ -21,8 +47,11 @@ export class TasksService {
     private readonly automations: AutomationsService,
   ) {}
 
+  /** Página da lista de tarefas. */
   findAll(query: QueryTasksDto) {
     const where: Prisma.TaskWhereInput = {};
+    const term = query.search ? foldSearch(query.search.trim()) : "";
+    if (term) where.searchText = { contains: term };
     if (query.status) where.status = query.status;
     if (query.type) where.type = query.type;
     if (query.priority) where.priority = query.priority;
@@ -46,11 +75,55 @@ export class TasksService {
       where.dueDate = query.overdue === "true" ? { lt: startOfToday } : { gte: startOfToday, lt: startOfTomorrow };
     }
 
-    return this.prisma.task.findMany({
-      where,
-      orderBy: [{ dueDate: "asc" }, { createdAt: "desc" }],
+    return readPage(
+      TASK_KEY,
+      query,
+      (after, take) =>
+        this.prisma.task.findMany({ where: after ? { AND: [where, after] } : where, orderBy: orderByKey(TASK_KEY), take, include: TASK_INCLUDE }),
+      // dueSort não sai nas respostas (coluna interna): calcula-se do prazo, como no trigger.
+      (task) => [task.dueDate ?? NO_DUE_DATE, task.createdAt, task.id],
+    );
+  }
+
+  /**
+   * Calendário: no intervalo visível, as primeiras CALENDAR_PER_DAY tarefas de cada dia e quantas há em cada dia.
+   * A resposta tem no máximo dias × CALENDAR_PER_DAY tarefas, seja qual for o volume (medido: 4 451 tarefas em 6
+   * semanas demoravam 434 ms a devolver, para a grelha mostrar 3 por dia).
+   */
+  async findCalendar(query: QueryTaskCalendarDto) {
+    const from = new Date(query.from);
+    const to = new Date(query.to);
+    const days = (to.getTime() - from.getTime()) / 86_400_000;
+    if (days < 0 || days > CALENDAR_MAX_DAYS) {
+      throw new BadRequestException(`O intervalo do calendário tem de ter entre 0 e ${CALENDAR_MAX_DAYS} dias`);
+    }
+    const tz = query.tz ?? "UTC";
+    if (!isTimeZone(tz)) throw new BadRequestException("Fuso horário desconhecido");
+    const assignee = query.assigneeId ? Prisma.sql`AND t."assigneeId" = ${query.assigneeId}` : Prisma.empty;
+    // O prazo está guardado em UTC; o dia conta-se no fuso do browser, como a grelha.
+    const rows = await this.prisma
+      .$queryRaw<Array<{ id: string; day: string; n: bigint }>>`
+      SELECT id, day, n FROM (
+        SELECT t.id, d.day,
+          row_number() OVER (PARTITION BY d.day ORDER BY t."dueDate", t.id) AS rn,
+          count(*) OVER (PARTITION BY d.day) AS n
+        FROM "Task" t
+        CROSS JOIN LATERAL (SELECT to_char((t."dueDate" AT TIME ZONE 'UTC') AT TIME ZONE ${tz}, 'YYYY-MM-DD') AS day) d
+        WHERE t."dueDate" >= ${from} AND t."dueDate" <= ${to} ${assignee}
+      ) x
+      WHERE rn <= ${CALENDAR_PER_DAY}`
+      .catch((err: unknown) => {
+        // Um nome que o Node conhece e o Postgres não (tzdata diferente): pedido inválido, não erro do servidor.
+        if (/time zone .* not recognized/i.test(String(err))) throw new BadRequestException("Fuso horário desconhecido");
+        throw err;
+      });
+    const items = await this.prisma.task.findMany({
+      where: { id: { in: rows.map((r) => r.id) } },
+      orderBy: [{ dueDate: "asc" }, { id: "asc" }],
       include: TASK_INCLUDE,
     });
+    const countsByDay = Object.fromEntries(rows.map((r) => [r.day, Number(r.n)]));
+    return { items, countsByDay };
   }
 
   async findOne(id: string) {

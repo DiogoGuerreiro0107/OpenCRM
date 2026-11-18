@@ -15,6 +15,14 @@ function toDayKey(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
+/** Intervalo que a grelha do mês mostra (42 dias, de segunda a domingo): é o que se pede ao servidor. */
+export function monthGridRange(current: Date) {
+  const days = buildMonthGrid(current);
+  const end = new Date(days[days.length - 1]);
+  end.setHours(23, 59, 59, 999);
+  return { from: days[0].toISOString(), to: end.toISOString() };
+}
+
 function buildMonthGrid(current: Date): Date[] {
   const first = startOfMonth(current);
   const firstWeekday = (first.getDay() + 6) % 7; // 0 = Monday
@@ -31,12 +39,14 @@ function buildMonthGrid(current: Date): Date[] {
 interface MonthCalendarProps {
   month: Date;
   tasks: Task[];
+  /** Quantas tarefas há em cada dia (AAAA-MM-DD); o servidor só manda as primeiras de cada dia. */
+  countsByDay?: Record<string, number>;
   onMonthChange: (month: Date) => void;
   onDayClick: (dayKey: string) => void;
   onTaskClick: (task: Task) => void;
 }
 
-export function MonthCalendar({ month, tasks, onMonthChange, onDayClick, onTaskClick }: MonthCalendarProps) {
+export function MonthCalendar({ month, tasks, countsByDay, onMonthChange, onDayClick, onTaskClick }: MonthCalendarProps) {
   const days = buildMonthGrid(month);
   const tasksByDay = new Map<string, Task[]>();
   for (const task of tasks) {
@@ -79,6 +89,7 @@ export function MonthCalendar({ month, tasks, onMonthChange, onDayClick, onTaskC
         {days.map((day) => {
           const key = toDayKey(day);
           const dayTasks = tasksByDay.get(key) ?? [];
+          const dayCount = countsByDay?.[key] ?? dayTasks.length;
           const isCurrentMonth = day.getMonth() === month.getMonth();
           return (
             <button
@@ -111,8 +122,10 @@ export function MonthCalendar({ month, tasks, onMonthChange, onDayClick, onTaskC
                     {task.title}
                   </div>
                 ))}
-                {dayTasks.length > 3 && (
-                  <span className="text-[11px] text-muted-foreground">+{dayTasks.length - 3}</span>
+                {dayCount > Math.min(3, dayTasks.length) && (
+                  <span className="text-[11px] text-muted-foreground" title="Vê todas na lista, filtrando por responsável ou pesquisa">
+                    +{dayCount - Math.min(3, dayTasks.length)}
+                  </span>
                 )}
               </div>
             </button>
