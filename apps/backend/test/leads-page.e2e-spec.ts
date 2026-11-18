@@ -195,7 +195,7 @@ describe("Leads: modelo e listagem (e2e)", () => {
       expect(ignoresStatus.total).toBe(25);
     });
 
-    it("parâmetros inválidos dão 400; cursor inválido devolve a primeira página; a página antiga continua igual", async () => {
+    it("parâmetros inválidos dão 400; cursor inválido devolve a primeira página; a lista antiga sem paginação já não existe", async () => {
       const auth = await as("COMERCIAL");
       await seed();
       await api().get("/leads/page").query({ limit: 0 }).set("Authorization", auth).expect(400);
@@ -203,8 +203,8 @@ describe("Leads: modelo e listagem (e2e)", () => {
       await api().get("/leads/page").query({ kind: "OUTRO" }).set("Authorization", auth).expect(400);
       const first = await api().get("/leads/page").query({ cursor: "lixo", limit: 3 }).set("Authorization", auth).expect(200);
       expect(first.body.items).toHaveLength(3);
-      const legacy = await api().get("/leads").set("Authorization", auth).expect(200);
-      expect(legacy.body).toHaveLength(25);
+      // removida no 1c: a página usa /leads/page (uma lista sem limite não escala)
+      await api().get("/leads").set("Authorization", auth).expect(404);
     });
 
     it("com o módulo de leads desligado, as rotas novas dão 404", async () => {

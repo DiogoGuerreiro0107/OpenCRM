@@ -1,9 +1,24 @@
-import type { Lead, LeadConversionResult, BusinessArea, LeadStatus } from "@opencrm/shared-types";
+import type {
+  Lead,
+  LeadConversionResult,
+  LeadCounts,
+  LeadKind,
+  LeadMode,
+  LeadPage,
+  BusinessArea,
+  LeadStatus,
+} from "@opencrm/shared-types";
 import { api } from "./api";
 
 export interface LeadInput {
+  kind?: LeadKind;
   name: string;
   companyName?: string;
+  taxId?: string;
+  jobTitle?: string;
+  /** `null` desliga a lead da empresa/contacto (só ao editar). */
+  companyId?: string | null;
+  contactId?: string | null;
   phone?: string;
   email?: string;
   source?: string;
@@ -16,12 +31,30 @@ export interface LeadInput {
 
 export interface LeadFilters {
   status?: LeadStatus;
+  kind?: LeadKind;
   responsavelId?: string;
   search?: string;
 }
 
-export async function listLeads(filters: LeadFilters = {}) {
-  const { data } = await api.get<Lead[]>("/leads", { params: filters });
+/** Uma página da lista (cursor da página anterior, ou nenhum para a primeira). */
+export async function listLeadPage(filters: LeadFilters, cursor?: string | null) {
+  const { data } = await api.get<LeadPage>("/leads/page", { params: { ...filters, cursor: cursor ?? undefined } });
+  return data;
+}
+
+/** Contagens por estado (para os separadores), com os mesmos filtros exceto o estado. */
+export async function getLeadCounts(filters: Omit<LeadFilters, "status">) {
+  const { data } = await api.get<LeadCounts>("/leads/counts", { params: filters });
+  return data;
+}
+
+export async function getLeadSettings() {
+  const { data } = await api.get<{ mode: LeadMode }>("/leads/settings");
+  return data;
+}
+
+export async function updateLeadSettings(mode: LeadMode) {
+  const { data } = await api.patch<{ mode: LeadMode }>("/leads/settings", { mode });
   return data;
 }
 

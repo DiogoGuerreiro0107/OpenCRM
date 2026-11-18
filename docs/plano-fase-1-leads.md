@@ -2,6 +2,8 @@
 
 Segunda fase da [reorganização modular](plano-reorganizacao-modular.md) (§3.5), depois da [Fase 0](plano-fase-0-fundacoes.md). Decisão já tomada (D1): **uma tabela**, mas **só depois de um teste de carga** com 200 mil leads sintéticas que compare as duas formas de guardar.
 
+**Estado (2026-11-18): concluída** — os três pacotes foram executados (ver «Resultado do 1a», «Execução do pacote 1b» e «Execução do pacote 1c»).
+
 ## O que existe hoje
 - `Lead` com dados soltos (`name`, `companyName` em texto, `phone`, `email`, `source`, `interest`, `status`, `responsavelId`, `nextActionAt`, `notes`). Não se distingue lead de empresa de lead de pessoa, nem se liga a uma empresa ou contacto que já existam.
 - **A listagem devolve todas as leads de uma vez** (sem paginação), ordenadas por data de criação; a pesquisa é `ILIKE` em quatro colunas sem índice. Com milhares de leads, a página mais importante fica lenta.
@@ -89,7 +91,7 @@ Em todas as consultas **A e B devolveram exatamente os mesmos resultados** (veri
 - **Modo do módulo** guardado nas opções do módulo (a coluna `options` da 0a passou a ser lida e escrita pelo `ModulesService`); rotas `GET/PATCH /leads/settings` (alterar: só Administrador, auditado). Mudar o modo **não** altera leads existentes: continuam editáveis, e só não se pode **mudar** uma lead para o tipo proibido.
 - Leads existentes classificadas na migração: com nome de empresa → empresa; sem → pessoa. Na base de desenvolvimento, a única lead (com empresa) ficou empresa.
 - Ligações: `contactId` sem `companyId` herda a empresa do contacto; apagar a empresa/contacto ligados deixa a lead sem ligação (não a apaga).
-- Rotas novas `GET /leads/page` e `GET /leads/counts`; `GET /leads` fica igual até o 1c mudar a página.
+- Rotas novas `GET /leads/page` e `GET /leads/counts`; `GET /leads` fica igual até o 1c mudar a página (removida no 1c).
 - API pública: `kind` e `tax_id` no corpo e na resposta (só acrescenta; especificação OpenAPI atualizada e verificada pelos testes de conformidade).
 
 **Validação:** 251 unitários e 359 e2e a passar (os 347 anteriores sem alterações); migração sem desvio; build OK. **Prova por mutação** (cursor com `>=`, pesquisa ignorada, modo sem efeito) → falham cinco testes. **Não testado:** desempenho da API com volume (o teste de carga mediu as consultas no Postgres, não a API) — fica para o 1c, com a página.
@@ -117,6 +119,21 @@ Em todas as consultas **A e B devolveram exatamente os mesmos resultados** (veri
 **Interface:** separadores com contagens; filtros de tipo (só no modo `BOTH`), responsável e pesquisa (com atraso de 300 ms); «Carregar mais». Diálogo com os campos do tipo e escolha de empresa/contacto existentes (listas, como no diálogo de negócios). O modo escolhe-se na página **Módulos**, no cartão das leads (só Administrador). Depois de converter, abre o contacto (ou a empresa, se não houver contacto).
 
 **Validação:** e2e da conversão (cada ramo de ligação/duplicado/criação, corrida dupla) e da remoção da rota antiga; prova por mutação; **medição da API com 200 mil leads** (o que ficou por testar no 1b); verificação no browser na base de testes.
+
+### Execução do pacote 1c (2026-11-18)
+
+**Implementado como desenhado acima**, com estes pormenores:
+- Regras puras da conversão em `leads/lead-conversion.ts` (NIF e telefone normalizados, empresa/pessoa de uma lead), com a mesma normalização em SQL para comparar com os registos guardados. Telefones com menos de 6 dígitos não ligam ninguém.
+- A timeline da lead diz o que aconteceu a cada registo, ex.: «Convertido: empresa "Acme" (já existia, mesmo NIF); contacto "Ana" (novo).»
+- Empresa criada na conversão fica com o responsável da lead; um contacto encontrado sem empresa ganha a da conversão; com outra empresa, não se mexe.
+- Interface: o tipo de leads escolhe-se no cartão do módulo, na página Módulos; o diálogo mostra os campos do tipo e, ao escolher uma empresa existente, preenche nome e NIF e só sugere os contactos dessa empresa.
+
+**Validação:**
+- 254 unitários e 368 e2e a passar (9 e2e novos da conversão: cada ramo de ligado/duplicado/criado, contacto com outra empresa, telefone curto, e três conversões em simultâneo → uma passa, duas recusadas, sem registos a mais); build OK.
+- **Prova por mutação** — 8 mutações, todas apanhadas: NIF sem normalização, ignorar a empresa ligada, ignorar o contacto ligado, marcação não condicional (apanhada pelo teste da corrida), lead de empresa sempre com pessoa, mudar a empresa de um contacto que já tem uma, telefone curto a ligar, email sensível a maiúsculas.
+- **API com 200 mil leads** (o que tinha ficado por testar no 1b; `scripts/bench-leads/api.cjs`, por HTTP com a aplicação compilada): todos os pedidos da página com mediana ≤ 32 ms e p95 ≤ 49 ms — primeira página, separador, responsável, tipo, página funda (depois de 10 000), pesquisa comum e rara, NIF, e contagens (a mais cara: contagens com pesquisa comum, p95 49 ms). No Windows os tempos saem em degraus de ~15,6 ms (resolução do relógio), por isso o valor real é menor.
+- **No browser** (base de testes, backend na porta 3001): separadores com contagens a acompanhar os filtros, filtro de tipo e responsável, pesquisa por NIF, «Carregar mais» (62 leads sem repetições, sem data no fim); conversão de uma lead com o NIF de uma empresa existente escrito de outra forma → ligou-se à empresa, sem a duplicar; lead de pessoa com o email de um contacto existente em maiúsculas → ligou-se ao contacto; modo «só empresas» na página Módulos (guardado e auditado) esconde a escolha de tipo; nova lead com empresa e contacto existentes ficou ligada aos dois.
+- **Não testado:** o seletor de empresas/contactos usa listas completas (como o diálogo de negócios); com milhares de empresas precisará de pesquisa — fica para quando a lista de empresas também passar a paginada.
 
 ## Riscos
 | Risco | Mitigação |
