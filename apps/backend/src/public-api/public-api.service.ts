@@ -85,8 +85,10 @@ export class PublicApiService {
     try {
       const lead = await this.leads.create(
         {
+          kind: dto.kind,
           name: dto.name,
           companyName: dto.company_name,
+          taxId: dto.tax_id,
           phone: dto.phone,
           email: dto.email,
           source: dto.source ?? `API: ${apiKey.name}`,

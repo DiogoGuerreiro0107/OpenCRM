@@ -1,4 +1,4 @@
-import { BusinessArea, CompanySource, CompanyStatus, LeadStatus, PreferredChannel } from "@prisma/client";
+import { BusinessArea, CompanySource, CompanyStatus, LeadKind, LeadStatus, PreferredChannel } from "@prisma/client";
 import { API_ERROR_CODES } from "./v1-error.filter";
 import { API_SCOPES } from "./scopes";
 
@@ -279,11 +279,13 @@ export const OPENAPI_SPEC = {
       Lead: {
         type: "object",
         additionalProperties: false,
-        required: ["id", "name", "status", "external_id", "created_at", "updated_at"],
+        required: ["id", "kind", "name", "status", "external_id", "created_at", "updated_at"],
         properties: {
           id: { type: "string" },
+          kind: { type: "string", enum: Object.values(LeadKind), description: "COMPANY (lead de empresa) ou PERSON (lead de pessoa)." },
           name: { type: "string" },
           company_name: nullable("string"),
+          tax_id: nullable("string", { description: "NIF (leads de empresa)." }),
           phone: nullable("string"),
           email: nullable("string"),
           source: nullable("string"),
@@ -300,7 +302,9 @@ export const OPENAPI_SPEC = {
         required: ["name"],
         properties: {
           name: { type: "string", minLength: 1, maxLength: 200 },
+          kind: { type: "string", enum: Object.values(LeadKind), description: "Sem valor: conforme o modo do módulo de leads (com nome de empresa → COMPANY)." },
           company_name: { type: "string", maxLength: 200 },
+          tax_id: { type: "string", maxLength: 20, description: "NIF (leads de empresa)." },
           phone: { type: "string", maxLength: 50 },
           email: { type: "string", format: "email" },
           source: { type: "string", maxLength: 100, description: "Por omissão «API: <nome da chave>»." },

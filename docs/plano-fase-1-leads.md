@@ -82,6 +82,18 @@ Em todas as consultas **A e B devolveram exatamente os mesmos resultados** (veri
 - **Índices** (validados no 1a): `(status, responsavelId, ordem)`, `(status, ordem)`, `(ordem)`, `(kind, status)`, `(responsavelId, status)` e GIN `pg_trgm` sobre nome/empresa/email/telefone, sendo «ordem» a próxima ação (sem data no fim) e o id. A extensão `pg_trgm` é ativada por migração.
 - **API pública:** `POST /api/v1/leads` aceita `kind` (opcional, por omissão conforme o modo) e `tax_id`. Só acrescenta.
 
+### Execução do pacote 1b (2026-11-18)
+
+**Implementado como planeado**, com estas decisões de pormenor:
+- **Colunas derivadas mantidas pela base de dados** em vez de índices sobre expressões: `nextActionSort` (próxima ação, ou 9999-12-31 sem data — o Prisma não lê o valor «infinity» usado no teste de carga) e `searchText` (nome, empresa, NIF, email e telefone em minúsculas), preenchidas por um **trigger** em qualquer escrita. Assim os índices são todos representáveis no Prisma (o teste de desvio do esquema continua a passar) e nenhum caminho de código as pode deixar desatualizadas. Não saem na API.
+- **Modo do módulo** guardado nas opções do módulo (a coluna `options` da 0a passou a ser lida e escrita pelo `ModulesService`); rotas `GET/PATCH /leads/settings` (alterar: só Administrador, auditado). Mudar o modo **não** altera leads existentes: continuam editáveis, e só não se pode **mudar** uma lead para o tipo proibido.
+- Leads existentes classificadas na migração: com nome de empresa → empresa; sem → pessoa. Na base de desenvolvimento, a única lead (com empresa) ficou empresa.
+- Ligações: `contactId` sem `companyId` herda a empresa do contacto; apagar a empresa/contacto ligados deixa a lead sem ligação (não a apaga).
+- Rotas novas `GET /leads/page` e `GET /leads/counts`; `GET /leads` fica igual até o 1c mudar a página.
+- API pública: `kind` e `tax_id` no corpo e na resposta (só acrescenta; especificação OpenAPI atualizada e verificada pelos testes de conformidade).
+
+**Validação:** 251 unitários e 359 e2e a passar (os 347 anteriores sem alterações); migração sem desvio; build OK. **Prova por mutação** (cursor com `>=`, pesquisa ignorada, modo sem efeito) → falham cinco testes. **Não testado:** desempenho da API com volume (o teste de carga mediu as consultas no Postgres, não a API) — fica para o 1c, com a página.
+
 ## Pacote 1c — Página e conversão (desenho preliminar)
 - **Página única** com separadores por estado e contagens, filtro de tipo (se o modo for `BOTH`), responsável e pesquisa; «carregar mais» por cursor; atualização em tempo real (já existe).
 - **Criar/editar** conforme o tipo e o modo: lead de empresa (nome da empresa, NIF, contacto principal opcional); lead de pessoa (nome, cargo, empresa opcional). Escolher uma empresa/contacto **existentes** em vez de escrever o nome.

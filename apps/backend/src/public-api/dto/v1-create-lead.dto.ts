@@ -1,4 +1,4 @@
-import { BusinessArea } from "@prisma/client";
+import { BusinessArea, LeadKind } from "@prisma/client";
 import { IsEmail, IsEnum, IsOptional, IsString, MaxLength, MinLength } from "class-validator";
 
 /**
@@ -11,10 +11,21 @@ export class V1CreateLeadDto {
   @MaxLength(200)
   name!: string;
 
+  /** Empresa ou pessoa. Sem valor: conforme o modo do módulo (com nome de empresa → empresa). */
+  @IsOptional()
+  @IsEnum(LeadKind)
+  kind?: LeadKind;
+
   @IsOptional()
   @IsString()
   @MaxLength(200)
   company_name?: string;
+
+  /** NIF (leads de empresa). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  tax_id?: string;
 
   @IsOptional()
   @IsString()

@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException, OnModuleInit } from "@nestjs/common";
+import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { MODULE_MANIFESTS, ModuleId, isModuleId, manifestOf } from "./module-manifest";
 import { activeDependents, missingDependencies } from "./module-rules";
@@ -22,6 +23,8 @@ const labelOf = (id: ModuleId) => manifestOf(id).label;
 @Injectable()
 export class ModulesService implements OnModuleInit {
   private enabled = new Map<ModuleId, boolean>(MODULE_MANIFESTS.map((m) => [m.id, m.defaultEnabled]));
+  /** Opções de cada módulo (coluna `options`), também em cache. Sem linha = {} (cada módulo define as predefinições). */
+  private options = new Map<ModuleId, Record<string, unknown>>();
 
   constructor(private readonly prisma: PrismaService) {}
 
@@ -34,6 +37,9 @@ export class ModulesService implements OnModuleInit {
     const rows = await this.prisma.moduleSetting.findMany();
     const saved = new Map(rows.map((row) => [row.moduleId, row.enabled]));
     this.enabled = new Map(MODULE_MANIFESTS.map((m) => [m.id, saved.get(m.id) ?? m.defaultEnabled]));
+    this.options = new Map(
+      rows.filter((row) => isModuleId(row.moduleId)).map((row) => [row.moduleId as ModuleId, (row.options ?? {}) as Record<string, unknown>]),
+    );
   }
 
   /** Módulo desconhecido conta como desligado (nunca se abre uma porta por engano). */
@@ -84,5 +90,25 @@ export class ModulesService implements OnModuleInit {
     });
     await this.reload();
     return this.list();
+  }
+
+  /** Opções guardadas de um módulo (o próprio módulo valida e aplica as predefinições). */
+  getOptions(id: ModuleId): Record<string, unknown> {
+    return this.options.get(id) ?? {};
+  }
+
+  /**
+   * Junta `patch` às opções guardadas do módulo, sem mexer no estado ligado/desligado. Quem chama valida os valores
+   * (cada módulo sabe o que as suas opções significam).
+   */
+  async setOptions(id: ModuleId, patch: Record<string, unknown>) {
+    const merged = { ...this.getOptions(id), ...patch } as Prisma.InputJsonValue;
+    await this.prisma.moduleSetting.upsert({
+      where: { moduleId: id },
+      update: { options: merged },
+      create: { moduleId: id, enabled: this.enabled.get(id) ?? manifestOf(id).defaultEnabled, options: merged },
+    });
+    await this.reload();
+    return this.getOptions(id);
   }
 }

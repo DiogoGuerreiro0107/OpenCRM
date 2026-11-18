@@ -90,7 +90,7 @@ curl -X POST http://IP-DO-CRM:3000/api/v1/leads \
   -d '{ "name": "Maria Silva", "email": "maria@exemplo.pt", "phone": "912345678", "company_name": "Exemplo Lda", "interest": "IMPRESSAO", "notes": "Pediu orçamento" }'
 ```
 
-Corpo: `name` (obrigatório), `company_name`, `phone`, `email`, `source` (por omissão «API: <nome da chave>»), `interest`, `notes`, `external_id`. Outros campos são ignorados: uma integração **não escolhe** o estado nem o responsável (o lead entra como `NOVO`). Resposta `201` com o lead (`id`, `name`, `company_name`, `phone`, `email`, `source`, `interest`, `status`, `notes`, `created_at`, `updated_at`).
+Corpo: `name` (obrigatório), `kind` (`COMPANY` ou `PERSON`; sem valor, conforme o modo do módulo de leads — com `company_name` fica `COMPANY`), `company_name`, `tax_id` (NIF), `phone`, `email`, `source` (por omissão «API: <nome da chave>»), `interest`, `notes`, `external_id`. Se o módulo estiver configurado só para um tipo, o outro é recusado com `400`. Outros campos são ignorados: uma integração **não escolhe** o estado nem o responsável (o lead entra como `NOVO`). Resposta `201` com o lead (`id`, `kind`, `tax_id`, `name`, `company_name`, `phone`, `email`, `source`, `interest`, `status`, `notes`, `created_at`, `updated_at`).
 
 Efeitos (iguais a criar um lead na interface): fica criada a tarefa «Contactar lead», atribuída a **quem criou a chave**; é disparado o webhook `lead.created` para o n8n (se configurado); a lista de leads atualiza-se nos browsers abertos.
 

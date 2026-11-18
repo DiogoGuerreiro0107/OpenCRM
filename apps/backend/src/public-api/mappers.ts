@@ -45,11 +45,13 @@ export function publicContact(c: Contact) {
 }
 
 /** `externalId`: o id externo desta integração para o lead, se houver (ExternalLink). */
-export function publicLead(l: Lead, externalId: string | null = null) {
+export function publicLead(l: Omit<Lead, "nextActionSort" | "searchText">, externalId: string | null = null) {
   return {
     id: l.id,
+    kind: l.kind,
     name: l.name,
     company_name: l.companyName,
+    tax_id: l.taxId,
     phone: l.phone,
     email: l.email,
     source: l.source,
