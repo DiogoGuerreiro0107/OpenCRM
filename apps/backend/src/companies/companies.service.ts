@@ -26,7 +26,8 @@ export class CompaniesService {
 
     return this.prisma.company.findMany({
       where,
-      orderBy: { name: "asc" },
+      orderBy: [{ name: "asc" }, { id: "asc" }],
+      take: query.limit,
       include: { _count: { select: { contacts: true } } },
     });
   }

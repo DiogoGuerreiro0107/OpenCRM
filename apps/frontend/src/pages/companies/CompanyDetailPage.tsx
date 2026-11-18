@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
+import { blankToNull } from "@/lib/forms";
+import { errorMessage } from "@/lib/errors";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { CompanySource, CompanyStatus } from "@opencrm/shared-types";
 import { deleteCompany, getCompany, updateCompany } from "@/lib/companies-api";
-import { listUsers } from "@/lib/tasks-api";
+import { UserPicker } from "@/components/pickers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -50,7 +52,6 @@ export function CompanyDetailPage() {
     queryFn: () => getCompany(id!),
     enabled: !!id,
   });
-  const { data: users } = useQuery({ queryKey: ["users"], queryFn: listUsers });
 
   const [form, setForm] = useState({
     name: "",
@@ -92,11 +93,8 @@ export function CompanyDetailPage() {
 
   const updateMutation = useMutation({
     mutationFn: () =>
-      updateCompany(id!, {
-        ...form,
-        source: form.source || undefined,
-        ownerId: form.ownerId || undefined,
-      }),
+      // Campos opcionais apagados vão como null (limpam no servidor; um email vazio deixava de ser recusado).
+      updateCompany(id!, { ...blankToNull(form), name: form.name, status: form.status }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["companies", id] });
       queryClient.invalidateQueries({ queryKey: ["companies"] });
@@ -209,19 +207,15 @@ export function CompanyDetailPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="ownerId">Responsável</Label>
-                <Select id="ownerId" value={form.ownerId} onChange={handleChange("ownerId")}>
-                  <option value="">Sem responsável</option>
-                  {users?.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.name}
-                    </option>
-                  ))}
-                </Select>
+                <UserPicker id="ownerId" value={form.ownerId} onChange={(id) => setForm((prev) => ({ ...prev, ownerId: id }))} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="notes">Notas</Label>
                 <Textarea id="notes" value={form.notes} onChange={handleChange("notes")} />
               </div>
+              {updateMutation.isError && (
+                <p className="text-sm text-red-600">{errorMessage(updateMutation.error, "Não foi possível guardar a empresa.")}</p>
+              )}
               <div className="flex justify-between">
                 <Button
                   type="button"

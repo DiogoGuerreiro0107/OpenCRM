@@ -24,7 +24,8 @@ export class ContactsService {
 
     return this.prisma.contact.findMany({
       where,
-      orderBy: { name: "asc" },
+      orderBy: [{ name: "asc" }, { id: "asc" }],
+      take: query.limit,
       include: { company: { select: { id: true, name: true } } },
     });
   }

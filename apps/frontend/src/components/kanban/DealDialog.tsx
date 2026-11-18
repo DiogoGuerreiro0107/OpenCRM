@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { BusinessArea, Deal } from "@opencrm/shared-types";
 import { createDeal, deleteDeal, updateDeal } from "@/lib/deals-api";
-import { listCompanies } from "@/lib/companies-api";
-import { listContacts } from "@/lib/contacts-api";
+import { CompanyPicker, ContactPicker } from "@/components/pickers";
 import { Dialog, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useCanWrite } from "@/lib/useCanWrite";
@@ -36,16 +35,6 @@ interface DealDialogProps {
 export function DealDialog({ open, onClose, pipelineId, stageId, deal }: DealDialogProps) {
   const queryClient = useQueryClient();
   const readOnly = !useCanWrite("deals");
-  const { data: companies } = useQuery({
-    queryKey: ["companies"],
-    queryFn: () => listCompanies(),
-    enabled: open,
-  });
-  const { data: contacts } = useQuery({
-    queryKey: ["contacts"],
-    queryFn: () => listContacts(),
-    enabled: open,
-  });
 
   const [form, setForm] = useState({
     title: "",
@@ -87,8 +76,9 @@ export function DealDialog({ open, onClose, pipelineId, stageId, deal }: DealDia
         type: form.type || undefined,
         estimatedMargin: form.estimatedMargin ? Number(form.estimatedMargin) : undefined,
         lossReason: form.lossReason || undefined,
-        contactId: form.contactId || undefined,
-        companyId: form.companyId || undefined,
+        // vazio = sem contacto/empresa (null limpa a ligação ao editar)
+        contactId: form.contactId || null,
+        companyId: form.companyId || null,
       };
       return deal ? updateDeal(deal.id, payload) : createDeal({ ...payload, pipelineId, stageId });
     },
@@ -171,25 +161,23 @@ export function DealDialog({ open, onClose, pipelineId, stageId, deal }: DealDia
         </div>
         <div className="space-y-2">
           <Label htmlFor="companyId">Empresa</Label>
-          <Select id="companyId" value={form.companyId} onChange={handleChange("companyId")}>
-            <option value="">Sem empresa</option>
-            {companies?.map((company) => (
-              <option key={company.id} value={company.id}>
-                {company.name}
-              </option>
-            ))}
-          </Select>
+          <CompanyPicker
+            id="companyId"
+            value={form.companyId}
+            onChange={(id) => setForm((prev) => ({ ...prev, companyId: id }))}
+            selectedLabel={deal?.companyId === form.companyId ? deal?.company?.name : null}
+            emptyLabel="Sem empresa"
+          />
         </div>
         <div className="space-y-2">
           <Label htmlFor="contactId">Contacto</Label>
-          <Select id="contactId" value={form.contactId} onChange={handleChange("contactId")}>
-            <option value="">Sem contacto</option>
-            {contacts?.map((contact) => (
-              <option key={contact.id} value={contact.id}>
-                {contact.name}
-              </option>
-            ))}
-          </Select>
+          <ContactPicker
+            id="contactId"
+            value={form.contactId}
+            onChange={(id) => setForm((prev) => ({ ...prev, contactId: id }))}
+            selectedLabel={deal?.contactId === form.contactId ? deal?.contact?.name : null}
+            emptyLabel="Sem contacto"
+          />
         </div>
         <div className="space-y-2">
           <Label htmlFor="lossReason">Motivo de perda</Label>

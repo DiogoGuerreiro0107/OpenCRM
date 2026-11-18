@@ -10,8 +10,9 @@ export interface TaskInput {
   priority?: TaskPriority;
   result?: string;
   assigneeId?: string;
-  contactId?: string;
-  companyId?: string;
+  /** `null` desliga (ao editar). */
+  contactId?: string | null;
+  companyId?: string | null;
   dealId?: string;
   reminders?: { remindAt: string; message?: string }[];
 }

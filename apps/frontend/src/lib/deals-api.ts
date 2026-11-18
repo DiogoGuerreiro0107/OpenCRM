@@ -10,8 +10,9 @@ export interface DealInput {
   type?: BusinessArea;
   estimatedMargin?: number;
   lossReason?: string;
-  contactId?: string;
-  companyId?: string;
+  /** `null` desliga (ao editar). */
+  contactId?: string | null;
+  companyId?: string | null;
 }
 
 export async function listDeals(pipelineId: string) {

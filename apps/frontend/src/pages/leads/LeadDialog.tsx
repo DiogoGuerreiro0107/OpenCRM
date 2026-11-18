@@ -1,11 +1,9 @@
 import { useEffect, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import type { Lead, BusinessArea, LeadKind, LeadMode, LeadStatus } from "@opencrm/shared-types";
 import { convertLead, createLead, deleteLead, updateLead, type LeadInput } from "@/lib/leads-api";
-import { listUsers } from "@/lib/tasks-api";
-import { listCompanies } from "@/lib/companies-api";
-import { listContacts } from "@/lib/contacts-api";
+import { CompanyPicker, ContactPicker, UserPicker } from "@/components/pickers";
 import { errorMessage } from "@/lib/errors";
 import { Dialog, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -41,6 +39,8 @@ function emptyForm(kind: LeadKind) {
     jobTitle: "",
     companyId: "",
     contactId: "",
+    /** Empresa do contacto escolhido (só para saber se ainda condiz com a empresa escolhida). */
+    contactCompanyId: "",
     phone: "",
     email: "",
     source: "",
@@ -62,6 +62,7 @@ function formFrom(lead: Lead): ReturnType<typeof emptyForm> {
     jobTitle: lead.jobTitle ?? "",
     companyId: lead.companyId ?? "",
     contactId: lead.contactId ?? "",
+    contactCompanyId: "",
     phone: lead.phone ?? "",
     email: lead.email ?? "",
     source: lead.source ?? "",
@@ -77,9 +78,6 @@ export function LeadDialog({ open, onClose, lead, mode }: LeadDialogProps) {
   const queryClient = useQueryClient();
   const readOnly = !useCanWrite("leads");
   const navigate = useNavigate();
-  const { data: users } = useQuery({ queryKey: ["users"], queryFn: listUsers, enabled: open });
-  const { data: companies } = useQuery({ queryKey: ["companies"], queryFn: () => listCompanies(), enabled: open });
-  const { data: contacts } = useQuery({ queryKey: ["contacts"], queryFn: () => listContacts(), enabled: open });
 
   const [form, setForm] = useState(() => emptyForm(mode === "PERSON" ? "PERSON" : "COMPANY"));
 
@@ -94,9 +92,6 @@ export function LeadDialog({ open, onClose, lead, mode }: LeadDialogProps) {
   const canChooseKind = mode === "BOTH" && !isConverted;
   const companyName = form.companyName.trim();
   const valid = isCompany ? companyName !== "" : form.person.trim() !== "";
-
-  // Numa lead de empresa com empresa escolhida, os contactos sugeridos são os dessa empresa.
-  const contactOptions = isCompany && form.companyId ? contacts?.filter((c) => c.companyId === form.companyId) : contacts;
 
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: ["leads"] });
@@ -160,27 +155,29 @@ export function LeadDialog({ open, onClose, lead, mode }: LeadDialogProps) {
   }
 
   /** Escolher uma empresa existente preenche o nome e o NIF a partir dela. */
-  function chooseCompany(id: string) {
-    const company = companies?.find((c) => c.id === id);
+  function chooseCompany(id: string, company: { name: string; taxId: string | null } | null) {
     setForm((prev) => ({
       ...prev,
       companyId: id,
       companyName: company ? company.name : prev.companyName,
       taxId: company?.taxId ?? prev.taxId,
       // um contacto de outra empresa deixa de fazer sentido
-      contactId: company && prev.contactId && contacts?.find((c) => c.id === prev.contactId)?.companyId !== id ? "" : prev.contactId,
+      contactId: company && prev.contactId && prev.contactCompanyId !== id ? "" : prev.contactId,
     }));
   }
 
   /** Escolher um contacto existente preenche o que estiver vazio e, sem empresa escolhida, usa a do contacto. */
-  function chooseContact(id: string) {
-    const contact = contacts?.find((c) => c.id === id);
+  function chooseContact(
+    id: string,
+    contact: { name: string; email: string | null; phone: string | null; mobilePhone: string | null; jobTitle: string | null; companyId: string | null; company?: { id: string; name: string } | null } | null,
+  ) {
     setForm((prev) => {
       if (!contact) return { ...prev, contactId: "" };
       const company = !prev.companyId && contact.company ? contact.company : null;
       return {
         ...prev,
         contactId: id,
+        contactCompanyId: contact.companyId ?? "",
         person: contact.name,
         email: prev.email || contact.email || "",
         phone: prev.phone || contact.phone || contact.mobilePhone || "",
@@ -235,15 +232,14 @@ export function LeadDialog({ open, onClose, lead, mode }: LeadDialogProps) {
             <>
               <div className="space-y-2">
                 <Label htmlFor="companyId">Empresa existente</Label>
-                <Select id="companyId" value={form.companyId} onChange={(e) => chooseCompany(e.target.value)} disabled={linkedLocked}>
-                  <option value="">— Nova empresa —</option>
-                  {companies?.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                      {c.taxId ? ` (${c.taxId})` : ""}
-                    </option>
-                  ))}
-                </Select>
+                <CompanyPicker
+                  id="companyId"
+                  value={form.companyId}
+                  onChange={chooseCompany}
+                  selectedLabel={lead?.companyId === form.companyId ? lead?.company?.name : null}
+                  emptyLabel="— Nova empresa —"
+                  disabled={linkedLocked}
+                />
               </div>
               <div className="grid grid-cols-3 gap-3">
                 <div className="col-span-2 space-y-2">
@@ -257,15 +253,16 @@ export function LeadDialog({ open, onClose, lead, mode }: LeadDialogProps) {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="contactId">Contacto principal</Label>
-                <Select id="contactId" value={form.contactId} onChange={(e) => chooseContact(e.target.value)} disabled={linkedLocked}>
-                  <option value="">— Escrever (ou nenhum) —</option>
-                  {contactOptions?.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                      {c.company && !form.companyId ? ` — ${c.company.name}` : ""}
-                    </option>
-                  ))}
-                </Select>
+                {/* Com empresa escolhida, só os contactos dessa empresa. */}
+                <ContactPicker
+                  id="contactId"
+                  value={form.contactId}
+                  onChange={chooseContact}
+                  companyId={form.companyId || null}
+                  selectedLabel={lead?.contactId === form.contactId ? lead?.contact?.name : null}
+                  emptyLabel="— Escrever (ou nenhum) —"
+                  disabled={linkedLocked}
+                />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
@@ -282,15 +279,14 @@ export function LeadDialog({ open, onClose, lead, mode }: LeadDialogProps) {
             <>
               <div className="space-y-2">
                 <Label htmlFor="contactId">Contacto existente</Label>
-                <Select id="contactId" value={form.contactId} onChange={(e) => chooseContact(e.target.value)} disabled={linkedLocked}>
-                  <option value="">— Nova pessoa —</option>
-                  {contactOptions?.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                      {c.company ? ` — ${c.company.name}` : ""}
-                    </option>
-                  ))}
-                </Select>
+                <ContactPicker
+                  id="contactId"
+                  value={form.contactId}
+                  onChange={chooseContact}
+                  selectedLabel={lead?.contactId === form.contactId ? lead?.contact?.name : null}
+                  emptyLabel="— Nova pessoa —"
+                  disabled={linkedLocked}
+                />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
@@ -305,14 +301,14 @@ export function LeadDialog({ open, onClose, lead, mode }: LeadDialogProps) {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-2">
                   <Label htmlFor="companyId">Empresa</Label>
-                  <Select id="companyId" value={form.companyId} onChange={(e) => chooseCompany(e.target.value)} disabled={linkedLocked}>
-                    <option value="">— Escrever (ou nenhuma) —</option>
-                    {companies?.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </Select>
+                  <CompanyPicker
+                    id="companyId"
+                    value={form.companyId}
+                    onChange={chooseCompany}
+                    selectedLabel={lead?.companyId === form.companyId ? lead?.company?.name : null}
+                    emptyLabel="— Escrever (ou nenhuma) —"
+                    disabled={linkedLocked}
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="companyName">Nome da empresa</Label>
@@ -365,14 +361,12 @@ export function LeadDialog({ open, onClose, lead, mode }: LeadDialogProps) {
             </div>
             <div className="space-y-2">
               <Label htmlFor="responsavelId">Responsável</Label>
-              <Select id="responsavelId" value={form.responsavelId} onChange={handleChange("responsavelId")}>
-                <option value="">Eu</option>
-                {users?.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name}
-                  </option>
-                ))}
-              </Select>
+              <UserPicker
+                id="responsavelId"
+                value={form.responsavelId}
+                onChange={(id) => setForm((prev) => ({ ...prev, responsavelId: id }))}
+                emptyLabel="Eu"
+              />
             </div>
           </div>
           <div className="space-y-2">

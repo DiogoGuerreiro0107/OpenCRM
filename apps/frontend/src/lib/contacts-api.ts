@@ -1,5 +1,6 @@
 import type { ContactDetail, ContactSummary, PreferredChannel } from "@opencrm/shared-types";
 import { api } from "./api";
+import type { Clearable } from "./forms";
 
 export interface ContactInput {
   name: string;
@@ -20,6 +21,8 @@ export interface ContactFilters {
   search?: string;
   ownerId?: string;
   companyId?: string;
+  /** Máximo de resultados (seletores com pesquisa). */
+  limit?: number;
 }
 
 export async function listContacts(filters: ContactFilters = {}) {
@@ -37,7 +40,7 @@ export async function createContact(input: ContactInput) {
   return data;
 }
 
-export async function updateContact(id: string, input: Partial<ContactInput>) {
+export async function updateContact(id: string, input: Clearable<ContactInput>) {
   const { data } = await api.patch<ContactDetail>(`/contacts/${id}`, input);
   return data;
 }

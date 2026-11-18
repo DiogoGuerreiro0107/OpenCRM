@@ -3,7 +3,7 @@ import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { Building2, User } from "lucide-react";
 import type { Lead, LeadKind, LeadStatus } from "@opencrm/shared-types";
 import { getLeadCounts, getLeadSettings, listLeadPage, type LeadFilters } from "@/lib/leads-api";
-import { listUsers } from "@/lib/tasks-api";
+import { UserPicker } from "@/components/pickers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -57,7 +57,6 @@ export function LeadsListPage() {
   const [dialogState, setDialogState] = useState<{ lead: Lead | null } | null>(null);
 
   const { data: settings } = useQuery({ queryKey: ["leads", "settings"], queryFn: getLeadSettings });
-  const { data: users } = useQuery({ queryKey: ["users"], queryFn: listUsers });
   const showKind = settings?.mode === "BOTH";
 
   // Filtros comuns à lista e às contagens (o tipo só conta quando o filtro está visível).
@@ -102,14 +101,7 @@ export function LeadsListPage() {
             <option value="PERSON">Só pessoas</option>
           </Select>
         )}
-        <Select aria-label="Responsável" value={responsavelFilter} onChange={(e) => setResponsavelFilter(e.target.value)} className="w-52">
-          <option value="">Todos os responsáveis</option>
-          {users?.map((u) => (
-            <option key={u.id} value={u.id}>
-              {u.name}
-            </option>
-          ))}
-        </Select>
+        <UserPicker aria-label="Responsável" value={responsavelFilter} onChange={(id) => setResponsavelFilter(id)} emptyLabel="Todos os responsáveis" className="w-56" />
       </div>
 
       <div className="flex flex-wrap gap-2 border-b border-border" role="tablist">

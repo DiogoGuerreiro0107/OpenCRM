@@ -1,5 +1,6 @@
 import type { CompanyDetail, CompanySource, CompanyStatus, CompanySummary } from "@opencrm/shared-types";
 import { api } from "./api";
+import type { Clearable } from "./forms";
 
 export interface CompanyInput {
   name: string;
@@ -23,6 +24,8 @@ export interface CompanyFilters {
   status?: CompanyStatus;
   source?: CompanySource;
   ownerId?: string;
+  /** Máximo de resultados (seletores com pesquisa). */
+  limit?: number;
 }
 
 export async function listCompanies(filters: CompanyFilters = {}) {
@@ -40,7 +43,7 @@ export async function createCompany(input: CompanyInput) {
   return data;
 }
 
-export async function updateCompany(id: string, input: Partial<CompanyInput>) {
+export async function updateCompany(id: string, input: Clearable<CompanyInput>) {
   const { data } = await api.patch<CompanyDetail>(`/companies/${id}`, input);
   return data;
 }

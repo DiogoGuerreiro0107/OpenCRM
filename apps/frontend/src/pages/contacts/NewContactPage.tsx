@@ -1,10 +1,9 @@
 import { useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { PreferredChannel } from "@opencrm/shared-types";
 import { createContact } from "@/lib/contacts-api";
-import { listCompanies } from "@/lib/companies-api";
-import { listUsers } from "@/lib/tasks-api";
+import { CompanyPicker, UserPicker } from "@/components/pickers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,8 +22,6 @@ export function NewContactPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [searchParams] = useSearchParams();
-  const { data: companies } = useQuery({ queryKey: ["companies"], queryFn: () => listCompanies() });
-  const { data: users } = useQuery({ queryKey: ["users"], queryFn: listUsers });
 
   const [form, setForm] = useState({
     name: "",
@@ -86,14 +83,13 @@ export function NewContactPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="company">Empresa</Label>
-              <Select id="company" value={form.companyId} onChange={handleChange("companyId")}>
-                <option value="">Sem empresa</option>
-                {companies?.map((company) => (
-                  <option key={company.id} value={company.id}>
-                    {company.name}
-                  </option>
-                ))}
-              </Select>
+              <CompanyPicker
+                id="company"
+                value={form.companyId}
+                onChange={(id) => setForm((prev) => ({ ...prev, companyId: id }))}
+                selectedLabel={null}
+                emptyLabel="Sem empresa"
+              />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
@@ -133,14 +129,7 @@ export function NewContactPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="ownerId">Responsável</Label>
-                <Select id="ownerId" value={form.ownerId} onChange={handleChange("ownerId")}>
-                  <option value="">Sem responsável</option>
-                  {users?.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.name}
-                    </option>
-                  ))}
-                </Select>
+                <UserPicker id="ownerId" value={form.ownerId} onChange={(id) => setForm((prev) => ({ ...prev, ownerId: id }))} />
               </div>
             </div>
             <div className="flex gap-6">

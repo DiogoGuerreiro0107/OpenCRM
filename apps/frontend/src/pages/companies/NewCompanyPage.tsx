@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { CompanySource, CompanyStatus } from "@opencrm/shared-types";
 import { createCompany } from "@/lib/companies-api";
-import { listUsers } from "@/lib/tasks-api";
+import { UserPicker } from "@/components/pickers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,7 +31,6 @@ const SOURCE_LABELS: Record<CompanySource, string> = {
 export function NewCompanyPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { data: users } = useQuery({ queryKey: ["users"], queryFn: listUsers });
   const [form, setForm] = useState({
     name: "",
     legalName: "",
@@ -153,14 +152,7 @@ export function NewCompanyPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="ownerId">Responsável</Label>
-              <Select id="ownerId" value={form.ownerId} onChange={handleChange("ownerId")}>
-                <option value="">Sem responsável</option>
-                {users?.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name}
-                  </option>
-                ))}
-              </Select>
+              <UserPicker id="ownerId" value={form.ownerId} onChange={(id) => setForm((prev) => ({ ...prev, ownerId: id }))} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="notes">Notas</Label>

@@ -1,5 +1,6 @@
 import { CompanySource, CompanyStatus } from "@prisma/client";
-import { IsEnum, IsOptional, IsString } from "class-validator";
+import { Type } from "class-transformer";
+import { IsEnum, IsInt, IsOptional, IsString, Max, Min } from "class-validator";
 
 export class QueryCompaniesDto {
   @IsOptional()
@@ -17,4 +18,12 @@ export class QueryCompaniesDto {
   @IsOptional()
   @IsString()
   ownerId?: string;
+
+  /** Máximo de resultados (seletores com pesquisa). Sem valor, devolve todos (páginas de listagem). */
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number;
 }
