@@ -94,10 +94,29 @@ Em todas as consultas **A e B devolveram exatamente os mesmos resultados** (veri
 
 **Validação:** 251 unitários e 359 e2e a passar (os 347 anteriores sem alterações); migração sem desvio; build OK. **Prova por mutação** (cursor com `>=`, pesquisa ignorada, modo sem efeito) → falham cinco testes. **Não testado:** desempenho da API com volume (o teste de carga mediu as consultas no Postgres, não a API) — fica para o 1c, com a página.
 
-## Pacote 1c — Página e conversão (desenho preliminar)
+## Pacote 1c — Página e conversão
 - **Página única** com separadores por estado e contagens, filtro de tipo (se o modo for `BOTH`), responsável e pesquisa; «carregar mais» por cursor; atualização em tempo real (já existe).
 - **Criar/editar** conforme o tipo e o modo: lead de empresa (nome da empresa, NIF, contacto principal opcional); lead de pessoa (nome, cargo, empresa opcional). Escolher uma empresa/contacto **existentes** em vez de escrever o nome.
 - **Conversão por tipo**, numa transação: se a lead já estiver ligada, usa os registos ligados; se não, **procura duplicados** (empresa pelo NIF; contacto pelo email ou telefone) e liga em vez de criar; senão cria. O negócio continua a depender do módulo de negócios (como hoje).
+
+### Desenho final do 1c (2026-11-18, antes de implementar)
+
+**Significado dos campos por tipo** (sem mudar o esquema nem a API pública, onde `name` é obrigatório):
+- **Lead de empresa:** `companyName` = a empresa (obrigatória na interface), `taxId` = NIF, `name` = o contacto principal. Sem contacto principal, a interface grava `name` = nome da empresa, e a conversão **não** cria contacto (nome igual ao da empresa, sem distinguir maiúsculas/espaços). É a mesma leitura que a migração do 1b fez das leads antigas (com empresa → empresa, e o nome é a pessoa).
+- **Lead de pessoa:** `name` = a pessoa, `jobTitle` = cargo; empresa opcional (existente, por `companyId`, ou só o nome).
+
+**Conversão** (uma transação; o resultado diz, para a empresa e para o contacto, se foi `LINKED` — já estava ligado —, `MATCHED` — duplicado encontrado — ou `CREATED`):
+1. **Empresa:** a ligada; senão, se houver NIF, uma empresa com o mesmo NIF (comparado sem espaços/pontuação, maiúsculas, e sem o prefixo `PT`); senão, se houver nome de empresa, cria (com o NIF; numa lead de empresa também com o telefone e o email). Sem nada disto, não há empresa.
+2. **Contacto:** o ligado; senão (e se a lead tiver uma pessoa — ver acima) um contacto com o mesmo email (sem distinguir maiúsculas) ou, não havendo, com o mesmo telefone (só dígitos, sem o indicativo 351, contra telefone e telemóvel); senão cria (nome, email, telefone, cargo, empresa). Em vários candidatos, o mais antigo.
+3. Um contacto **encontrado** sem empresa fica com a empresa da conversão; com outra empresa, **não** se mexe (só se liga). Nada mais é alterado em registos que já existiam.
+4. A lead fica ligada à empresa e ao contacto usados (`companyId`/`contactId`) e convertida. O negócio continua a depender do módulo de negócios; título com o nome da empresa, ou da pessoa.
+5. **Converter duas vezes ao mesmo tempo:** a marcação como convertida é condicional dentro da transação; a segunda falha e desfaz tudo o que criou.
+
+**API interna:** sai `GET /leads` (lista sem paginação); a página usa `GET /leads/page` e `GET /leads/counts`. O resultado da conversão passa a ter `contact` possivelmente `null` e `outcome`. A API pública não muda.
+
+**Interface:** separadores com contagens; filtros de tipo (só no modo `BOTH`), responsável e pesquisa (com atraso de 300 ms); «Carregar mais». Diálogo com os campos do tipo e escolha de empresa/contacto existentes (listas, como no diálogo de negócios). O modo escolhe-se na página **Módulos**, no cartão das leads (só Administrador). Depois de converter, abre o contacto (ou a empresa, se não houver contacto).
+
+**Validação:** e2e da conversão (cada ramo de ligação/duplicado/criação, corrida dupla) e da remoção da rota antiga; prova por mutação; **medição da API com 200 mil leads** (o que ficou por testar no 1b); verificação no browser na base de testes.
 
 ## Riscos
 | Risco | Mitigação |
