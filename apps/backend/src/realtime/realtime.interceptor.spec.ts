@@ -12,6 +12,8 @@ describe("resourceOf", () => {
     ["/email/ingest", "email"],
     ["/stages/abc", "pipelines"], // as fases são mostradas no Kanban, tal como os funis
     ["/pipelines/1/stages", "pipelines"],
+    ["/workflow-steps/abc", "workflows"], // passos de qualquer fluxo (2b)
+    ["/menu-settings", "menu-settings"], // menu configurável (2c)
     ["/api/v1/leads", "leads"], // API pública: o recurso é o que vem depois de /api/v1
     ["/api/v1/leads?x=1", "leads"],
     ["/api-keys", "api-keys"],

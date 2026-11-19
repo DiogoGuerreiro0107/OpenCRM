@@ -237,19 +237,102 @@ id e de uma `key` à parte.
 
 ---
 
+## Pacote 2c — Registo de contribuições e menu configurável (plano, 2026-11-19)
+
+### Registo de contribuições (frontend)
+- Pasta `apps/frontend/src/modules/`: um ficheiro por módulo (núcleo, leads, negócios, email, telefonia, automações)
+  que declara as suas **contribuições**:
+  - **itens de menu** (id estável, rótulo, ícone, destino, secção «principal» ou «configurações», módulo, quem vê);
+  - **rotas**, com a página **carregada à parte** (`React.lazy`): um módulo desligado ou nunca aberto não pesa no
+    arranque;
+  - **cartões nas fichas** (empresa, contacto; negócio e lead ficam prontos para quando houver um cartão para eles).
+- O núcleo (`App.tsx`, `AppShell.tsx`, fichas) passa a **ler o registo** em vez de listas escritas à mão: mostra cada
+  contribuição só com o módulo ativo e a permissão (papel ou área de escrita, as mesmas de hoje). As guardas das rotas
+  (`RequireModule`, `RequireRole`, `RequireWrite`) passam a vir da contribuição, por isso o menu e a rota não podem
+  divergir.
+- **Email e Chamadas** deixam de estar escritos nas fichas de empresa e contacto: são cartões registados pelos módulos
+  `email` e `zadarma`. O botão de ligar dentro dos campos de telefone fica onde está (é uma ação do campo e já se
+  esconde sem o módulo).
+- **Widgets do dashboard e fontes da agenda:** os widgets ficam de fora (regra de dois): os indicadores do dashboard
+  vêm de um único resumo do servidor que já respeita os módulos, e não há ainda um módulo com um gráfico próprio. As
+  fontes da agenda entram com a agenda (2d).
+
+### Menu configurável (decisão D5: define o Administrador)
+- Configurável: **só a secção principal** (Dashboard, Leads, Funis, Tarefas, Email, Empresas, Contactos e os tipos de
+  tarefa com «aparece no menu»). As configurações continuam fixas: são ferramentas de administração.
+- O Administrador **ordena, renomeia, oculta e agrupa** (cabeçalhos de grupo: os itens a seguir a um cabeçalho ficam
+  nesse grupo). «Repor» volta ao menu por omissão.
+- **O servidor guarda só as preferências** (`MenuSetting`, uma linha com a lista ordenada de entradas: item `{id,
+  rótulo?, oculto?}` ou grupo `{id, rótulo}`). Os itens e as rotas vivem no código do frontend; um item novo (de um
+  módulo ou tipo novo) que ainda não esteja nas preferências aparece no fim; preferências de itens que já não existem
+  ignoram-se. Desvio ao §3.10, que previa um `GET /menu` já filtrado: o servidor não conhece as rotas do frontend.
+- **Ocultar não é proibir**: tira o item do menu, mas a página continua acessível a quem tem permissão (o backend
+  continua a impor módulos e permissões em cada rota). Fica escrito no ecrã.
+- **Tipos de tarefa no menu:** `WorkItemType.showInMenu` (caixa «Aparece no menu» no diálogo do tipo). O item leva à
+  página do tipo (2b), com o ícone e o nome do tipo; renomear o item no menu não muda o nome do tipo.
+
+### API
+- `GET /menu-settings` (todos os utilizadores com sessão: o menu de cada um usa-as) e `PUT /menu-settings`
+  (Administrador, auditado `menu_settings.updated`). Validação: no máximo 200 entradas, ids únicos com formato fechado
+  (letras, números, `:`, `-`, `_`), rótulos até 60 caracteres e não vazios.
+- `/work-item-types`: `showInMenu` na leitura e na escrita.
+- Tempo real: `menu-settings` como recurso; o menu de todas as sessões atualiza-se quando o Administrador grava.
+
+### Validação prevista
+- Migração (tabela nova e uma coluna com valor por omissão) ensaiada, reversão testada, sem desvio face ao esquema.
+- **e2e:** leitura por todos e escrita só do Administrador, auditada; validação (ids repetidos, formato, rótulos,
+  tamanho); `showInMenu` nos tipos; tempo real.
+- **Frontend** (sem executor de testes no projeto): a junção do menu (preferências + itens visíveis) é uma função pura,
+  verificada com um script durante a validação; o resto no browser.
+- **Browser** (base de testes): menu igual ao de hoje sem preferências; reordenar, renomear, ocultar, agrupar e repor;
+  um tipo com «aparece no menu»; módulo desligado tira o item e os cartões da ficha; um Comercial vê o menu configurado
+  mas não as configurações; as páginas dos módulos carregam à parte.
+
+### Execução do 2c (2026-11-19)
+**Implementado como planeado**, com estes pormenores decididos na implementação:
+- Registo em `apps/frontend/src/modules/`: `types.ts` (contratos), `core.ts` e `optional-modules.tsx` (as contribuições),
+  `registry.ts` (junta-as; cada contribuição herda o módulo que a declara), `menu.ts` (junção do menu, funções puras) e
+  `hooks.tsx` (quem vê o quê, menu, cartões das fichas).
+- **Páginas carregadas à parte:** o pacote inicial passou de um só ficheiro com mais de 500 kB (o build avisava) para
+  388 kB, com 49 ficheiros de JavaScript carregados a pedido.
+- Os tipos de tarefa no menu entram, por omissão, logo a seguir a «Tarefas».
+- Um item cujo destino é o início do de outro item (Tarefas e a página de um tipo) só fica marcado no endereço exato;
+  sem isto, na página da Visita ficavam marcados os dois.
+- O editor do menu mantém as entradas de itens indisponíveis (módulo desligado), para não perder a posição deles ao
+  gravar.
+- **Migração** `20261119150000_menu_configuravel` ensaiada numa cópia da base de desenvolvimento: dados iguais antes e
+  depois, e a reversão (`prisma/rollbacks/20261119150000_menu_configuravel.down.sql`) repõe exatamente o mesmo esquema e
+  os mesmos dados; sem desvio face ao `schema.prisma`; aplicada à base de desenvolvimento, com cópia de segurança antes.
+- **e2e:** 5 novos em `test/menu-settings.e2e-spec.ts`. Total: 265 unitários e 433 e2e, todos a passar.
+- **Junção do menu:** 7 verificações num script (o frontend não tem executor de testes), todas a passar.
+- **Prova por mutação:** 9 mutações, todas apanhadas (e, sem mutações, tudo passa):
+  - ids repetidos aceites;
+  - qualquer papel grava o menu;
+  - «oculto: falso» gravado;
+  - «aparece no menu» não grava;
+  - id sem formato fechado;
+  - item oculto aparece no menu;
+  - itens novos caem dentro do último grupo;
+  - grupos vazios aparecem;
+  - o editor perde os itens indisponíveis.
+- **Browser** (base de testes):
+  - sem preferências, o menu é igual ao de antes;
+  - «Aparece no menu» na Visita põe-na no menu a seguir a Tarefas;
+  - em Configurações > Menu: renomear Tarefas, ocultar Email, criar o grupo «Vendas» e gravar; o menu reflete tudo;
+  - desligar a telefonia tira o cartão «Chamadas» da ficha da empresa e o item «Zadarma» das configurações, e o endereço
+    direto mostra «Módulo desligado»;
+  - o Comercial vê o menu configurado e nenhuma configuração; «Menu» dá «Sem permissão»; o Email oculto continua a
+    abrir pelo endereço.
+
+---
+
 ## Pacotes seguintes (esboço; cada um terá plano detalhado antes de começar)
 
 ### 2b — Passos, campos e página por tipo
 Plano detalhado acima («Pacote 2b»).
 
 ### 2c — Registo de contribuições e menu configurável
-- Cada módulo do frontend regista as suas **contribuições**: itens de menu, rotas (carregadas à parte), cartões nas
-  fichas de empresa/contacto/negócio/lead e widgets do dashboard. O núcleo mostra-as só com o módulo ativo e a
-  permissão. Os 5 módulos atuais passam a usá-lo (Email e Chamadas deixam de estar escritos nas fichas).
-- **Menu configurável pelo Administrador** (decisão D5): ordem, nome, grupos e ocultar; os tipos com «aparece no menu»
-  ganham um item. O servidor guarda só as preferências por id de item (`GET`/`PUT /menu-settings`); os itens e as rotas
-  vivem no código do frontend, e o backend continua a impor módulos e permissões em cada rota. (Desvio ao §3.10, que
-  previa um `GET /menu` já filtrado: o servidor não conhece as rotas do frontend.)
+Plano detalhado acima («Pacote 2c»).
 
 ### 2d — Agenda
 - **Horário marcado** opcional (`scheduledStart`, `scheduledEnd`) além do prazo: uma visita tem hora marcada, uma tarefa

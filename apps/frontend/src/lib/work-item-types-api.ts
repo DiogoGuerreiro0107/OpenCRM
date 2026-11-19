@@ -18,7 +18,7 @@ export async function createWorkItemType(input: WorkItemTypeInput) {
   return data;
 }
 
-export async function updateWorkItemType(id: string, input: Partial<WorkItemTypeInput> & { active?: boolean }) {
+export async function updateWorkItemType(id: string, input: Partial<WorkItemTypeInput> & { active?: boolean; showInMenu?: boolean }) {
   const { data } = await api.patch<WorkItemType>(`/work-item-types/${id}`, input);
   return data;
 }

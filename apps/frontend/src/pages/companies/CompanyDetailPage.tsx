@@ -13,12 +13,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TimelineSection } from "@/components/TimelineSection";
-import { EmailSection } from "@/components/email/EmailSection";
 import { CustomFieldsSection } from "@/components/CustomFieldsSection";
 import { CallButton } from "@/components/CallButton";
-import { CallHistorySection } from "@/components/CallHistorySection";
+import { RecordPanels } from "@/modules/hooks";
 import { CompanyContactsSection } from "@/components/CompanyContactsSection";
-import { useModuleEnabled } from "@/lib/useModules";
 import { useCanWrite } from "@/lib/useCanWrite";
 import { ReadOnlyFieldset } from "@/components/ReadOnly";
 
@@ -40,8 +38,6 @@ const SOURCE_LABELS: Record<CompanySource, string> = {
 };
 
 export function CompanyDetailPage() {
-  const emailOn = useModuleEnabled("email");
-  const callsOn = useModuleEnabled("zadarma");
   const canEditCompany = useCanWrite("companies");
   const canAddContact = useCanWrite("contacts");
   const { id } = useParams<{ id: string }>();
@@ -270,27 +266,8 @@ export function CompanyDetailPage() {
           </CardContent>
         </Card>
 
-        {emailOn && (
-<Card>
-          <CardHeader>
-            <CardTitle>Email</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <EmailSection companyId={company.id} />
-          </CardContent>
-        </Card>
-)}
-
-        {callsOn && (
-<Card>
-          <CardHeader>
-            <CardTitle>Chamadas</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <CallHistorySection companyId={company.id} />
-          </CardContent>
-        </Card>
-)}
+        {/* Cartões dos módulos (Email, Chamadas...), pelo registo de contribuições (Fase 2c). */}
+        <RecordPanels entity="company" companyId={company.id} />
       </div>
     </div>
   );

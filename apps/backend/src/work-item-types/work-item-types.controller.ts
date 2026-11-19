@@ -32,7 +32,7 @@ export class WorkItemTypesController {
     return this.types.reorder(dto.ids);
   }
 
-  @Audit("work_item_type.updated", { target: "work_item_type", fields: ["name", "icon", "color", "active"] })
+  @Audit("work_item_type.updated", { target: "work_item_type", fields: ["name", "icon", "color", "active", "showInMenu"] })
   @Patch(":id")
   update(@Param("id") id: string, @Body() dto: UpdateWorkItemTypeDto) {
     return this.types.update(id, dto);

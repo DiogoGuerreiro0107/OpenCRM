@@ -27,6 +27,7 @@ const CORE_CONTROLLERS = [
   "CustomFieldsController",
   // Rotas genéricas de fluxos (2b): o módulo de cada fluxo é verificado no serviço (registo de fluxos).
   "WorkflowsController",
+  "MenuSettingsController",
   "DashboardController",
   "ModulesController",
 ];

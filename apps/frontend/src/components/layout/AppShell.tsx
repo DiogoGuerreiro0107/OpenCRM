@@ -1,54 +1,32 @@
 import { useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
-import { Building2, CheckSquare, FileText, ListChecks, KanbanSquare, LayoutDashboard, KeyRound, Mail, Phone, ShieldCheck, Puzzle, ScrollText, Settings, UserCog, UserPlus, Users, Webhook, Zap, type LucideIcon } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
 import { PasswordDialog } from "@/components/PasswordDialog";
 import { changeOwnPassword } from "@/lib/users-api";
 import { cn } from "@/lib/utils";
-import { ADMIN_ONLY, hasRole, type WriteArea } from "@/lib/permissions";
-import { useMyPermissions } from "@/lib/useCanWrite";
-import { useModules } from "@/lib/useModules";
-import type { ModuleId } from "@/lib/modules-api";
-import type { Role } from "@opencrm/shared-types";
+import { useMainMenu, useSettingsMenu } from "@/modules/hooks";
 
-// `module`: módulo opcional de que o item depende (sem ele, o item não aparece).
-const navItems: Array<{ to: string; label: string; icon: LucideIcon; module?: ModuleId }> = [
-  { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/leads", label: "Leads", icon: UserPlus, module: "leads" },
-  { to: "/funis", label: "Funis", icon: KanbanSquare, module: "deals" },
-  { to: "/tarefas", label: "Tarefas", icon: CheckSquare },
-  { to: "/email", label: "Email", icon: Mail, module: "email" },
-  { to: "/empresas", label: "Empresas", icon: Building2 },
-  { to: "/contactos", label: "Contactos", icon: Users },
-];
+const linkClass = ({ isActive }: { isActive: boolean }) =>
+  cn(
+    "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+    isActive ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted",
+  );
 
-// Quem vê cada item: `roles` (lista fixa: administração) OU `writeArea` (área configurável, Fase 0d). Têm de coincidir
-// com as <RequireRole>/<RequireWrite> em App.tsx e com o backend.
-const settingsItems: Array<{ to: string; label: string; icon: LucideIcon; roles?: Role[]; writeArea?: WriteArea; module?: ModuleId }> = [
-  { to: "/configuracoes/campos-personalizados", label: "Campos Personalizados", icon: Settings, roles: ADMIN_ONLY },
-  { to: "/configuracoes/tipos-de-tarefa", label: "Tipos de tarefa", icon: ListChecks, roles: ADMIN_ONLY },
-  { to: "/configuracoes/templates-email", label: "Templates de Email", icon: FileText, writeArea: "emailTemplates", module: "email" },
-  { to: "/configuracoes/automacoes", label: "Automações", icon: Zap, roles: ADMIN_ONLY, module: "automations" },
-  { to: "/configuracoes/utilizadores", label: "Utilizadores", icon: UserCog, roles: ADMIN_ONLY },
-  { to: "/configuracoes/zadarma", label: "Zadarma", icon: Phone, roles: ADMIN_ONLY, module: "zadarma" },
-  { to: "/configuracoes/modulos", label: "Módulos", icon: Puzzle, roles: ADMIN_ONLY },
-  { to: "/configuracoes/permissoes", label: "Permissões", icon: ShieldCheck, roles: ADMIN_ONLY },
-  { to: "/configuracoes/chaves-api", label: "Chaves de API", icon: KeyRound, roles: ADMIN_ONLY },
-  { to: "/configuracoes/webhooks", label: "Webhooks", icon: Webhook, roles: ADMIN_ONLY },
-  { to: "/configuracoes/auditoria", label: "Auditoria", icon: ScrollText, roles: ADMIN_ONLY },
-];
-
+/**
+ * Moldura da aplicação. O menu vem do registo de contribuições (src/modules/, Fase 2c): a secção principal com as
+ * preferências do Administrador (Configurações > Menu), as configurações fixas. Cada item só aparece com o módulo
+ * ativo e a permissão.
+ */
 export function AppShell() {
   const { user, logout } = useAuth();
   const [isPasswordOpen, setIsPasswordOpen] = useState(false);
-  const { enabled: enabledModules } = useModules();
-  const moduleOn = (id?: ModuleId) => !id || enabledModules.has(id);
-  const visibleNavItems = navItems.filter((item) => moduleOn(item.module));
-  const { data: myPermissions } = useMyPermissions();
-  const allowed = (item: (typeof settingsItems)[number]) =>
-    item.writeArea ? !!myPermissions?.writeAreas.includes(item.writeArea) : hasRole(user?.role, item.roles ?? []);
-  const visibleSettingsItems = settingsItems.filter((item) => allowed(item) && moduleOn(item.module));
+  const mainMenu = useMainMenu();
+  const settingsItems = useSettingsMenu();
+  // Um item cujo destino é o início do de outro item (Tarefas → Visita em /tarefas/tipo/VISITA) só fica ativo no
+  // endereço exato; senão ficavam os dois marcados. Os outros continuam ativos nas subpáginas (/empresas/:id).
+  const allTargets = mainMenu.flatMap((s) => s.items.map((i) => i.to));
+  const exact = (to: string) => allTargets.some((other) => other !== to && other.startsWith(`${to}/`));
 
   return (
     <div className="flex min-h-screen">
@@ -56,34 +34,21 @@ export function AppShell() {
         <div className="px-4 py-5">
           <span className="text-lg font-semibold">OpenCRM</span>
         </div>
-        <nav className="flex-1 space-y-1 px-2">
-          {visibleNavItems.map(({ to, label, icon: Icon }) => (
-            <NavLink
-              key={to}
-              to={to}
-              className={({ isActive }) =>
-                cn(
-                  "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                  isActive ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted",
-                )
-              }
-            >
-              <Icon className="h-4 w-4" />
-              {label}
-            </NavLink>
+        <nav className="flex-1 space-y-1 overflow-y-auto px-2" aria-label="Menu principal">
+          {mainMenu.map((section) => (
+            <div key={section.group?.id ?? "sem-grupo"} role={section.group ? "group" : undefined} aria-label={section.group?.label} className="space-y-1">
+              {section.group && <p className="px-3 pb-1 pt-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{section.group.label}</p>}
+              {section.items.map(({ id, to, label, icon: Icon }) => (
+                <NavLink key={id} to={to} end={exact(to)} className={linkClass}>
+                  <Icon className="h-4 w-4" />
+                  {label}
+                </NavLink>
+              ))}
+            </div>
           ))}
-          {visibleSettingsItems.length > 0 && <div className="my-2 border-t border-border" />}
-          {visibleSettingsItems.map(({ to, label, icon: Icon }) => (
-            <NavLink
-              key={to}
-              to={to}
-              className={({ isActive }) =>
-                cn(
-                  "flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors",
-                  isActive ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-muted",
-                )
-              }
-            >
+          {settingsItems.length > 0 && <div className="my-2 border-t border-border" />}
+          {settingsItems.map(({ id, to, label, icon: Icon }) => (
+            <NavLink key={id} to={to} className={linkClass}>
               <Icon className="h-4 w-4" />
               {label}
             </NavLink>
