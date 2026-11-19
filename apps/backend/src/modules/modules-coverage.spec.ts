@@ -25,6 +25,8 @@ const CORE_CONTROLLERS = [
   "TasksController",
   "WorkItemTypesController",
   "CustomFieldsController",
+  // Rotas genéricas de fluxos (2b): o módulo de cada fluxo é verificado no serviço (registo de fluxos).
+  "WorkflowsController",
   "DashboardController",
   "ModulesController",
 ];

@@ -193,6 +193,48 @@ id e de uma `key` à parte.
 - **Prova por mutação** nas regras novas; **browser** (base de testes): dar passos a um tipo, quadro com arrastar,
   formulário com passo, campos de um tipo.
 
+### Execução do 2b (2026-11-19)
+**Implementado como planeado**, com estes pormenores decididos na implementação:
+- O trigger `WorkItem_passo_coerente` lê o tipo com `FOR SHARE`. Quem cria ou altera uma tarefa enquanto um administrador
+  dá ou tira passos ao tipo espera pelo fim dessa operação e vê o resultado. Dar e tirar passos usam uma atualização
+  condicional do tipo, para dois pedidos ao mesmo tempo não criarem dois fluxos.
+- Pedir só um estado mantém a tarefa no passo atual se ele já for dessa categoria. Sem isto, um formulário que reenvia
+  o mesmo estado moveria a tarefa para o primeiro passo da categoria.
+- Mover tarefas em bloco (apagar um passo com destino, mudar a categoria de um passo) não regista na timeline nem avalia
+  automações. É o mesmo que já acontecia com os negócios ao apagar uma fase.
+- O nome de um campo personalizado não se repete entre campos que se aplicam às mesmas tarefas: um campo «de todas»
+  colide com os de qualquer tipo.
+- O fluxo de um tipo acompanha o nome do tipo ao renomear.
+- **Migração** `20261119140000_passos_por_tipo`, ensaiada numa cópia da base de desenvolvimento:
+  - impressão digital de tarefas, campos e valores, fluxos e passos, lembretes e negócios igual antes e depois;
+  - todos os campos existentes ficaram com âmbito vazio e todas as tarefas sem passo;
+  - a reversão (`prisma/rollbacks/20261119140000_passos_por_tipo.down.sql`) repõe exatamente o mesmo esquema e os mesmos
+    dados;
+  - sem desvio face ao `schema.prisma`; aplicada à base de desenvolvimento, com cópia de segurança antes.
+- **e2e:** 20 novos em `test/work-item-steps.e2e-spec.ts` e 1 em `test/automations.e2e-spec.ts` (concluir pelo passo
+  dispara a regra). Total: 263 unitários e 428 e2e, todos a passar. Os testes apanharam um erro: o `typeId` do quadro não era obrigatório (o `@IsOptional` herdado
+  prevalecia), corrigido com `OmitType`.
+- **Prova por mutação:** 11 mutações, todas apanhadas:
+  - passo de outro tipo aceite;
+  - categoria `OPEN` traduzida para o estado errado;
+  - o último passo apaga-se;
+  - resultado aceite em tarefas;
+  - mudar a categoria de um passo não muda as tarefas;
+  - campo de outro tipo aceite;
+  - nome repetido entre âmbitos;
+  - lead sem passo;
+  - o passo atual não fica;
+  - dar passos não move as tarefas;
+  - quadro sem filtros.
+- **Browser** (base de testes):
+  - quadro da Assistência: contagens, ordem por prazo e «Mostrar mais»; arrastar um cartão mudou o passo, o estado e as
+    contagens;
+  - dar passos à Visita no diálogo do tipo, acrescentar um passo, apagar um passo com tarefas (pede o destino e move-as);
+  - «Campos deste tipo» abre os campos de tarefas já no âmbito «Visita»; o campo criado aparece só nas visitas;
+  - formulário da visita com «Passo» em vez de «Estado»; mudar o passo pelo formulário;
+  - lista geral com o nome do passo na coluna do estado;
+  - auditoria com as ações novas, sem erros na consola.
+
 ---
 
 ## Pacotes seguintes (esboço; cada um terá plano detalhado antes de começar)

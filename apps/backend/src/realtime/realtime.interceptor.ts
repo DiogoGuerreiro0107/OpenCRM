@@ -4,7 +4,7 @@ import { MUTATING_METHODS } from "../auth/guards/roles.guard";
 import { RealtimeService } from "./realtime.service";
 
 /** Rotas cujo primeiro segmento é um "recurso" diferente do nome pelo qual o frontend as conhece. */
-const RESOURCE_ALIASES: Record<string, string> = { stages: "pipelines" };
+const RESOURCE_ALIASES: Record<string, string> = { stages: "pipelines", "workflow-steps": "workflows" };
 
 /** Primeiro segmento do caminho: "/deals/123/move?x=1" -> "deals". */
 export function resourceOf(url: string): string | null {

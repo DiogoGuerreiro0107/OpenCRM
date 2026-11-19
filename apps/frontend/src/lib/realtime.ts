@@ -15,7 +15,9 @@ const KEYS_BY_RESOURCE: Record<string, string[]> = {
   pipelines: ["pipelines", "deals", "dashboard-summary"],
   tasks: ["tasks", "dashboard-summary", "work-item-types"],
   // Um administrador mudou os tipos de tarefa: formulários, filtros e listas atualizam-se.
-  "work-item-types": ["work-item-types", "tasks"],
+  "work-item-types": ["work-item-types", "tasks", "custom-fields"],
+  // Passos de um fluxo (tipos de tarefa ou funis) mudaram: tipos, tarefas, quadros e funis atualizam-se.
+  workflows: ["workflows", "work-item-types", "tasks", "pipelines", "deals"],
   leads: ["leads", "dashboard-summary"],
   companies: ["dashboard-summary"],
   contacts: ["dashboard-summary"],

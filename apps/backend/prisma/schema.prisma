@@ -189,6 +189,7 @@ model Workflow {
   steps           WorkflowStep[]
   deals           Deal[]
   automationRules AutomationRule[]
+  workItemType    WorkItemType?
 
   @@index([entityType])
 }
@@ -204,6 +205,7 @@ model WorkflowStep {
   workflowId      String
   workflow        Workflow             @relation(fields: [workflowId], references: [id], onDelete: Cascade)
   deals           Deal[]
+  workItems       WorkItem[]
   automationRules AutomationRule[]
 
   @@index([workflowId])
@@ -300,10 +302,13 @@ model WorkItemType {
   color     String
   isSystem  Boolean    @default(false)
   active    Boolean    @default(true)
-  sortOrder Int        @default(0)
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
-  items     WorkItem[]
+  sortOrder  Int        @default(0)
+  /// Fluxo de passos do tipo (Fase 2b), `entityType` WORK_ITEM. Sem fluxo, os itens só têm estado.
+  workflowId String?    @unique
+  workflow   Workflow?  @relation(fields: [workflowId], references: [id], onDelete: Restrict)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+  items      WorkItem[]
 }
 
 // Item de trabalho (era a «tarefa», Task): o que a agenda e as listas veem. A API continua em /tasks.
@@ -314,6 +319,9 @@ model WorkItem {
   status      WorkItemStatus   @default(PENDING)
   typeId      String           @default("TAREFA")
   type        WorkItemType     @relation(fields: [typeId], references: [id], onDelete: Restrict)
+  /// Passo do fluxo do tipo (só em tipos com passos). O estado deriva da categoria do passo (trigger confirma).
+  stepId      String?
+  step        WorkflowStep?    @relation(fields: [stepId], references: [id], onDelete: Restrict)
   priority    WorkItemPriority @default(NORMAL)
   result      String?
   dueDate     DateTime?
@@ -338,6 +346,7 @@ model WorkItem {
   @@index([assigneeId])
   @@index([dueDate])
   @@index([typeId])
+  @@index([stepId])
   @@index([dueSort, createdAt(sort: Desc), id(sort: Desc)])
   @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin)
 }
@@ -553,6 +562,8 @@ model CustomField {
   /// Tipo de registo ("COMPANY", "LEAD"...). Texto, não enum: os tipos válidos estão em
   /// src/custom-fields/entity-registry.ts e cada módulo novo junta o seu (Fase 0b).
   entityType          String
+  /// Âmbito dentro do tipo de registo ("" = todos). Em WORK_ITEM, o id de um tipo de tarefa (Fase 2b).
+  scopeId             String             @default("")
   sectionName         String?
   fieldName           String
   fieldLabel          String
@@ -569,7 +580,7 @@ model CustomField {
   updatedAt           DateTime           @updatedAt
   values              CustomFieldValue[]
 
-  @@unique([entityType, fieldName])
+  @@unique([entityType, scopeId, fieldName])
 }
 
 model CustomFieldValue {

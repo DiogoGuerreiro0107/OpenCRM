@@ -21,14 +21,17 @@ const WRITE_AREA_BY_ENTITY: Record<CustomFieldEntityType, WriteArea> = {
   CONTACT: "contacts",
   LEAD: "leads",
   DEAL: "deals",
+  WORK_ITEM: "dailyWork",
 };
 
 interface CustomFieldsSectionProps {
   entityType: CustomFieldEntityType;
   entityId: string;
+  /** Âmbito do registo (nas tarefas, o tipo): mostra os campos de todos e os deste âmbito. */
+  scopeId?: string;
 }
 
-export function CustomFieldsSection({ entityType, entityId }: CustomFieldsSectionProps) {
+export function CustomFieldsSection({ entityType, entityId, scopeId = "" }: CustomFieldsSectionProps) {
   const queryClient = useQueryClient();
   const canEdit = useCanWrite(WRITE_AREA_BY_ENTITY[entityType]);
   const { data: fields } = useQuery({
@@ -36,7 +39,8 @@ export function CustomFieldsSection({ entityType, entityId }: CustomFieldsSectio
     queryFn: () => listCustomFields(entityType),
   });
   const { data: values } = useQuery({
-    queryKey: ["custom-field-values", entityType, entityId],
+    // O âmbito entra na chave: mudar o tipo de uma tarefa muda os campos que se lhe aplicam.
+    queryKey: ["custom-field-values", entityType, entityId, scopeId],
     queryFn: () => getCustomFieldValues(entityType, entityId),
   });
 
@@ -62,7 +66,7 @@ export function CustomFieldsSection({ entityType, entityId }: CustomFieldsSectio
     },
   });
 
-  const visibleFields = fields?.filter((f) => f.isVisible) ?? [];
+  const visibleFields = fields?.filter((f) => f.isVisible && (f.scopeId === "" || f.scopeId === scopeId)) ?? [];
   if (visibleFields.length === 0) return null;
 
   function setValue(fieldId: string, value: unknown) {

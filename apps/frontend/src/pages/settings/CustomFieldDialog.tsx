@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
+import { errorMessage } from "@/lib/errors";
 
 const TYPE_LABELS: Record<CustomFieldType, string> = {
   TEXT: "Texto curto",
@@ -26,10 +27,14 @@ interface CustomFieldDialogProps {
   open: boolean;
   onClose: () => void;
   entityType: CustomFieldEntityType;
+  /** Âmbito de um campo novo ("" = todos os registos; nas tarefas, um tipo). */
+  scopeId?: string;
+  /** Texto do âmbito, para quem cria saber a que se aplica o campo. */
+  scopeLabel?: string;
   field?: CustomField | null;
 }
 
-export function CustomFieldDialog({ open, onClose, entityType, field }: CustomFieldDialogProps) {
+export function CustomFieldDialog({ open, onClose, entityType, scopeId = "", scopeLabel, field }: CustomFieldDialogProps) {
   const queryClient = useQueryClient();
   const [form, setForm] = useState({
     fieldLabel: "",
@@ -76,7 +81,7 @@ export function CustomFieldDialog({ open, onClose, entityType, field }: CustomFi
         isSearchable: form.isSearchable,
         isFilterable: form.isFilterable,
       };
-      return field ? updateCustomField(field.id, payload) : createCustomField({ ...payload, entityType });
+      return field ? updateCustomField(field.id, payload) : createCustomField({ ...payload, entityType, scopeId: scopeId || undefined });
     },
     onSuccess: () => {
       invalidate();
@@ -111,6 +116,7 @@ export function CustomFieldDialog({ open, onClose, entityType, field }: CustomFi
           saveMutation.mutate();
         }}
       >
+        {scopeLabel && <p className="text-sm text-muted-foreground">Aplica-se a: {scopeLabel}</p>}
         <div className="space-y-2">
           <Label htmlFor="fieldLabel">Nome do campo *</Label>
           <Input id="fieldLabel" value={form.fieldLabel} onChange={handleChange("fieldLabel")} required />
@@ -166,7 +172,7 @@ export function CustomFieldDialog({ open, onClose, entityType, field }: CustomFi
         </div>
 
         {saveMutation.isError && (
-          <p className="text-sm text-red-600">Não foi possível guardar o campo. Verifica se o nome já existe.</p>
+          <p className="text-sm text-red-600">{errorMessage(saveMutation.error, "Não foi possível guardar o campo. Verifica se o nome já existe.")}</p>
         )}
 
         <div className="flex justify-between pt-2">

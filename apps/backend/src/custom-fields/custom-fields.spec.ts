@@ -96,8 +96,8 @@ describe("validação dos valores por tipo de campo", () => {
 });
 
 describe("registo de tipos de registo com campos personalizados", () => {
-  it("tem os quatro tipos atuais, com os MESMOS identificadores de antes (não muda nada para quem usa)", () => {
-    expect([...CUSTOM_FIELD_ENTITY_TYPES].sort()).toEqual(["COMPANY", "CONTACT", "DEAL", "LEAD"]);
+  it("tem os tipos atuais, com os MESMOS identificadores de antes (não muda nada para quem usa), mais as tarefas (2b)", () => {
+    expect([...CUSTOM_FIELD_ENTITY_TYPES].sort()).toEqual(["COMPANY", "CONTACT", "DEAL", "LEAD", "WORK_ITEM"]);
   });
 
   it("cada tipo tem rótulo, módulo existente (ou núcleo), permissões e verificação de existência", () => {

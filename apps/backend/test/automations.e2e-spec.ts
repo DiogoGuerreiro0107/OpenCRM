@@ -120,6 +120,16 @@ describe("Motor de automações (e2e)", () => {
       await api().patch(`/tasks/${t2.id}`).set("Authorization", comercial).send({ status: "CANCELLED" }).expect(200);
       expect(await currentStage(deal.id)).toBe(stage("Em negociação").id);
     });
+
+    it("concluir pelo passo (tipo com passos) também dispara a regra (Fase 2b)", async () => {
+      const type = (await api().post("/work-item-types/VISITA/workflow").set("Authorization", admin).expect(201)).body;
+      const done = type.steps.find((s: { category: string }) => s.category === "DONE").id;
+      const deal = await createDeal(stage("Novo").id);
+      const t = (await api().post("/tasks").set("Authorization", comercial).send({ title: "Visita", typeId: "VISITA", dealId: deal.id }).expect(201)).body;
+
+      await api().patch(`/tasks/${t.id}`).set("Authorization", comercial).send({ stepId: done }).expect(200);
+      expect(await currentStage(deal.id)).toBe(stage("Em negociação").id);
+    });
   });
 
   it("uma automação pode mover para a fase de perdido sem motivo de perda (decisão documentada)", async () => {

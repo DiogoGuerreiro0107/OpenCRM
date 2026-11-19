@@ -1,6 +1,7 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import type { Task, TaskPriority, TaskStatus } from "@opencrm/shared-types";
+import type { Task, TaskPriority, TaskStatus, WorkItemType } from "@opencrm/shared-types";
 import { listCalendarTasks, listTasks, type TaskFilters } from "@/lib/tasks-api";
 import { LoadMore, useDebounced, usePagedList } from "@/lib/pagination";
 import { Input } from "@/components/ui/input";
@@ -14,6 +15,7 @@ import { Select } from "@/components/ui/select";
 import { WorkItemTypeBadge } from "@/components/WorkItemTypeBadge";
 import { listWorkItemTypes } from "@/lib/work-item-types-api";
 import { TaskDialog } from "./TaskDialog";
+import { WorkItemBoard } from "./WorkItemBoard";
 import { TASK_STATUS_LABELS } from "./task-labels";
 
 type TabValue = TaskStatus | "ALL" | "OVERDUE" | "TODAY";
@@ -54,17 +56,25 @@ function formatDate(iso: string | null) {
   return new Date(iso).toLocaleString("pt-PT", { dateStyle: "short", timeStyle: "short" });
 }
 
-export function TasksListPage() {
+/**
+ * Tarefas: lista paginada e calendário. Com `fixedType` (Fase 2b) é a página de um tipo (/tarefas/tipo/:id): só esse
+ * tipo e, se tiver passos, também o quadro por passos (a vista por omissão).
+ */
+export function TasksListPage({ fixedType }: { fixedType?: WorkItemType } = {}) {
   const canCreate = useCanWrite("dailyWork");
+  const hasBoard = !!fixedType && fixedType.steps.length > 0;
   const [statusFilter, setStatusFilter] = useState<TabValue>("ALL");
-  const [view, setView] = useState<"list" | "calendar">("list");
+  const [view, setView] = useState<"list" | "calendar" | "board">(hasBoard ? "board" : "list");
   const [month, setMonth] = useState(() => new Date());
-  const [dialogState, setDialogState] = useState<{ task: Task | null; defaultDueDate?: string } | null>(null);
+  const [dialogState, setDialogState] = useState<{ task: Task | null; defaultDueDate?: string; defaultStepId?: string } | null>(null);
 
   const [search, setSearch] = useState("");
   const term = useDebounced(search.trim());
   const [assigneeId, setAssigneeId] = useState("");
-  const [typeId, setTypeId] = useState("");
+  const [chosenTypeId, setTypeId] = useState("");
+  const typeId = fixedType?.id ?? chosenTypeId;
+  // Um tipo que perdeu os passos enquanto se via o quadro volta à lista.
+  const currentView = view === "board" && !hasBoard ? "list" : view;
   // Todos os tipos (também os desativados: as tarefas antigas continuam a filtrar-se por eles).
   const { data: types = [] } = useQuery({ queryKey: ["work-item-types", "all"], queryFn: () => listWorkItemTypes() });
 
@@ -72,7 +82,7 @@ export function TasksListPage() {
   const tabFilters: TaskFilters =
     statusFilter === "ALL" ? {} : statusFilter === "OVERDUE" ? { overdue: "true" } : statusFilter === "TODAY" ? { dueToday: "true" } : { status: statusFilter };
   const list = usePagedList(["tasks", "list", statusFilter, term, assigneeId, typeId], (cursor) => listTasks({ ...tabFilters, search: term || undefined, assigneeId: assigneeId || undefined, typeId: typeId || undefined, cursor }), {
-    enabled: view === "list",
+    enabled: currentView === "list",
   });
   const tasks = list.items;
   const isLoading = list.isLoading;
@@ -82,26 +92,44 @@ export function TasksListPage() {
   const calendar = useQuery({
     queryKey: ["tasks", "calendar", range.from, range.to, assigneeId, typeId],
     queryFn: () => listCalendarTasks({ ...range, assigneeId: assigneeId || undefined, typeId: typeId || undefined }),
-    enabled: view === "calendar",
+    enabled: currentView === "calendar",
   });
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Tarefas</h1>
+        {fixedType ? (
+          <div className="space-y-1">
+            <Link to="/tarefas" className="text-xs text-muted-foreground hover:underline">
+              ← Todas as tarefas
+            </Link>
+            <h1 className="flex items-center gap-2 text-2xl font-semibold">
+              <WorkItemTypeBadge type={fixedType} />
+            </h1>
+          </div>
+        ) : (
+          <h1 className="text-2xl font-semibold">Tarefas</h1>
+        )}
         <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={() => setView(view === "list" ? "calendar" : "list")}
-          >
-            {view === "list" ? "Ver calendário" : "Ver lista"}
-          </Button>
-          {canCreate && <Button onClick={() => setDialogState({ task: null })}>Nova tarefa</Button>}
+          <div className="flex overflow-hidden rounded-md border border-border" role="group" aria-label="Vista">
+            {([...(hasBoard ? (["board"] as const) : []), "list", "calendar"] as const).map((v) => (
+              <button
+                key={v}
+                type="button"
+                aria-pressed={currentView === v}
+                onClick={() => setView(v)}
+                className={cn("px-3 py-1.5 text-sm", currentView === v ? "bg-primary text-primary-foreground" : "hover:bg-muted")}
+              >
+                {v === "board" ? "Quadro" : v === "list" ? "Lista" : "Calendário"}
+              </button>
+            ))}
+          </div>
+          {canCreate && <Button onClick={() => setDialogState({ task: null })}>{fixedType ? `Nova: ${fixedType.name}` : "Nova tarefa"}</Button>}
         </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        {view === "list" && (
+        {currentView !== "calendar" && (
           <Input
             aria-label="Pesquisar tarefas"
             placeholder="Pesquisar por título ou descrição..."
@@ -111,18 +139,25 @@ export function TasksListPage() {
           />
         )}
         <UserPicker aria-label="Responsável" value={assigneeId} onChange={(id) => setAssigneeId(id)} emptyLabel="Todos os responsáveis" className="w-56" />
-        <Select aria-label="Tipo" value={typeId} onChange={(e) => setTypeId(e.target.value)} className="w-48">
-          <option value="">Todos os tipos</option>
-          {types.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name}
-              {t.active ? "" : " (desativado)"}
-            </option>
-          ))}
-        </Select>
+        {!fixedType && (
+          <Select aria-label="Tipo" value={typeId} onChange={(e) => setTypeId(e.target.value)} className="w-48">
+            <option value="">Todos os tipos</option>
+            {types.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.name}
+                {t.active ? "" : " (desativado)"}
+              </option>
+            ))}
+          </Select>
+        )}
+        {!fixedType && typeId && (
+          <Link to={`/tarefas/tipo/${encodeURIComponent(typeId)}`} className="text-sm text-primary hover:underline">
+            Abrir a página deste tipo
+          </Link>
+        )}
       </div>
 
-      {view === "list" && (
+      {currentView === "list" && (
         <div className="flex gap-2 border-b border-border">
           {STATUS_TABS.map((tab) => (
             <button
@@ -141,7 +176,15 @@ export function TasksListPage() {
         </div>
       )}
 
-      {view === "calendar" ? (
+      {currentView === "board" && fixedType ? (
+        <WorkItemBoard
+          type={fixedType}
+          filters={{ search: term || undefined, assigneeId: assigneeId || undefined }}
+          onTaskClick={(task) => setDialogState({ task })}
+          onAdd={(stepId) => setDialogState({ task: null, defaultStepId: stepId })}
+          readOnly={!canCreate}
+        />
+      ) : currentView === "calendar" ? (
         <MonthCalendar
           month={month}
           tasks={calendar.data?.items ?? []}
@@ -193,7 +236,8 @@ export function TasksListPage() {
                   </td>
                   <td className="px-4 py-2 text-muted-foreground">{formatDate(task.dueDate)}</td>
                   <td className="px-4 py-2">
-                    <Badge className={STATUS_BADGE_CLASS[task.status]}>{TASK_STATUS_LABELS[task.status]}</Badge>
+                    {/* Num tipo com passos mostra-se o passo (a cor continua a ser a do estado). */}
+                    <Badge className={STATUS_BADGE_CLASS[task.status]}>{task.step?.name ?? TASK_STATUS_LABELS[task.status]}</Badge>
                   </td>
                   <td className="px-4 py-2">
                     <Badge className={PRIORITY_BADGE_CLASS[task.priority]}>{PRIORITY_LABELS[task.priority]}</Badge>
@@ -208,7 +252,7 @@ export function TasksListPage() {
           </table>
         </div>
       )}
-      {view === "list" && (
+      {currentView === "list" && (
         <LoadMore shown={tasks.length} hasMore={list.hasNextPage} loading={list.isFetchingNextPage} onMore={() => list.fetchNextPage()} noun={["tarefa", "tarefas"]} />
       )}
 
@@ -218,6 +262,8 @@ export function TasksListPage() {
           onClose={() => setDialogState(null)}
           task={dialogState.task}
           defaultDueDate={dialogState.defaultDueDate}
+          defaultTypeId={fixedType?.id}
+          defaultStepId={dialogState.defaultStepId}
         />
       )}
     </div>

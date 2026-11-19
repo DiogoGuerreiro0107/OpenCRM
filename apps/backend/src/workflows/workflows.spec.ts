@@ -1,5 +1,6 @@
 import { WorkflowOutcome, WorkflowStepCategory } from "@prisma/client";
 import { MODULE_IDS } from "../modules/module-manifest";
+import { categoryForStatus, isOpenStatus, statusForCategory } from "../tasks/work-item-status";
 import { isOpenStep, OPEN_CATEGORIES, STAGE_TYPES, stageTypeOf, stepStateFor } from "./workflow-steps";
 import { isWorkflowEntityType, WORKFLOW_ENTITIES, WORKFLOW_ENTITY_TYPES } from "./workflow-registry";
 
@@ -35,8 +36,10 @@ describe("regras dos passos de fluxo", () => {
 });
 
 describe("registo de tipos com fluxos", () => {
-  it("hoje só negócios, com o identificador DEAL", () => {
-    expect(WORKFLOW_ENTITY_TYPES).toEqual(["DEAL"]);
+  it("negócios (DEAL) e tarefas (WORK_ITEM, 2b); só os negócios têm resultado", () => {
+    expect(WORKFLOW_ENTITY_TYPES).toEqual(["DEAL", "WORK_ITEM"]);
+    expect(WORKFLOW_ENTITIES.DEAL.allowsOutcome).toBe(true);
+    expect(WORKFLOW_ENTITIES.WORK_ITEM.allowsOutcome).toBe(false);
   });
 
   it("cada tipo tem rótulo, módulo existente (ou núcleo), contagem e mudança de itens", () => {
@@ -45,11 +48,32 @@ describe("registo de tipos com fluxos", () => {
       expect({ type, ok: entity.module === null || MODULE_IDS.includes(entity.module) }).toEqual({ type, ok: true });
       expect(typeof entity.countItems).toBe("function");
       expect(typeof entity.moveItems).toBe("function");
+      expect(typeof entity.onStepStateChanged).toBe("function");
+      for (const message of Object.values(entity.messages)) {
+        const text = typeof message === "function" ? message(3) : message;
+        expect({ type, ok: text.length > 0 }).toEqual({ type, ok: true });
+      }
     }
   });
 
   it("isWorkflowEntityType só aceita tipos registados", () => {
     expect(isWorkflowEntityType("DEAL")).toBe(true);
     for (const bad of ["deal", "ORDER", "", "toString", "__proto__", null]) expect(isWorkflowEntityType(bad)).toBe(false);
+  });
+});
+
+describe("estado das tarefas a partir da categoria do passo (2b)", () => {
+  it("OPEN → PENDING; as outras têm o mesmo nome; e o inverso", () => {
+    expect(statusForCategory("OPEN")).toBe("PENDING");
+    expect(statusForCategory("IN_PROGRESS")).toBe("IN_PROGRESS");
+    expect(statusForCategory("DONE")).toBe("DONE");
+    expect(statusForCategory("CANCELLED")).toBe("CANCELLED");
+    for (const category of Object.values(WorkflowStepCategory)) expect(categoryForStatus(statusForCategory(category))).toBe(category);
+  });
+
+  it("um passo «aberto» dá sempre uma tarefa «em aberto» (as listas e a agenda contam pelo estado)", () => {
+    for (const category of Object.values(WorkflowStepCategory)) {
+      expect({ category, coerente: isOpenStatus(statusForCategory(category)) === isOpenStep(step(category)) }).toEqual({ category, coerente: true });
+    }
   });
 });

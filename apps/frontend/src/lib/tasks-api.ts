@@ -9,6 +9,8 @@ export interface TaskInput {
   status?: TaskStatus;
   /** Tipo de tarefa (sem ele, «Tarefa»). */
   typeId?: string;
+  /** Passo (só em tipos com passos; decide o estado). */
+  stepId?: string;
   priority?: TaskPriority;
   result?: string;
   assigneeId?: string;
@@ -22,6 +24,7 @@ export interface TaskInput {
 export interface TaskFilters {
   status?: TaskStatus;
   typeId?: string;
+  stepId?: string;
   priority?: TaskPriority;
   assigneeId?: string;
   companyId?: string;
@@ -49,6 +52,12 @@ export interface CalendarTasks {
 export async function listCalendarTasks(range: { from: string; to: string; assigneeId?: string; typeId?: string }) {
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const { data } = await api.get<CalendarTasks>("/tasks/calendar", { params: { ...range, tz } });
+  return data;
+}
+
+/** Quadro de um tipo com passos: quantas tarefas há em cada passo, com os mesmos filtros da lista. */
+export async function getTaskBoard(filters: TaskFilters & { typeId: string }) {
+  const { data } = await api.get<{ stepId: string; count: number }[]>("/tasks/board", { params: filters });
   return data;
 }
 

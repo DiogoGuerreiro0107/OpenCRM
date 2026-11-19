@@ -1,9 +1,10 @@
 import { WorkItemPriority, WorkItemStatus } from "@prisma/client";
 import { IsBooleanString, IsDateString, IsEnum, IsOptional, IsString, MaxLength } from "class-validator";
+import { IntersectionType, OmitType } from "@nestjs/mapped-types";
 import { PageQueryDto } from "../../common/pagination";
 
-/** Filtros da lista paginada de tarefas (`limit`/`cursor` vêm de PageQueryDto). */
-export class QueryTasksDto extends PageQueryDto {
+/** Filtros comuns à lista paginada e ao quadro por passos. */
+export class TaskFiltersDto {
   /** Contém (título ou descrição), sem acentos. */
   @IsOptional()
   @IsString()
@@ -18,6 +19,12 @@ export class QueryTasksDto extends PageQueryDto {
   @IsString()
   @MaxLength(64)
   typeId?: string;
+
+  /** Passo (coluna do quadro de um tipo com passos). */
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  stepId?: string;
 
   @IsOptional()
   @IsEnum(WorkItemPriority)
@@ -50,6 +57,16 @@ export class QueryTasksDto extends PageQueryDto {
   @IsOptional()
   @IsBooleanString()
   dueToday?: string;
+}
+
+/** Lista paginada de tarefas (`limit`/`cursor` de PageQueryDto, com os filtros de TaskFiltersDto). */
+export class QueryTasksDto extends IntersectionType(PageQueryDto, TaskFiltersDto) {}
+
+/** Quadro de um tipo com passos: o tipo é obrigatório. */
+export class QueryTaskBoardDto extends OmitType(TaskFiltersDto, ["typeId"] as const) {
+  @IsString()
+  @MaxLength(64)
+  typeId!: string;
 }
 
 /**

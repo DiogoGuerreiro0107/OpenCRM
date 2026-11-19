@@ -26,6 +26,12 @@ export class CreateTaskDto {
   @MaxLength(64)
   typeId?: string;
 
+  /** Passo (só em tipos com passos; decide o estado). Sem ele, o primeiro passo da categoria do estado. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  stepId?: string;
+
   @IsOptional()
   @IsEnum(WorkItemPriority)
   priority?: WorkItemPriority;

@@ -3,7 +3,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Task, TaskPriority, TaskStatus } from "@opencrm/shared-types";
 import { createTask, deleteTask, updateTask } from "@/lib/tasks-api";
 import { listWorkItemTypes } from "@/lib/work-item-types-api";
-import { TASK_STATUS_LABELS } from "./task-labels";
+import { TASK_STATUS_LABELS, categoryForStatus } from "./task-labels";
+import { STEP_CATEGORY_LABELS } from "@/lib/workflows-api";
+import { errorMessage } from "@/lib/errors";
+import { CustomFieldsSection } from "@/components/CustomFieldsSection";
 import { CompanyPicker, ContactPicker, UserPicker } from "@/components/pickers";
 import { Dialog, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -31,6 +34,9 @@ interface TaskDialogProps {
   onClose: () => void;
   task?: Task | null;
   defaultDueDate?: string;
+  /** Tarefa nova já com tipo (p. ex. na página de um tipo) e, num tipo com passos, já num passo (coluna do quadro). */
+  defaultTypeId?: string;
+  defaultStepId?: string;
 }
 
 function toDateTimeLocal(iso: string | null | undefined) {
@@ -41,7 +47,7 @@ function toDateTimeLocal(iso: string | null | undefined) {
   return local.toISOString().slice(0, 16);
 }
 
-export function TaskDialog({ open, onClose, task, defaultDueDate }: TaskDialogProps) {
+export function TaskDialog({ open, onClose, task, defaultDueDate, defaultTypeId, defaultStepId }: TaskDialogProps) {
   const queryClient = useQueryClient();
   const readOnly = !useCanWrite("dailyWork");
 
@@ -51,6 +57,7 @@ export function TaskDialog({ open, onClose, task, defaultDueDate }: TaskDialogPr
     dueDate: "",
     status: "PENDING" as TaskStatus,
     typeId: "",
+    stepId: "",
     priority: "NORMAL" as TaskPriority,
     result: "",
     assigneeId: "",
@@ -66,7 +73,8 @@ export function TaskDialog({ open, onClose, task, defaultDueDate }: TaskDialogPr
       description: task?.description ?? "",
       dueDate: task ? toDateTimeLocal(task.dueDate) : defaultDueDate ? `${defaultDueDate}T09:00` : "",
       status: task?.status ?? "PENDING",
-      typeId: task?.typeId ?? "",
+      typeId: task?.typeId ?? defaultTypeId ?? "",
+      stepId: task?.stepId ?? defaultStepId ?? "",
       priority: task?.priority ?? "NORMAL",
       result: task?.result ?? "",
       assigneeId: task?.assigneeId ?? "",
@@ -76,12 +84,18 @@ export function TaskDialog({ open, onClose, task, defaultDueDate }: TaskDialogPr
     setReminders(
       task?.reminders.map((r) => ({ remindAt: toDateTimeLocal(r.remindAt), message: r.message ?? "" })) ?? [],
     );
-  }, [open, task, defaultDueDate]);
+  }, [open, task, defaultDueDate, defaultTypeId, defaultStepId]);
 
   // Tipos ativos para escolher; o da tarefa mantém-se na lista mesmo que tenha sido desativado.
   const { data: activeTypes = [] } = useQuery({ queryKey: ["work-item-types", "active"], queryFn: () => listWorkItemTypes(true), enabled: open });
   const typeOptions = task && !activeTypes.some((t) => t.id === task.typeId) ? [...activeTypes, { ...task.type, active: false }] : activeTypes;
   const typeValue = form.typeId || activeTypes.find((t) => t.isDefault)?.id || "TAREFA";
+  // Num tipo com passos escolhe-se o passo (o estado vem dele); o passo escolhido só vale se for deste tipo.
+  const steps = activeTypes.find((t) => t.id === typeValue)?.steps ?? (task?.typeId === typeValue && task.step ? [task.step] : []);
+  const hasSteps = steps.length > 0;
+  const stepValue = steps.some((s) => s.id === form.stepId)
+    ? form.stepId
+    : (steps.find((s) => s.category === categoryForStatus(form.status)) ?? steps[0])?.id ?? "";
 
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: ["tasks"] });
@@ -93,7 +107,8 @@ export function TaskDialog({ open, onClose, task, defaultDueDate }: TaskDialogPr
         title: form.title,
         description: form.description || undefined,
         dueDate: form.dueDate ? new Date(form.dueDate).toISOString() : undefined,
-        status: form.status,
+        // Num tipo com passos manda o passo (o servidor deriva o estado); sem passos, o estado.
+        ...(hasSteps ? { stepId: stepValue } : { status: form.status }),
         typeId: typeValue,
         priority: form.priority,
         result: form.result || undefined,
@@ -156,16 +171,29 @@ export function TaskDialog({ open, onClose, task, defaultDueDate }: TaskDialogPr
             <Label htmlFor="dueDate">Prazo</Label>
             <Input id="dueDate" type="datetime-local" value={form.dueDate} onChange={handleChange("dueDate")} />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="status">Estado</Label>
-            <Select id="status" value={form.status} onChange={handleChange("status")}>
-              {Object.entries(TASK_STATUS_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </Select>
-          </div>
+          {hasSteps ? (
+            <div className="space-y-2">
+              <Label htmlFor="stepId">Passo</Label>
+              <Select id="stepId" value={stepValue} onChange={handleChange("stepId")}>
+                {steps.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} ({STEP_CATEGORY_LABELS[s.category]})
+                  </option>
+                ))}
+              </Select>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Label htmlFor="status">Estado</Label>
+              <Select id="status" value={form.status} onChange={handleChange("status")}>
+                {Object.entries(TASK_STATUS_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          )}
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-2">
@@ -271,8 +299,15 @@ export function TaskDialog({ open, onClose, task, defaultDueDate }: TaskDialogPr
 
         </ReadOnlyFieldset>
 
+        {task && (
+          <div className="space-y-2 border-t border-border pt-3">
+            {/* Campos de todas as tarefas e do tipo GUARDADO (mudar o tipo mostra os do novo depois de guardar). */}
+            <CustomFieldsSection entityType="WORK_ITEM" entityId={task.id} scopeId={task.typeId} />
+          </div>
+        )}
+
         {saveMutation.isError && (
-          <p className="text-sm text-red-600">Não foi possível guardar a tarefa. Tenta novamente.</p>
+          <p className="text-sm text-red-600">{errorMessage(saveMutation.error, "Não foi possível guardar a tarefa. Tenta novamente.")}</p>
         )}
 
         {readOnly ? (
