@@ -148,6 +148,7 @@ Estado atual: **todas as fases do roadmap consolidado e a revisão final conclu�
   - [x] Atualizações em tempo real (Socket.io): Kanban, tarefas, leads, dashboard, timeline e email atualizam sem recarregar — ver [docs/plano-tempo-real.md](docs/plano-tempo-real.md)
   - [x] Fase 0 da reorganização concluída: campos personalizados genéricos com validação (0b), funis sobre fluxos genéricos (0c) e permissões de escrita configuráveis em Configurações > Permissões (0d) — ver [docs/plano-fase-0-fundacoes.md](docs/plano-fase-0-fundacoes.md)
   - [x] Módulos opcionais (Fase 0a da [reorganização modular](docs/plano-reorganizacao-modular.md)): leads, funis/negócios, email, telefonia e automações podem ser ligados/desligados em Configurações > Módulos, sem apagar dados — ver [docs/plano-fase-0-fundacoes.md](docs/plano-fase-0-fundacoes.md)
+  - [x] Tipos de tarefa configuráveis em Configurações > Tipos de tarefa (nome, ícone, cor, ordem, ativo) e estado «cancelada»; as tarefas passam a ser o item de trabalho da agenda (Fase 2a) — ver [docs/plano-fase-2-itens-de-trabalho.md](docs/plano-fase-2-itens-de-trabalho.md)
 
 ### Por fazer (backlog)
 

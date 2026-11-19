@@ -13,7 +13,9 @@ import { api, getAccessToken } from "./api";
 const KEYS_BY_RESOURCE: Record<string, string[]> = {
   deals: ["deals", "pipelines", "dashboard-summary"],
   pipelines: ["pipelines", "deals", "dashboard-summary"],
-  tasks: ["tasks", "dashboard-summary"],
+  tasks: ["tasks", "dashboard-summary", "work-item-types"],
+  // Um administrador mudou os tipos de tarefa: formulários, filtros e listas atualizam-se.
+  "work-item-types": ["work-item-types", "tasks"],
   leads: ["leads", "dashboard-summary"],
   companies: ["dashboard-summary"],
   contacts: ["dashboard-summary"],

@@ -34,7 +34,7 @@ model User {
   updatedAt            DateTime              @updatedAt
   timelineEvents       TimelineEvent[]
   deals                Deal[]
-  tasks                Task[]
+  workItems            WorkItem[]
   leads                Lead[]
   ownedCompanies       Company[]
   ownedContacts        Contact[]
@@ -122,7 +122,7 @@ model Company {
   updatedAt   DateTime       @updatedAt
   contacts    Contact[]
   deals       Deal[]
-  tasks       Task[]
+  workItems   WorkItem[]
   emails      EmailMessage[]
   callRecords CallRecord[]
   leads       Lead[]
@@ -153,7 +153,7 @@ model Contact {
   createdAt        DateTime          @default(now())
   updatedAt        DateTime          @updatedAt
   deals            Deal[]
-  tasks            Task[]
+  workItems        WorkItem[]
   emails           EmailMessage[]
   callRecords      CallRecord[]
   leads            Lead[]
@@ -234,7 +234,7 @@ model Deal {
   searchText      String        @default("")
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
-  tasks           Task[]
+  workItems       WorkItem[]
   lead            Lead?
 
   @@index([pipelineId])
@@ -274,71 +274,83 @@ model AutomationRule {
   @@index([triggerType, active])
 }
 
-enum TaskStatus {
+enum WorkItemStatus {
   PENDING
   IN_PROGRESS
   DONE
+  CANCELLED
 }
 
-enum TaskType {
-  CHAMADA
-  EMAIL
-  VISITA
-  PROPOSTA
-  COBRANCA
-  ASSISTENCIA
-  OUTRO
-}
-
-enum TaskPriority {
+enum WorkItemPriority {
   BAIXA
   NORMAL
   ALTA
   URGENTE
 }
 
-model Task {
-  id          String       @id @default(uuid())
+// Tipo de item de trabalho (Fase 2a, docs/plano-fase-2-itens-de-trabalho.md): «Tarefa», «Visita», «Assistência»...
+// Configurável pelo Administrador. O id é o código estável (não muda depois de criado). Os tipos de sistema estão
+// também em código (src/work-item-types/system-types.ts) e o arranque repõe os que faltem.
+model WorkItemType {
+  id        String     @id
+  name      String
+  /// Nome de um ícone da lista fechada do frontend (nunca SVG vindo da base de dados).
+  icon      String
+  /// Nome de uma cor da paleta fechada.
+  color     String
+  isSystem  Boolean    @default(false)
+  active    Boolean    @default(true)
+  sortOrder Int        @default(0)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  items     WorkItem[]
+}
+
+// Item de trabalho (era a «tarefa», Task): o que a agenda e as listas veem. A API continua em /tasks.
+model WorkItem {
+  id          String           @id @default(uuid())
   title       String
   description String?
-  status      TaskStatus   @default(PENDING)
-  type        TaskType?
-  priority    TaskPriority @default(NORMAL)
+  status      WorkItemStatus   @default(PENDING)
+  typeId      String           @default("TAREFA")
+  type        WorkItemType     @relation(fields: [typeId], references: [id], onDelete: Restrict)
+  priority    WorkItemPriority @default(NORMAL)
   result      String?
   dueDate     DateTime?
   assigneeId  String
-  assignee    User         @relation(fields: [assigneeId], references: [id])
+  assignee    User             @relation(fields: [assigneeId], references: [id])
   contactId   String?
-  contact     Contact?     @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  contact     Contact?         @relation(fields: [contactId], references: [id], onDelete: SetNull)
   companyId   String?
-  company     Company?     @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  company     Company?         @relation(fields: [companyId], references: [id], onDelete: SetNull)
   dealId      String?
-  deal        Deal?        @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  deal        Deal?            @relation(fields: [dealId], references: [id], onDelete: SetNull)
   leadId      String?
-  lead        Lead?        @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  lead        Lead?            @relation(fields: [leadId], references: [id], onDelete: SetNull)
   reminders   Reminder[]
   /// Coluna interna mantida por trigger (prazo, ou 9999-12-31 sem prazo).
-  dueSort     DateTime     @default(dbgenerated("'9999-12-31 00:00:00'::timestamp without time zone"))
+  dueSort     DateTime         @default(dbgenerated("'9999-12-31 00:00:00'::timestamp without time zone"))
   /// Coluna interna de pesquisa (título e descrição sem acentos), mantida por trigger.
-  searchText  String       @default("")
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  searchText  String           @default("")
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
 
   @@index([assigneeId])
   @@index([dueDate])
+  @@index([typeId])
   @@index([dueSort, createdAt(sort: Desc), id(sort: Desc)])
   @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin)
 }
 
 model Reminder {
-  id        String   @id @default(uuid())
-  remindAt  DateTime
-  message   String?
-  taskId    String
-  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
+  id         String   @id @default(uuid())
+  remindAt   DateTime
+  message    String?
+  workItemId String
+  workItem   WorkItem @relation(fields: [workItemId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
 
-  @@index([taskId])
+  @@index([workItemId])
 }
 
 enum EmailDirection {
@@ -507,7 +519,7 @@ model Lead {
   convertedDeal   Deal?         @relation(fields: [convertedDealId], references: [id], onDelete: SetNull)
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
-  tasks           Task[]
+  workItems       WorkItem[]
 
   @@index([responsavelId])
   @@index([status])

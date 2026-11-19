@@ -10,7 +10,11 @@ import { cn } from "@/lib/utils";
 import { useCanWrite } from "@/lib/useCanWrite";
 import { MonthCalendar, monthGridRange } from "@/components/calendar/MonthCalendar";
 import { UserPicker } from "@/components/pickers";
+import { Select } from "@/components/ui/select";
+import { WorkItemTypeBadge } from "@/components/WorkItemTypeBadge";
+import { listWorkItemTypes } from "@/lib/work-item-types-api";
 import { TaskDialog } from "./TaskDialog";
+import { TASK_STATUS_LABELS } from "./task-labels";
 
 type TabValue = TaskStatus | "ALL" | "OVERDUE" | "TODAY";
 
@@ -19,6 +23,7 @@ const STATUS_TABS: { value: TabValue; label: string }[] = [
   { value: "PENDING", label: "Pendentes" },
   { value: "IN_PROGRESS", label: "Em progresso" },
   { value: "DONE", label: "Concluídas" },
+  { value: "CANCELLED", label: "Canceladas" },
   { value: "OVERDUE", label: "Atrasadas" },
   { value: "TODAY", label: "Hoje" },
 ];
@@ -41,12 +46,7 @@ const STATUS_BADGE_CLASS: Record<TaskStatus, string> = {
   PENDING: "",
   IN_PROGRESS: "bg-blue-100 text-blue-800 border-blue-200",
   DONE: "bg-green-100 text-green-800 border-green-200",
-};
-
-const STATUS_LABELS: Record<TaskStatus, string> = {
-  PENDING: "Pendente",
-  IN_PROGRESS: "Em progresso",
-  DONE: "Concluída",
+  CANCELLED: "bg-gray-100 text-gray-600 border-gray-200 line-through",
 };
 
 function formatDate(iso: string | null) {
@@ -64,11 +64,14 @@ export function TasksListPage() {
   const [search, setSearch] = useState("");
   const term = useDebounced(search.trim());
   const [assigneeId, setAssigneeId] = useState("");
+  const [typeId, setTypeId] = useState("");
+  // Todos os tipos (também os desativados: as tarefas antigas continuam a filtrar-se por eles).
+  const { data: types = [] } = useQuery({ queryKey: ["work-item-types", "all"], queryFn: () => listWorkItemTypes() });
 
   // Lista: paginada, com pesquisa (docs/plano-paginacao-listagens.md).
   const tabFilters: TaskFilters =
     statusFilter === "ALL" ? {} : statusFilter === "OVERDUE" ? { overdue: "true" } : statusFilter === "TODAY" ? { dueToday: "true" } : { status: statusFilter };
-  const list = usePagedList(["tasks", "list", statusFilter, term, assigneeId], (cursor) => listTasks({ ...tabFilters, search: term || undefined, assigneeId: assigneeId || undefined, cursor }), {
+  const list = usePagedList(["tasks", "list", statusFilter, term, assigneeId, typeId], (cursor) => listTasks({ ...tabFilters, search: term || undefined, assigneeId: assigneeId || undefined, typeId: typeId || undefined, cursor }), {
     enabled: view === "list",
   });
   const tasks = list.items;
@@ -77,8 +80,8 @@ export function TasksListPage() {
   // Calendário: só as tarefas com prazo nas 6 semanas visíveis.
   const range = monthGridRange(month);
   const calendar = useQuery({
-    queryKey: ["tasks", "calendar", range.from, range.to, assigneeId],
-    queryFn: () => listCalendarTasks({ ...range, assigneeId: assigneeId || undefined }),
+    queryKey: ["tasks", "calendar", range.from, range.to, assigneeId, typeId],
+    queryFn: () => listCalendarTasks({ ...range, assigneeId: assigneeId || undefined, typeId: typeId || undefined }),
     enabled: view === "calendar",
   });
 
@@ -108,6 +111,15 @@ export function TasksListPage() {
           />
         )}
         <UserPicker aria-label="Responsável" value={assigneeId} onChange={(id) => setAssigneeId(id)} emptyLabel="Todos os responsáveis" className="w-56" />
+        <Select aria-label="Tipo" value={typeId} onChange={(e) => setTypeId(e.target.value)} className="w-48">
+          <option value="">Todos os tipos</option>
+          {types.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.name}
+              {t.active ? "" : " (desativado)"}
+            </option>
+          ))}
+        </Select>
       </div>
 
       {view === "list" && (
@@ -146,6 +158,7 @@ export function TasksListPage() {
             <thead className="border-b border-border bg-muted/40 text-left text-muted-foreground">
               <tr>
                 <th className="px-4 py-2 font-medium">Título</th>
+                <th className="px-4 py-2 font-medium">Tipo</th>
                 <th className="px-4 py-2 font-medium">Prazo</th>
                 <th className="px-4 py-2 font-medium">Estado</th>
                 <th className="px-4 py-2 font-medium">Prioridade</th>
@@ -156,14 +169,14 @@ export function TasksListPage() {
             <tbody>
               {isLoading && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">
+                  <td colSpan={7} className="px-4 py-6 text-center text-muted-foreground">
                     A carregar...
                   </td>
                 </tr>
               )}
               {!isLoading && tasks.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">
+                  <td colSpan={7} className="px-4 py-6 text-center text-muted-foreground">
                     Nenhuma tarefa encontrada.
                   </td>
                 </tr>
@@ -175,9 +188,12 @@ export function TasksListPage() {
                   onClick={() => setDialogState({ task })}
                 >
                   <td className="px-4 py-2 font-medium">{task.title}</td>
+                  <td className="px-4 py-2">
+                    <WorkItemTypeBadge type={task.type} />
+                  </td>
                   <td className="px-4 py-2 text-muted-foreground">{formatDate(task.dueDate)}</td>
                   <td className="px-4 py-2">
-                    <Badge className={STATUS_BADGE_CLASS[task.status]}>{STATUS_LABELS[task.status]}</Badge>
+                    <Badge className={STATUS_BADGE_CLASS[task.status]}>{TASK_STATUS_LABELS[task.status]}</Badge>
                   </td>
                   <td className="px-4 py-2">
                     <Badge className={PRIORITY_BADGE_CLASS[task.priority]}>{PRIORITY_LABELS[task.priority]}</Badge>

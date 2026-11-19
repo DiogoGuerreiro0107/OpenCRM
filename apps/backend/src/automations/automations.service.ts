@@ -1,3 +1,4 @@
+import { OPEN_WORK_ITEM_STATUSES } from "../tasks/work-item-status";
 import { Injectable, Logger, NotFoundException } from "@nestjs/common";
 import { Cron, CronExpression } from "@nestjs/schedule";
 import { AutomationRule, Prisma } from "@prisma/client";
@@ -96,7 +97,7 @@ export class AutomationsService {
     const deal = await this.prisma.deal.findUnique({ where: { id: dealId } });
     if (!deal) return;
 
-    const remaining = await this.prisma.task.count({ where: { dealId, status: { not: "DONE" } } });
+    const remaining = await this.prisma.workItem.count({ where: { dealId, status: { in: OPEN_WORK_ITEM_STATUSES } } });
     if (remaining > 0) return;
 
     const rules = await this.prisma.automationRule.findMany({

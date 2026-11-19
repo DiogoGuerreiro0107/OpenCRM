@@ -164,7 +164,7 @@ describe("Contrato da API pública: OpenAPI e ids externos (e2e)", () => {
       const again = await postLead(key, "ext-000002", { name: "Maria (reenviado)", external_id: "pedido-1001" }).expect(409);
       expect(again.body.error).toMatchObject({ code: "conflict", details: { existing_id: first.body.data.id } });
       expect(await prisma().lead.count()).toBe(1);
-      expect(await prisma().task.count()).toBe(1);
+      expect(await prisma().workItem.count()).toBe(1);
     });
 
     it("outra chave pode usar o mesmo external_id (o espaço de ids é de cada integração)", async () => {

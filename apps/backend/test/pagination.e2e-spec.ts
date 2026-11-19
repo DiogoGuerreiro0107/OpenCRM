@@ -83,9 +83,9 @@ describe("Paginação das listagens (e2e)", () => {
       { title: "Tarde", dueDate: new Date("2027-01-05T08:00:00Z") },
       { title: "Sem prazo recente", dueDate: null, createdAt: new Date("2026-11-10T09:00:00Z") },
     ];
-    for (const d of data) await prisma.task.create({ data: { ...d, assigneeId: user.id } });
+    for (const d of data) await prisma.workItem.create({ data: { ...d, assigneeId: user.id } });
     const expected = (
-      await prisma.task.findMany({ orderBy: [{ dueDate: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }, { id: "desc" }], select: { id: true } })
+      await prisma.workItem.findMany({ orderBy: [{ dueDate: { sort: "asc", nulls: "last" } }, { createdAt: "desc" }, { id: "desc" }], select: { id: true } })
     ).map((t) => t.id);
 
     const { ids } = await walk("/tasks", { limit: 3 });
@@ -100,9 +100,9 @@ describe("Paginação das listagens (e2e)", () => {
   it("tarefas: pesquisa sem acentos no título e na descrição; colunas internas não saem", async () => {
     const prisma = prismaOf(app);
     const user = await prisma.user.findFirstOrThrow();
-    await prisma.task.create({ data: { title: "Ligar ao João", assigneeId: user.id } });
-    await prisma.task.create({ data: { title: "Visita", description: "Levar orçamento", assigneeId: user.id } });
-    await prisma.task.create({ data: { title: "Outra", assigneeId: user.id } });
+    await prisma.workItem.create({ data: { title: "Ligar ao João", assigneeId: user.id } });
+    await prisma.workItem.create({ data: { title: "Visita", description: "Levar orçamento", assigneeId: user.id } });
+    await prisma.workItem.create({ data: { title: "Outra", assigneeId: user.id } });
     const find = async (search: string) => (await get("/tasks", { search }).expect(200)).body.items.map((t: { title: string }) => t.title);
     expect(await find("joao")).toEqual(["Ligar ao João"]);
     expect(await find("ORCAMENTO")).toEqual(["Visita"]);
@@ -114,9 +114,9 @@ describe("Paginação das listagens (e2e)", () => {
   it("calendário de tarefas: intervalo obrigatório e limitado; devolve só o intervalo", async () => {
     const prisma = prismaOf(app);
     const user = await prisma.user.findFirstOrThrow();
-    await prisma.task.create({ data: { title: "Dentro", dueDate: new Date("2026-11-15T10:00:00Z"), assigneeId: user.id } });
-    await prisma.task.create({ data: { title: "Fora", dueDate: new Date("2027-03-15T10:00:00Z"), assigneeId: user.id } });
-    await prisma.task.create({ data: { title: "Sem prazo", assigneeId: user.id } });
+    await prisma.workItem.create({ data: { title: "Dentro", dueDate: new Date("2026-11-15T10:00:00Z"), assigneeId: user.id } });
+    await prisma.workItem.create({ data: { title: "Fora", dueDate: new Date("2027-03-15T10:00:00Z"), assigneeId: user.id } });
+    await prisma.workItem.create({ data: { title: "Sem prazo", assigneeId: user.id } });
 
     const range = { from: "2026-10-26T00:00:00Z", to: "2026-12-07T00:00:00Z" };
     const month = (await get("/tasks/calendar", range).expect(200)).body;
@@ -133,10 +133,10 @@ describe("Paginação das listagens (e2e)", () => {
     const prisma = prismaOf(app);
     const [ana, rui] = [await prisma.user.findFirstOrThrow(), await createUser(prisma, "TECNICO", "Rui")];
     for (let h = 8; h < 14; h++) {
-      await prisma.task.create({ data: { title: `Dia 10 às ${h}h`, dueDate: new Date(`2026-11-10T${String(h).padStart(2, "0")}:00:00Z`), assigneeId: h % 2 ? rui.id : ana.id } });
+      await prisma.workItem.create({ data: { title: `Dia 10 às ${h}h`, dueDate: new Date(`2026-11-10T${String(h).padStart(2, "0")}:00:00Z`), assigneeId: h % 2 ? rui.id : ana.id } });
     }
     // 23h30 UTC de 11/11 já é dia 12 em Lisboa? Não (Lisboa = UTC em novembro); em Madrid (UTC+1) sim.
-    await prisma.task.create({ data: { title: "Fronteira", dueDate: new Date("2026-11-11T23:30:00Z"), assigneeId: ana.id } });
+    await prisma.workItem.create({ data: { title: "Fronteira", dueDate: new Date("2026-11-11T23:30:00Z"), assigneeId: ana.id } });
     const range = { from: "2026-11-01T00:00:00Z", to: "2026-11-30T23:59:59Z" };
 
     const all = (await get("/tasks/calendar", { ...range, tz: "Europe/Lisbon" }).expect(200)).body;

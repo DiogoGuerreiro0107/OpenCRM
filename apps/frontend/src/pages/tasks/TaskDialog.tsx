@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import type { Task, TaskPriority, TaskStatus, TaskType } from "@opencrm/shared-types";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { Task, TaskPriority, TaskStatus } from "@opencrm/shared-types";
 import { createTask, deleteTask, updateTask } from "@/lib/tasks-api";
+import { listWorkItemTypes } from "@/lib/work-item-types-api";
+import { TASK_STATUS_LABELS } from "./task-labels";
 import { CompanyPicker, ContactPicker, UserPicker } from "@/components/pickers";
 import { Dialog, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -11,22 +13,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
-
-const STATUS_LABELS: Record<TaskStatus, string> = {
-  PENDING: "Pendente",
-  IN_PROGRESS: "Em progresso",
-  DONE: "Concluída",
-};
-
-const TYPE_LABELS: Record<TaskType, string> = {
-  CHAMADA: "Chamada",
-  EMAIL: "Email",
-  VISITA: "Visita",
-  PROPOSTA: "Proposta",
-  COBRANCA: "Cobrança",
-  ASSISTENCIA: "Assistência",
-  OUTRO: "Outro",
-};
 
 const PRIORITY_LABELS: Record<TaskPriority, string> = {
   BAIXA: "Baixa",
@@ -64,7 +50,7 @@ export function TaskDialog({ open, onClose, task, defaultDueDate }: TaskDialogPr
     description: "",
     dueDate: "",
     status: "PENDING" as TaskStatus,
-    type: "" as TaskType | "",
+    typeId: "",
     priority: "NORMAL" as TaskPriority,
     result: "",
     assigneeId: "",
@@ -80,7 +66,7 @@ export function TaskDialog({ open, onClose, task, defaultDueDate }: TaskDialogPr
       description: task?.description ?? "",
       dueDate: task ? toDateTimeLocal(task.dueDate) : defaultDueDate ? `${defaultDueDate}T09:00` : "",
       status: task?.status ?? "PENDING",
-      type: task?.type ?? "",
+      typeId: task?.typeId ?? "",
       priority: task?.priority ?? "NORMAL",
       result: task?.result ?? "",
       assigneeId: task?.assigneeId ?? "",
@@ -91,6 +77,11 @@ export function TaskDialog({ open, onClose, task, defaultDueDate }: TaskDialogPr
       task?.reminders.map((r) => ({ remindAt: toDateTimeLocal(r.remindAt), message: r.message ?? "" })) ?? [],
     );
   }, [open, task, defaultDueDate]);
+
+  // Tipos ativos para escolher; o da tarefa mantém-se na lista mesmo que tenha sido desativado.
+  const { data: activeTypes = [] } = useQuery({ queryKey: ["work-item-types", "active"], queryFn: () => listWorkItemTypes(true), enabled: open });
+  const typeOptions = task && !activeTypes.some((t) => t.id === task.typeId) ? [...activeTypes, { ...task.type, active: false }] : activeTypes;
+  const typeValue = form.typeId || activeTypes.find((t) => t.isDefault)?.id || "TAREFA";
 
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: ["tasks"] });
@@ -103,7 +94,7 @@ export function TaskDialog({ open, onClose, task, defaultDueDate }: TaskDialogPr
         description: form.description || undefined,
         dueDate: form.dueDate ? new Date(form.dueDate).toISOString() : undefined,
         status: form.status,
-        type: form.type || undefined,
+        typeId: typeValue,
         priority: form.priority,
         result: form.result || undefined,
         assigneeId: form.assigneeId || undefined,
@@ -168,7 +159,7 @@ export function TaskDialog({ open, onClose, task, defaultDueDate }: TaskDialogPr
           <div className="space-y-2">
             <Label htmlFor="status">Estado</Label>
             <Select id="status" value={form.status} onChange={handleChange("status")}>
-              {Object.entries(STATUS_LABELS).map(([value, label]) => (
+              {Object.entries(TASK_STATUS_LABELS).map(([value, label]) => (
                 <option key={value} value={value}>
                   {label}
                 </option>
@@ -179,11 +170,11 @@ export function TaskDialog({ open, onClose, task, defaultDueDate }: TaskDialogPr
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-2">
             <Label htmlFor="type">Tipo</Label>
-            <Select id="type" value={form.type} onChange={handleChange("type")}>
-              <option value="">Não definido</option>
-              {Object.entries(TYPE_LABELS).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
+            <Select id="type" value={typeValue} onChange={handleChange("typeId")}>
+              {typeOptions.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                  {t.active ? "" : " (desativado)"}
                 </option>
               ))}
             </Select>

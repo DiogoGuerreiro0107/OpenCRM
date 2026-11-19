@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { NavLink, Outlet } from "react-router-dom";
-import { Building2, CheckSquare, FileText, KanbanSquare, LayoutDashboard, KeyRound, Mail, Phone, ShieldCheck, Puzzle, ScrollText, Settings, UserCog, UserPlus, Users, Webhook, Zap, type LucideIcon } from "lucide-react";
+import { Building2, CheckSquare, FileText, ListChecks, KanbanSquare, LayoutDashboard, KeyRound, Mail, Phone, ShieldCheck, Puzzle, ScrollText, Settings, UserCog, UserPlus, Users, Webhook, Zap, type LucideIcon } from "lucide-react";
 import { useAuth } from "@/lib/AuthContext";
 import { Button } from "@/components/ui/button";
 import { PasswordDialog } from "@/components/PasswordDialog";
@@ -27,6 +27,7 @@ const navItems: Array<{ to: string; label: string; icon: LucideIcon; module?: Mo
 // com as <RequireRole>/<RequireWrite> em App.tsx e com o backend.
 const settingsItems: Array<{ to: string; label: string; icon: LucideIcon; roles?: Role[]; writeArea?: WriteArea; module?: ModuleId }> = [
   { to: "/configuracoes/campos-personalizados", label: "Campos Personalizados", icon: Settings, roles: ADMIN_ONLY },
+  { to: "/configuracoes/tipos-de-tarefa", label: "Tipos de tarefa", icon: ListChecks, roles: ADMIN_ONLY },
   { to: "/configuracoes/templates-email", label: "Templates de Email", icon: FileText, writeArea: "emailTemplates", module: "email" },
   { to: "/configuracoes/automacoes", label: "Automações", icon: Zap, roles: ADMIN_ONLY, module: "automations" },
   { to: "/configuracoes/utilizadores", label: "Utilizadores", icon: UserCog, roles: ADMIN_ONLY },

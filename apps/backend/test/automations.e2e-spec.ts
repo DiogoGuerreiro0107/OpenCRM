@@ -106,6 +106,20 @@ describe("Motor de automações (e2e)", () => {
       await api().patch(`/tasks/${t2.id}`).set("Authorization", comercial).send({ status: "DONE" }).expect(200);
       expect(await currentStage(deal.id)).toBe(stage("Em negociação").id);
     });
+
+    it("uma tarefa cancelada não bloqueia, e cancelar a última em aberto também conta (Fase 2a)", async () => {
+      const deal = await createDeal(stage("Novo").id);
+      const newTask = async (title: string) =>
+        (await api().post("/tasks").set("Authorization", comercial).send({ title, dealId: deal.id }).expect(201)).body;
+      const t1 = await newTask("T1");
+      const t2 = await newTask("T2");
+
+      await api().patch(`/tasks/${t1.id}`).set("Authorization", comercial).send({ status: "DONE" }).expect(200);
+      expect(await currentStage(deal.id)).toBe(stage("Novo").id);
+
+      await api().patch(`/tasks/${t2.id}`).set("Authorization", comercial).send({ status: "CANCELLED" }).expect(200);
+      expect(await currentStage(deal.id)).toBe(stage("Em negociação").id);
+    });
   });
 
   it("uma automação pode mover para a fase de perdido sem motivo de perda (decisão documentada)", async () => {

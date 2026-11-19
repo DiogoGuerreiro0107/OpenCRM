@@ -1,5 +1,6 @@
 import type { Task } from "@opencrm/shared-types";
 import { Button } from "@/components/ui/button";
+import { workItemColor } from "@/components/WorkItemTypeBadge";
 import { cn } from "@/lib/utils";
 
 const WEEKDAYS = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
@@ -112,14 +113,18 @@ export function MonthCalendar({ month, tasks, countsByDay, onMonthChange, onDayC
                       e.stopPropagation();
                       onTaskClick(task);
                     }}
+                    title={`${task.type.name}: ${task.title}`}
                     className={cn(
-                      "truncate rounded px-1 py-0.5 text-[11px]",
+                      "flex items-center gap-1 truncate rounded px-1 py-0.5 text-[11px]",
                       task.status === "DONE"
                         ? "bg-green-100 text-green-800 line-through"
-                        : "bg-primary/10 text-primary",
+                        : task.status === "CANCELLED"
+                          ? "bg-gray-100 text-gray-500 line-through"
+                          : "bg-primary/10 text-primary",
                     )}
                   >
-                    {task.title}
+                    <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", workItemColor(task.type.color).dot)} aria-hidden />
+                    <span className="truncate">{task.title}</span>
                   </div>
                 ))}
                 {dayCount > Math.min(3, dayTasks.length) && (
