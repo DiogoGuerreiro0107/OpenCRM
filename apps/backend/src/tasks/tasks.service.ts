@@ -11,6 +11,7 @@ import { UpdateTaskDto } from "./dto/update-task.dto";
 import { QueryTaskBoardDto, QueryTaskCalendarDto, QueryTasksDto, TaskFiltersDto } from "./dto/query-tasks.dto";
 import { KeyField, orderByKey, readPage } from "../common/pagination";
 import { foldSearch } from "../common/search-text";
+import { isTimeZone, isUnknownTimeZoneError } from "../common/time-zone";
 
 const TASK_INCLUDE = {
   type: { select: { id: true, name: true, icon: true, color: true } },
@@ -36,14 +37,15 @@ export const CALENDAR_MAX_DAYS = 62;
 /** Tarefas por dia que a grelha do mês mostra (o resto aparece como «+N»). */
 export const CALENDAR_PER_DAY = 3;
 
-/** Fuso horário IANA válido (o mesmo teste que o browser faz). O nome vai como parâmetro, nunca no texto do SQL. */
-function isTimeZone(tz: string) {
-  try {
-    new Intl.DateTimeFormat("en", { timeZone: tz });
-    return /^[A-Za-z0-9_+\-/]+$/.test(tz);
-  } catch {
-    return false;
-  }
+/** Horário marcado de uma escrita: `undefined` = não mexer, `null` = limpar. */
+function toDate(value: string | null | undefined) {
+  return value === undefined ? undefined : value ? new Date(value) : null;
+}
+
+/** O fim exige início e não pode ser antes dele (a base de dados confirma com uma restrição CHECK). */
+function assertSchedule(start: Date | null | undefined, end: Date | null | undefined) {
+  if (end && !start) throw new BadRequestException("Indica o início do horário marcado");
+  if (start && end && end < start) throw new BadRequestException("O fim do horário marcado não pode ser antes do início");
 }
 
 @Injectable()
@@ -99,7 +101,8 @@ export class TasksService {
   }
 
   /**
-   * Calendário: no intervalo visível, as primeiras CALENDAR_PER_DAY tarefas de cada dia e quantas há em cada dia.
+   * Calendário: no intervalo visível, as primeiras CALENDAR_PER_DAY tarefas de cada dia e quantas há em cada dia. O dia
+   * de uma tarefa é o do seu momento na agenda (`agendaAt`: início marcado, senão o prazo; Fase 2d).
    * A resposta tem no máximo dias × CALENDAR_PER_DAY tarefas, seja qual for o volume (medido: 4 451 tarefas em 6
    * semanas demoravam 434 ms a devolver, para a grelha mostrar 3 por dia).
    */
@@ -119,21 +122,21 @@ export class TasksService {
       .$queryRaw<Array<{ id: string; day: string; n: bigint }>>`
       SELECT id, day, n FROM (
         SELECT t.id, d.day,
-          row_number() OVER (PARTITION BY d.day ORDER BY t."dueDate", t.id) AS rn,
+          row_number() OVER (PARTITION BY d.day ORDER BY t."agendaAt", t.id) AS rn,
           count(*) OVER (PARTITION BY d.day) AS n
         FROM "WorkItem" t
-        CROSS JOIN LATERAL (SELECT to_char((t."dueDate" AT TIME ZONE 'UTC') AT TIME ZONE ${tz}, 'YYYY-MM-DD') AS day) d
-        WHERE t."dueDate" >= ${from} AND t."dueDate" <= ${to} ${assignee} ${type}
+        CROSS JOIN LATERAL (SELECT to_char((t."agendaAt" AT TIME ZONE 'UTC') AT TIME ZONE ${tz}, 'YYYY-MM-DD') AS day) d
+        WHERE t."agendaAt" >= ${from} AND t."agendaAt" <= ${to} ${assignee} ${type}
       ) x
       WHERE rn <= ${CALENDAR_PER_DAY}`
       .catch((err: unknown) => {
         // Um nome que o Node conhece e o Postgres não (tzdata diferente): pedido inválido, não erro do servidor.
-        if (/time zone .* not recognized/i.test(String(err))) throw new BadRequestException("Fuso horário desconhecido");
+        if (isUnknownTimeZoneError(err)) throw new BadRequestException("Fuso horário desconhecido");
         throw err;
       });
     const items = await this.prisma.workItem.findMany({
       where: { id: { in: rows.map((r) => r.id) } },
-      orderBy: [{ dueDate: "asc" }, { id: "asc" }],
+      orderBy: [{ agendaAt: "asc" }, { id: "asc" }],
       include: TASK_INCLUDE,
     });
     const countsByDay = Object.fromEntries(rows.map((r) => [r.day, Number(r.n)]));
@@ -154,12 +157,15 @@ export class TasksService {
 
   async create(dto: CreateTaskDto, creatorId: string) {
     if (dto.typeId) await this.types.assertUsable(dto.typeId);
-    const { reminders, ...rest } = dto;
+    const { reminders, scheduledStart, scheduledEnd, ...rest } = dto;
+    const schedule = { scheduledStart: toDate(scheduledStart), scheduledEnd: toDate(scheduledEnd) };
+    assertSchedule(schedule.scheduledStart, schedule.scheduledEnd);
     // Num tipo com passos, o passo decide o estado (docs/plano-fase-2-itens-de-trabalho.md, pacote 2b).
     const step = await resolveWorkItemStep(this.prisma, { typeId: dto.typeId ?? DEFAULT_WORK_ITEM_TYPE, stepId: dto.stepId, status: dto.status });
     return this.prisma.workItem.create({
       data: {
         ...rest,
+        ...schedule,
         stepId: step.stepId,
         status: step.status,
         assigneeId: dto.assigneeId ?? creatorId,
@@ -176,7 +182,13 @@ export class TasksService {
     const existing = await this.prisma.workItem.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException("Tarefa não encontrada");
     if (dto.typeId) await this.types.assertUsable(dto.typeId, existing.typeId);
-    const { reminders, ...rest } = dto;
+    const { reminders, scheduledStart, scheduledEnd, ...rest } = dto;
+    const schedule = { scheduledStart: toDate(scheduledStart), scheduledEnd: toDate(scheduledEnd) };
+    // Valida o horário que fica (o que vem no pedido por cima do que já existe).
+    assertSchedule(
+      schedule.scheduledStart === undefined ? existing.scheduledStart : schedule.scheduledStart,
+      schedule.scheduledEnd === undefined ? existing.scheduledEnd : schedule.scheduledEnd,
+    );
 
     // Passo e estado só se resolvem quando algum deles (ou o tipo) vem no pedido; editar o título não mexe no passo.
     const typeId = dto.typeId ?? existing.typeId;
@@ -190,6 +202,7 @@ export class TasksService {
       where: { id },
       data: {
         ...rest,
+        ...schedule,
         ...(step ? { stepId: step.stepId, status: nextStatus } : {}),
         dueDate: dto.dueDate !== undefined ? (dto.dueDate ? new Date(dto.dueDate) : null) : undefined,
         reminders:

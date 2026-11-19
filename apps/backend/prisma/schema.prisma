@@ -327,6 +327,11 @@ model WorkItem {
   priority    WorkItemPriority @default(NORMAL)
   result      String?
   dueDate     DateTime?
+  /// Horário marcado (Fase 2d), opcional e além do prazo. O fim exige início e não é antes dele (CHECK).
+  scheduledStart DateTime?
+  scheduledEnd   DateTime?
+  /// Coluna interna (trigger): início marcado, senão o prazo. É o momento na agenda.
+  agendaAt    DateTime?
   assigneeId  String
   assignee    User             @relation(fields: [assigneeId], references: [id])
   contactId   String?
@@ -349,6 +354,7 @@ model WorkItem {
   @@index([dueDate])
   @@index([typeId])
   @@index([stepId])
+  @@index([agendaAt])
   @@index([dueSort, createdAt(sort: Desc), id(sort: Desc)])
   @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin)
 }

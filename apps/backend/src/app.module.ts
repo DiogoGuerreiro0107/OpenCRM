@@ -20,6 +20,7 @@ import { DealsModule } from "./deals/deals.module";
 import { TasksModule } from "./tasks/tasks.module";
 import { WorkItemTypesModule } from "./work-item-types/work-item-types.module";
 import { MenuSettingsModule } from "./menu-settings/menu-settings.module";
+import { AgendaModule } from "./agenda/agenda.module";
 import { EmailModule } from "./email/email.module";
 import { EmailTemplatesModule } from "./email-templates/email-templates.module";
 import { LeadsModule } from "./leads/leads.module";
@@ -57,6 +58,7 @@ import { RealtimeInterceptor } from "./realtime/realtime.interceptor";
     TasksModule,
     WorkItemTypesModule,
     MenuSettingsModule,
+    AgendaModule,
     EmailModule,
     EmailTemplatesModule,
     LeadsModule,

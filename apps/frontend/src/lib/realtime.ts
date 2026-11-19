@@ -13,14 +13,14 @@ import { api, getAccessToken } from "./api";
 const KEYS_BY_RESOURCE: Record<string, string[]> = {
   deals: ["deals", "pipelines", "dashboard-summary"],
   pipelines: ["pipelines", "deals", "dashboard-summary"],
-  tasks: ["tasks", "dashboard-summary", "work-item-types"],
+  tasks: ["tasks", "dashboard-summary", "work-item-types", "agenda"],
   // Um administrador mudou os tipos de tarefa: formulários, filtros e listas atualizam-se.
-  "work-item-types": ["work-item-types", "tasks", "custom-fields"],
+  "work-item-types": ["work-item-types", "tasks", "custom-fields", "agenda"],
   // Passos de um fluxo (tipos de tarefa ou funis) mudaram: tipos, tarefas, quadros e funis atualizam-se.
   workflows: ["workflows", "work-item-types", "tasks", "pipelines", "deals"],
   // O Administrador mudou o menu: o menu de todas as sessões atualiza-se.
   "menu-settings": ["menu-settings"],
-  leads: ["leads", "dashboard-summary"],
+  leads: ["leads", "dashboard-summary", "agenda"],
   companies: ["dashboard-summary"],
   contacts: ["dashboard-summary"],
   timeline: ["timeline"],
@@ -29,7 +29,7 @@ const KEYS_BY_RESOURCE: Record<string, string[]> = {
   zadarma: ["call-records"],
   users: ["users"],
   // Um administrador ligou/desligou um módulo: menu, rotas e dashboard de todas as sessões atualizam-se.
-  modules: ["modules", "dashboard-summary"],
+  modules: ["modules", "dashboard-summary", "agenda"],
   "api-keys": ["api-keys"],
   webhooks: ["webhooks"],
   // Um administrador mudou permissões: os botões de todas as sessões ajustam-se sem recarregar.

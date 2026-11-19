@@ -1,6 +1,6 @@
 import type { ComponentType } from "react";
 import type { LucideIcon } from "lucide-react";
-import type { Role } from "@opencrm/shared-types";
+import type { AgendaSourceId, Role } from "@opencrm/shared-types";
 import type { ModuleId } from "@/lib/modules-api";
 import type { WriteArea } from "@/lib/permissions";
 
@@ -61,10 +61,19 @@ export interface RecordPanelContribution extends Visibility {
   component: ComponentType<RecordPanelProps>;
 }
 
+/** Fonte da agenda (Fase 2d): o servidor dá as entradas; aqui fica o nome do filtro e como se abre uma entrada. */
+export interface AgendaSourceContribution extends Visibility {
+  id: AgendaSourceId;
+  label: string;
+  /** Diálogo (carregado à parte) que abre a entrada com este id. */
+  open: ComponentType<{ id: string; onClose: () => void }>;
+}
+
 export interface FrontendModule {
   /** Módulo opcional, ou «core» (sempre ativo). As contribuições herdam-no como `module`. */
   id: ModuleId | "core";
   nav?: NavContribution[];
   routes?: RouteContribution[];
   recordPanels?: RecordPanelContribution[];
+  agendaSources?: AgendaSourceContribution[];
 }

@@ -220,6 +220,9 @@ export interface Task {
   priority: TaskPriority;
   result: string | null;
   dueDate: string | null;
+  /** Horário marcado (Fase 2d), além do prazo. */
+  scheduledStart: string | null;
+  scheduledEnd: string | null;
   assigneeId: string;
   assignee: { id: string; name: string };
   contactId: string | null;
@@ -563,4 +566,30 @@ export type MenuEntry =
 export interface MenuSettings {
   entries: MenuEntry[];
   updatedAt: string | null;
+}
+
+/** Fontes da agenda (Fase 2d). Cada módulo pode acrescentar a sua (backend: src/agenda/agenda-sources.ts). */
+export type AgendaSourceId = "WORK_ITEM" | "LEAD_NEXT_ACTION";
+
+export interface AgendaEntry {
+  source: AgendaSourceId;
+  id: string;
+  title: string;
+  /** Dia (AAAA-MM-DD) no fuso do browser. */
+  day: string;
+  start: string;
+  end: string | null;
+  /** «scheduled» = horário marcado; «due» = prazo; «date» = dia inteiro. */
+  kind: "scheduled" | "due" | "date";
+  closed: boolean;
+  cancelled: boolean;
+  type: WorkItemTypeSummary | null;
+  assignee: { id: string; name: string } | null;
+}
+
+export interface AgendaResponse {
+  /** Fontes que entraram (as pedidas, sem as de módulos desligados). */
+  sources: AgendaSourceId[];
+  entries: AgendaEntry[];
+  countsByDay: Record<string, number>;
 }

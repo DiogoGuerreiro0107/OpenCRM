@@ -55,6 +55,8 @@ export function TaskDialog({ open, onClose, task, defaultDueDate, defaultTypeId,
     title: "",
     description: "",
     dueDate: "",
+    scheduledStart: "",
+    scheduledEnd: "",
     status: "PENDING" as TaskStatus,
     typeId: "",
     stepId: "",
@@ -72,6 +74,8 @@ export function TaskDialog({ open, onClose, task, defaultDueDate, defaultTypeId,
       title: task?.title ?? "",
       description: task?.description ?? "",
       dueDate: task ? toDateTimeLocal(task.dueDate) : defaultDueDate ? `${defaultDueDate}T09:00` : "",
+      scheduledStart: toDateTimeLocal(task?.scheduledStart),
+      scheduledEnd: toDateTimeLocal(task?.scheduledEnd),
       status: task?.status ?? "PENDING",
       typeId: task?.typeId ?? defaultTypeId ?? "",
       stepId: task?.stepId ?? defaultStepId ?? "",
@@ -107,6 +111,9 @@ export function TaskDialog({ open, onClose, task, defaultDueDate, defaultTypeId,
         title: form.title,
         description: form.description || undefined,
         dueDate: form.dueDate ? new Date(form.dueDate).toISOString() : undefined,
+        // Vazio = sem horário marcado (null limpa ao editar).
+        scheduledStart: form.scheduledStart ? new Date(form.scheduledStart).toISOString() : null,
+        scheduledEnd: form.scheduledStart && form.scheduledEnd ? new Date(form.scheduledEnd).toISOString() : null,
         // Num tipo com passos manda o passo (o servidor deriva o estado); sem passos, o estado.
         ...(hasSteps ? { stepId: stepValue } : { status: form.status }),
         typeId: typeValue,
@@ -194,6 +201,16 @@ export function TaskDialog({ open, onClose, task, defaultDueDate, defaultTypeId,
               </Select>
             </div>
           )}
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="space-y-2">
+            <Label htmlFor="scheduledStart">Marcado para (início)</Label>
+            <Input id="scheduledStart" type="datetime-local" value={form.scheduledStart} onChange={handleChange("scheduledStart")} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="scheduledEnd">Fim</Label>
+            <Input id="scheduledEnd" type="datetime-local" value={form.scheduledEnd} min={form.scheduledStart || undefined} disabled={!form.scheduledStart} onChange={handleChange("scheduledEnd")} />
+          </div>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-2">

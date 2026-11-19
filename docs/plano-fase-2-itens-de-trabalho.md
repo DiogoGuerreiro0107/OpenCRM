@@ -375,6 +375,43 @@ id e de uma `key` à parte.
 - **Prova por mutação** nas regras novas; **browser** (base de testes): as três vistas, filtros, abrir uma tarefa e uma
   lead a partir da agenda, marcar horário no formulário.
 
+### Execução do 2d (2026-11-19)
+**Implementado como planeado**, com estes pormenores decididos na implementação:
+- Dentro de um dia, as entradas de dia inteiro vêm primeiro, depois pela hora. O corte em `perDay` faz-se **depois** de
+  juntar as fontes, por isso o «+N» conta todas.
+- O fuso horário passou para `src/common/time-zone.ts`, partilhado pelo calendário das tarefas e pela agenda.
+- No frontend, cada fonte regista o filtro e o diálogo que abre uma entrada (`src/pages/agenda/openers.tsx`, carregado
+  à parte). O item «Agenda» entra no menu entre Funis e Tarefas.
+- **Migração** `20261119160000_agenda`, ensaiada numa cópia da base de desenvolvimento:
+  - tarefas e leads iguais antes e depois, incluindo o `updatedAt`;
+  - o momento na agenda ficou igual ao prazo em todas as tarefas existentes;
+  - a reversão (`prisma/rollbacks/20261119160000_agenda.down.sql`) repõe exatamente o mesmo esquema e os mesmos dados;
+  - sem desvio face ao `schema.prisma`; aplicada à base de desenvolvimento, com cópia de segurança antes.
+- **Testes:** 11 e2e novos em `test/agenda.e2e-spec.ts` e 5 unitários (registo de fontes e fusos). Total: 270
+  unitários e 444 e2e, todos a passar.
+- **Prova por mutação:** 11 mutações.
+  - Na primeira volta escaparam duas: o corte por dia depois de juntar as fontes e o «dia inteiro primeiro».
+  - Juntei um teste para esses dois casos e, na segunda volta, as 11 foram apanhadas:
+    - fim antes do início aceite;
+    - fim sem início aceite;
+    - o calendário volta ao prazo;
+    - entram leads fechadas;
+    - o tipo não tira as leads;
+    - o módulo desligado é ignorado;
+    - `perDay` não corta a junção;
+    - o dia inteiro não vem primeiro;
+    - intervalo sem limite;
+    - o responsável não filtra as leads;
+    - o dia das tarefas é contado em UTC.
+- **Browser** (base de testes):
+  - **mês:** a lead primeiro, a visita marcada, «+7»; a lead convertida não aparece; a visita marcada sem prazo
+    aparece;
+  - **semana e dia** pela hora;
+  - **filtros:** por tipo (só visitas, com o aviso de que as leads saem) e por fonte;
+  - **abrir:** a lead e a tarefa abrem a partir da agenda;
+  - **horário marcado** pelo formulário: aparece logo na agenda;
+  - **título:** só com a primeira letra em maiúscula (antes saía «Novembro De 2026»).
+
 ---
 
 ## Pacotes seguintes (esboço; cada um terá plano detalhado antes de começar)

@@ -1,6 +1,6 @@
 import { coreModule } from "./core";
 import { automationsModule, dealsModule, emailModule, leadsModule, zadarmaModule } from "./optional-modules";
-import type { FrontendModule, NavContribution, RecordEntity, RecordPanelContribution, RouteContribution } from "./types";
+import type { AgendaSourceContribution, FrontendModule, NavContribution, RecordEntity, RecordPanelContribution, RouteContribution } from "./types";
 
 /** Todos os módulos do frontend. Um módulo novo junta-se aqui. */
 export const FRONTEND_MODULES: FrontendModule[] = [coreModule, leadsModule, dealsModule, emailModule, zadarmaModule, automationsModule];
@@ -17,3 +17,5 @@ export const ROUTE_CONTRIBUTIONS: RouteContribution[] = FRONTEND_MODULES.flatMap
 export const RECORD_PANELS: RecordPanelContribution[] = FRONTEND_MODULES.flatMap((m) => withModule(m, m.recordPanels)).sort((a, b) => a.order - b.order);
 
 export const recordPanelsFor = (entity: RecordEntity) => RECORD_PANELS.filter((p) => p.entities.includes(entity));
+
+export const AGENDA_SOURCES: AgendaSourceContribution[] = FRONTEND_MODULES.flatMap((m) => withModule(m, m.agendaSources));
