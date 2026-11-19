@@ -85,7 +85,7 @@ describe("motor", () => {
   const rule = (over: Partial<EngineRule> = {}): EngineRule => ({
     id: "r1", name: "Regra", entityType: "DEAL", workflowId: null, stepId: null, trigger: "T", triggerConfig: {}, conditions: [], action: "A", actionConfig: {}, ...over,
   });
-  const record = { values: { value: 50 }, workflowId: "w1", stepId: "s1" };
+  const record = { values: { value: 50 }, workflowId: "w1", stepId: "s1", ownerId: "u1", links: {}, variables: {} };
   const event = { entityType: "DEAL", entityId: "d1", trigger: "T" };
 
   function deps(over: Partial<EngineDeps> = {}) {
@@ -93,7 +93,7 @@ describe("motor", () => {
     const d: EngineDeps = {
       rulesFor: async () => [rule()],
       load: async () => record,
-      fields: () => FIELDS,
+      fields: async () => FIELDS,
       matches: async () => true,
       execute: async () => "feito",
       log: async (r) => {
@@ -158,5 +158,36 @@ describe("motor", () => {
     const { d, runs } = deps({ load: async () => null });
     await runEvent(d, event);
     expect(runs).toEqual([]);
+  });
+});
+
+describe("auxiliares (3b)", () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { addBusinessDays, dueFrom, renderTemplate, templateVariables } = require("./helpers") as typeof import("./helpers");
+  const at = (iso: string) => new Date(`${iso}T10:30:00`);
+  const day = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+  it("dias úteis saltam o fim de semana e mantêm a hora", () => {
+    expect(day(addBusinessDays(at("2026-11-20"), 1))).toBe("2026-11-23"); // sexta + 1 = segunda
+    expect(day(addBusinessDays(at("2026-11-21"), 1))).toBe("2026-11-23"); // sábado + 1 = segunda
+    expect(day(addBusinessDays(at("2026-11-16"), 5))).toBe("2026-11-23"); // segunda + 5 = segunda seguinte
+    expect(day(addBusinessDays(at("2026-11-18"), 2))).toBe("2026-11-20"); // quarta + 2 = sexta
+    expect(day(addBusinessDays(at("2026-11-18"), 0))).toBe("2026-11-18");
+    expect(addBusinessDays(at("2026-11-20"), 1).getHours()).toBe(10);
+    expect(day(dueFrom(at("2026-11-20"), 1, "days"))).toBe("2026-11-21");
+    expect(dueFrom(at("2026-11-20"), 3, "hours").getHours()).toBe(13);
+  });
+
+  it("modelos: variáveis conhecidas, vazias somem sem deixar espaços a mais", () => {
+    expect(templateVariables("Ligar a {nome} ({empresa})")).toEqual(["nome", "empresa"]);
+    expect(renderTemplate("Ligar a {nome} {empresa}", { nome: "Ana", empresa: null })).toBe("Ligar a Ana");
+    expect(renderTemplate("{titulo}", {})).toBe("");
+  });
+
+  it("cada tipo de registo tem o campo do responsável, variáveis e campos acompanhados entre os seus campos", () => {
+    for (const [type, entity] of Object.entries(AUTOMATION_ENTITIES)) {
+      const names = entity.fields.map((f) => f.name);
+      expect({ type, ok: names.includes(entity.ownerField) && Object.keys(entity.variables).length > 0 }).toEqual({ type, ok: true });
+    }
   });
 });

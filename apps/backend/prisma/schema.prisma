@@ -252,7 +252,9 @@ model AutomationRule {
   id            String          @id @default(uuid())
   name          String
   active        Boolean         @default(true)
-  /// Tipo de registo ("DEAL"; os outros entram no 3b).
+  /// Regras do sistema (ex.: "lead.first_contact"): o arranque cria as que faltem; desativam-se mas não se apagam.
+  systemKey     String?         @unique
+  /// Tipo de registo: DEAL, WORK_ITEM, LEAD (src/automations/registry/automation-entities.ts).
   entityType    String          @default("DEAL")
   /// Âmbito opcional: só registos deste fluxo / neste passo (alguns gatilhos exigem o passo).
   workflowId    String?

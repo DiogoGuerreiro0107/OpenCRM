@@ -1,3 +1,4 @@
+import { MODULE_MANIFESTS } from "../src/modules/module-manifest";
 import { INestApplication } from "@nestjs/common";
 import axios from "axios";
 import * as request from "supertest";
@@ -49,7 +50,15 @@ describe("Módulos opcionais (e2e)", () => {
     });
 
     it("a lista de gestão traz dependências e dependentes ativos", async () => {
-      const res = await api().get("/modules/manage").set(as(admin)).expect(200);
+      // Desde a 3b nenhum módulo real depende de outro: declara-se uma dependência só para este teste.
+      const automationsManifest = MODULE_MANIFESTS.find((m) => m.id === "automations")!;
+      automationsManifest.dependsOn = ["deals"];
+      let res;
+      try {
+        res = await api().get("/modules/manage").set(as(admin)).expect(200);
+      } finally {
+        automationsManifest.dependsOn = [];
+      }
       const automations = res.body.find((m: { id: string }) => m.id === "automations");
       const deals = res.body.find((m: { id: string }) => m.id === "deals");
       expect(automations.dependsOn).toEqual(["deals"]);
@@ -66,8 +75,8 @@ describe("Módulos opcionais (e2e)", () => {
     // [módulo a desligar, módulos que é preciso desligar antes, rota de leitura]
     const CASES: Array<[string, string[], string]> = [
       ["leads", [], "/leads/page"],
-      ["deals", ["automations"], "/deals?pipelineId=qualquer"],
-      ["deals", ["automations"], "/pipelines"],
+      ["deals", [], "/deals?pipelineId=qualquer"],
+      ["deals", [], "/pipelines"],
       ["email", [], "/email/messages"],
       ["email", [], "/email-templates"],
       ["zadarma", [], "/zadarma/calls"],
@@ -116,6 +125,15 @@ describe("Módulos opcionais (e2e)", () => {
   });
 
   describe("dependências", () => {
+    // Desde a 3b nenhum módulo real depende de outro: o mecanismo testa-se com «automações → negócios» declarada aqui.
+    const automationsManifest = () => MODULE_MANIFESTS.find((m) => m.id === "automations")!;
+    beforeEach(() => {
+      automationsManifest().dependsOn = ["deals"];
+    });
+    afterEach(() => {
+      automationsManifest().dependsOn = [];
+    });
+
     it("não se desliga negócios com as automações ativas (diz qual)", async () => {
       const res = await setModule("deals", false, 400);
       expect(res.body.message).toContain("Automações");

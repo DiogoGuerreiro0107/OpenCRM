@@ -16,7 +16,19 @@ const TRIGGER_SUMMARY: Record<string, (rule: AutomationRule) => string> = {
 const ACTION_SUMMARY: Record<string, (rule: AutomationRule) => string> = {
   MOVE_TO_STEP: () => "Move para outra fase",
   WEBHOOK: (rule) => `Dispara webhook "${rule.actionConfig.event ?? "?"}"`,
+  CREATE_WORK_ITEM: (rule) => `Cria a tarefa "${rule.actionConfig.title ?? "?"}"`,
+  ASSIGN: () => "Atribui a um utilizador",
 };
+
+/** Tipos de registo e gatilhos das regras que este editor ainda não desenha (3b; o editor genérico é o 3c). */
+const ENTITY_LABELS: Record<string, string> = { DEAL: "Negócio", WORK_ITEM: "Tarefa", LEAD: "Lead" };
+const GENERIC_TRIGGERS: Record<string, string> = { CREATED: "criado", ENTERED_STEP: "entrou no passo", CLOSED: "fechado", FIELD_CHANGED: "campo alterado" };
+
+function triggerSummary(rule: AutomationRule) {
+  if (rule.entityType === "DEAL" && TRIGGER_SUMMARY[rule.trigger]) return TRIGGER_SUMMARY[rule.trigger](rule);
+  const where = rule.step ? ` em "${rule.step.name}"` : "";
+  return `${ENTITY_LABELS[rule.entityType] ?? rule.entityType} ${GENERIC_TRIGGERS[rule.trigger] ?? rule.trigger}${where}${rule.conditions.length ? ` (${rule.conditions.length} condição/ões)` : ""}`;
+}
 
 export function AutomationsSettingsPage() {
   const [dialogState, setDialogState] = useState<{ rule: AutomationRule | null } | null>(null);
@@ -69,7 +81,7 @@ export function AutomationsSettingsPage() {
                 onClick={() => setDialogState({ rule })}
               >
                 <td className="px-4 py-2 font-medium">{rule.name}</td>
-                <td className="px-4 py-2 text-muted-foreground">{TRIGGER_SUMMARY[rule.trigger]?.(rule)}</td>
+                <td className="px-4 py-2 text-muted-foreground">{triggerSummary(rule)}</td>
                 <td className="px-4 py-2 text-muted-foreground">{ACTION_SUMMARY[rule.action]?.(rule)}</td>
                 <td className="px-4 py-2">
                   <Badge className={rule.active ? "bg-green-100 text-green-800 border-green-200" : ""}>

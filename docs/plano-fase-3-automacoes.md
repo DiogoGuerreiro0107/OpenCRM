@@ -197,6 +197,39 @@ calendário configurável), gatilhos de módulos que ainda não existem (cronóm
 - Unitários: dias úteis, variáveis, campos personalizados nas condições; prova por mutação; browser (a página atual
   continua a funcionar; as regras novas configuram-se pela API até ao editor do 3c).
 
+### Execução do 3b (2026-11-19)
+**Implementado como planeado**, com estes pormenores decididos na implementação:
+- **Escrita das tarefas pelo serviço das tarefas:** as ações «criar tarefa» e «mover» (nas tarefas) passam por
+  `TasksService`, que se regista no serviço das automações ao arrancar (assim não há dependência circular). Por isso uma
+  tarefa criada ou concluída por uma automação tem as mesmas regras e a mesma timeline que uma feita por uma pessoa, e
+  os seus eventos entram na cadeia (com o limite de profundidade 3).
+- **Negócios:** o resultado (ganho/perdido) entrou nos campos das condições, para o «fechado» distinguir os dois. O
+  responsável passou a ser acompanhado (muda pela ação «atribuir»).
+- **Ligações da tarefa criada a partir de uma lead:** só a lead, como a tarefa de primeiro contacto sempre fez.
+- **Histórico:** cada execução é registada quando termina, por isso o que uma ação desencadeia aparece antes dela.
+- **Página atual de automações:** mostra as regras novas (incluindo a do sistema), mas só as edita se forem das de
+  sempre; as outras abrem só para ativar ou desativar, para não as estragar ao gravar.
+- **Migração** `20261119180000_automacoes_regras_sistema` (coluna `systemKey`), ensaiada numa cópia da base de
+  desenvolvimento:
+  - dados iguais antes e depois;
+  - a regra do sistema é criada uma só vez, mesmo correndo a criação duas vezes;
+  - a reversão repõe o mesmo esquema e os mesmos dados;
+  - sem desvio face ao `schema.prisma`; aplicada à base de desenvolvimento, com cópia de segurança antes.
+- **Testes:**
+  - Os testes de leads de sempre (incluindo a API pública) passam sem mudanças: a regra do sistema cria a mesma tarefa.
+  - Os testes de dependências entre módulos passaram a usar uma dependência de teste.
+  - Novos: 13 e2e em `test/automation-triggers.e2e-spec.ts` e 4 unitários (dias úteis, modelos, registos, nenhum
+    módulo real com dependências).
+  - Total: 284 unitários e 467 e2e, todos a passar.
+  - Numa volta da suite completa falhou o contrato da API pública por tempo (passa sozinho e na volta seguinte).
+- **Prova por mutação:** 15 mutações.
+  - Na primeira volta escapou uma: entrar no passo sem mudar de passo. Outra só falhou por não compilar.
+  - Juntei o teste que faltava e refiz a segunda com uma mutação que compila; as 15 ficaram apanhadas.
+- **Browser** (base de testes):
+  - a regra do sistema aparece na página e abre só para ativar ou desativar (sem apagar);
+  - desativada, uma lead criada pela interface não teve tarefa;
+  - reativada, nasceu «Contactar lead: …» para quem a criou, com sucesso no histórico e as alterações na auditoria.
+
 ---
 
 ## Pacotes seguintes (esboço; cada um terá plano detalhado antes de começar)

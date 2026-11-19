@@ -1,3 +1,4 @@
+import { ensureSystemAutomationRules } from "../src/automations/registry/system-rules";
 import { INestApplication } from "@nestjs/common";
 import { JwtService } from "@nestjs/jwt";
 import { Test } from "@nestjs/testing";
@@ -26,7 +27,8 @@ export async function createTestApp(): Promise<INestApplication> {
 }
 
 /**
- * Apaga todos os dados (menos o histórico de migrações) e repõe os tipos de tarefa do sistema, como no arranque.
+ * Apaga todos os dados (menos o histórico de migrações) e repõe os tipos de tarefa e as regras de automação do sistema,
+ * como no arranque.
  * Só corre em bases de dados de teste (ver env.ts).
  */
 export async function resetDatabase(prisma: PrismaClient) {
@@ -36,6 +38,7 @@ export async function resetDatabase(prisma: PrismaClient) {
   const list = tables.map((t) => `"${t.tablename}"`).join(", ");
   await prisma.$executeRawUnsafe(`TRUNCATE TABLE ${list} RESTART IDENTITY CASCADE`);
   await ensureSystemWorkItemTypes(prisma);
+  await ensureSystemAutomationRules(prisma);
 }
 
 export const TEST_PASSWORD = "Teste-E2E-1";

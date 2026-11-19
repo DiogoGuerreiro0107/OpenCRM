@@ -25,6 +25,7 @@ export interface EngineEvent {
   entityId: string;
   trigger: string;
   changedFields?: string[];
+  actorId?: string | null;
 }
 
 /** Cadeia de eventos causados uns pelos outros (uma ação pode gerar eventos que disparam outras regras). */
@@ -52,11 +53,12 @@ export interface RunRecord {
 export interface EngineDeps {
   rulesFor: (entityType: string, trigger: string) => Promise<EngineRule[]>;
   load: (entityType: string, id: string) => Promise<LoadedRecord | null>;
-  fields: (entityType: string) => AutomationField[];
+  /** Campos das condições (inclui os personalizados «disponíveis em automações», lidos da base de dados). */
+  fields: (entityType: string) => Promise<AutomationField[]>;
   /** Verificação própria do gatilho (ex.: o campo que mudou é o da regra). */
   matches: (rule: EngineRule, event: EngineEvent) => Promise<boolean>;
   /** Executa a ação; a cadeia serve para a ação despachar os eventos que causar. */
-  execute: (rule: EngineRule, event: EngineEvent, chain: Chain) => Promise<string>;
+  execute: (rule: EngineRule, event: EngineEvent, chain: Chain, record: LoadedRecord) => Promise<string>;
   log: (run: RunRecord) => Promise<void>;
 }
 
@@ -71,7 +73,7 @@ export async function runRule(deps: EngineDeps, rule: EngineRule, event: EngineE
   if (!(await deps.matches(rule, event))) return;
 
   const base = { ruleId: rule.id, entityType: event.entityType, entityId: event.entityId, trigger: event.trigger, depth: chain.depth };
-  const failing = firstFailing(deps.fields(rule.entityType), record.values, rule.conditions);
+  const failing = rule.conditions.length > 0 ? firstFailing(await deps.fields(rule.entityType), record.values, rule.conditions) : null;
   if (failing) {
     if (logSkips) await deps.log({ ...base, outcome: "SKIPPED", message: failing });
     return;
@@ -87,7 +89,7 @@ export async function runRule(deps: EngineDeps, rule: EngineRule, event: EngineE
   }
   chain.seen.add(key);
   try {
-    const message = await deps.execute(rule, event, chain);
+    const message = await deps.execute(rule, event, chain, record);
     await deps.log({ ...base, outcome: "SUCCEEDED", message });
   } catch (err) {
     await deps.log({ ...base, outcome: "FAILED", message: (err as Error).message || "Erro desconhecido" });

@@ -51,13 +51,13 @@ export class DealsController {
   }
 
   @Patch(":id")
-  update(@Param("id") id: string, @Body() dto: UpdateDealDto) {
-    return this.dealsService.update(id, dto);
+  update(@Param("id") id: string, @Body() dto: UpdateDealDto, @CurrentUser() user: { userId: string }) {
+    return this.dealsService.update(id, dto, user.userId);
   }
 
   @Patch(":id/move")
-  move(@Param("id") id: string, @Body() dto: MoveDealDto) {
-    return this.dealsService.move(id, dto);
+  move(@Param("id") id: string, @Body() dto: MoveDealDto, @CurrentUser() user: { userId: string }) {
+    return this.dealsService.move(id, dto, user.userId);
   }
 
   @Delete(":id")

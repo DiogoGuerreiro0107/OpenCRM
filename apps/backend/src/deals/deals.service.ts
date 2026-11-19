@@ -96,6 +96,8 @@ export class DealsService {
       include: DEAL_INCLUDE,
     });
 
+    await this.automations.dispatch({ entityType: "DEAL", entityId: deal.id, trigger: "CREATED", actorId: ownerId });
+
     this.webhooks.trigger("deal.created", {
       dealId: deal.id,
       title: deal.title,
@@ -108,7 +110,7 @@ export class DealsService {
     return deal;
   }
 
-  async update(id: string, dto: UpdateDealDto) {
+  async update(id: string, dto: UpdateDealDto, actorId?: string) {
     const existing = await this.prisma.deal.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException("Negócio não encontrado");
 
@@ -117,7 +119,7 @@ export class DealsService {
     // Gatilho «campo alterado» das automações (Fase 3a): os campos que mudaram de facto.
     const changedFields = WATCHED_FIELDS.filter((field) => dto[field] !== undefined && dto[field] !== existing[field]);
     if (changedFields.length > 0) {
-      await this.automations.dispatch({ entityType: "DEAL", entityId: id, trigger: "FIELD_CHANGED", changedFields: [...changedFields] });
+      await this.automations.dispatch({ entityType: "DEAL", entityId: id, trigger: "FIELD_CHANGED", changedFields: [...changedFields], actorId });
     }
 
     return deal;
@@ -132,7 +134,7 @@ export class DealsService {
     ]);
   }
 
-  async move(id: string, dto: MoveDealDto) {
+  async move(id: string, dto: MoveDealDto, actorId?: string) {
     const deal = await this.prisma.deal.findUnique({ where: { id }, include: { stage: true } });
     if (!deal) throw new NotFoundException("Negócio não encontrado");
 
@@ -175,6 +177,10 @@ export class DealsService {
     ]);
 
     if (deal.stageId !== dto.stageId) {
+      // Automações (Fase 3b): entrou no passo e, se a fase de destino fecha o negócio, fechado.
+      await this.automations.dispatch({ entityType: "DEAL", entityId: id, trigger: "ENTERED_STEP", actorId });
+      if (isOpenStep(deal.stage) && !isOpenStep(targetStage)) await this.automations.dispatch({ entityType: "DEAL", entityId: id, trigger: "CLOSED", actorId });
+
       this.webhooks.trigger("deal.stage_changed", {
         dealId: deal.id,
         title: deal.title,

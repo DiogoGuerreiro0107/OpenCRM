@@ -45,7 +45,7 @@ describe("LeadsService.convert é atómica", () => {
       timelineEvent: { createMany: jest.fn() },
       $transaction: jest.fn(async (callback: (client: typeof tx) => unknown) => callback(tx)),
     };
-    const service = new LeadsService(prisma as never, { trigger: jest.fn() } as never, { isEnabled: () => true } as never);
+    const service = new LeadsService(prisma as never, { trigger: jest.fn() } as never, { dispatch: jest.fn() } as never, { isEnabled: () => true } as never);
     return { service, prisma, tx };
   }
 

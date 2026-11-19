@@ -1,10 +1,11 @@
-import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException, OnModuleInit } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { AutomationsService } from "../automations/automations.service";
 import { WorkItemTypesService } from "../work-item-types/work-item-types.service";
 import { OPEN_WORK_ITEM_STATUSES, isOpenStatus } from "./work-item-status";
 import { resolveWorkItemStep } from "./work-item-steps";
+import { Chain, newChain } from "../automations/registry/engine";
 import { DEFAULT_WORK_ITEM_TYPE } from "../work-item-types/system-types";
 import { CreateTaskDto } from "./dto/create-task.dto";
 import { UpdateTaskDto } from "./dto/update-task.dto";
@@ -49,7 +50,7 @@ function assertSchedule(start: Date | null | undefined, end: Date | null | undef
 }
 
 @Injectable()
-export class TasksService {
+export class TasksService implements OnModuleInit {
   constructor(
     private readonly prisma: PrismaService,
     private readonly automations: AutomationsService,
@@ -155,14 +156,34 @@ export class TasksService {
     return task;
   }
 
-  async create(dto: CreateTaskDto, creatorId: string) {
+  /**
+   * As ações das automações que criam ou movem tarefas passam por este serviço (passo, timeline e eventos na cadeia da
+   * automação).
+   */
+  onModuleInit() {
+    this.automations.registerTaskWriter((chain) => ({
+      create: (draft, creatorId) => this.create(draft, creatorId, chain),
+      moveToStep: async (id, stepId, actorId) => {
+        await this.update(id, { stepId }, actorId, chain);
+      },
+    }));
+  }
+
+  /** Campos cuja mudança se comunica às automações («campo alterado»). */
+  private static readonly TRACKED = ["typeId", "status", "priority", "assigneeId"] as const;
+
+  /**
+   * `chain`: cadeia de automações quando a tarefa é criada por uma automação (proteção contra ciclos); sem ela, é uma
+   * pessoa (ou a API) e começa uma cadeia nova.
+   */
+  async create(dto: CreateTaskDto & { leadId?: string }, creatorId: string, chain?: Chain) {
     if (dto.typeId) await this.types.assertUsable(dto.typeId);
     const { reminders, scheduledStart, scheduledEnd, ...rest } = dto;
     const schedule = { scheduledStart: toDate(scheduledStart), scheduledEnd: toDate(scheduledEnd) };
     assertSchedule(schedule.scheduledStart, schedule.scheduledEnd);
     // Num tipo com passos, o passo decide o estado (docs/plano-fase-2-itens-de-trabalho.md, pacote 2b).
     const step = await resolveWorkItemStep(this.prisma, { typeId: dto.typeId ?? DEFAULT_WORK_ITEM_TYPE, stepId: dto.stepId, status: dto.status });
-    return this.prisma.workItem.create({
+    const task = await this.prisma.workItem.create({
       data: {
         ...rest,
         ...schedule,
@@ -176,9 +197,11 @@ export class TasksService {
       },
       include: TASK_INCLUDE,
     });
+    await this.automations.dispatch({ entityType: "WORK_ITEM", entityId: task.id, trigger: "CREATED", actorId: creatorId }, chain ?? newChain());
+    return task;
   }
 
-  async update(id: string, dto: UpdateTaskDto, actingUserId: string) {
+  async update(id: string, dto: UpdateTaskDto, actingUserId: string, chain: Chain = newChain()) {
     const existing = await this.prisma.workItem.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException("Tarefa não encontrada");
     if (dto.typeId) await this.types.assertUsable(dto.typeId, existing.typeId);
@@ -234,9 +257,16 @@ export class TasksService {
 
       // A regra «tarefas do negócio concluídas» olha para as que ficam em aberto: cancelar a última também conta.
       if (task.dealId && isOpenStatus(existing.status)) {
-        await this.automations.dispatch({ entityType: "DEAL", entityId: task.dealId, trigger: "ALL_TASKS_CLOSED" });
+        await this.automations.dispatch({ entityType: "DEAL", entityId: task.dealId, trigger: "ALL_TASKS_CLOSED", actorId: actingUserId }, chain);
       }
     }
+
+    // Automações das tarefas (Fase 3b): campo alterado, entrou no passo, fechada — na mesma cadeia.
+    const actor = { entityType: "WORK_ITEM" as const, entityId: task.id, actorId: actingUserId };
+    const changedFields = TasksService.TRACKED.filter((field) => task[field] !== existing[field]);
+    if (changedFields.length > 0) await this.automations.dispatch({ ...actor, trigger: "FIELD_CHANGED", changedFields: [...changedFields] }, chain);
+    if (task.stepId && task.stepId !== existing.stepId) await this.automations.dispatch({ ...actor, trigger: "ENTERED_STEP" }, chain);
+    if (closedAs) await this.automations.dispatch({ ...actor, trigger: "CLOSED" }, chain);
 
     return task;
   }

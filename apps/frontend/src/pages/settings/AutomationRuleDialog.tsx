@@ -14,13 +14,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 
-const TRIGGER_LABELS: Record<AutomationTriggerType, string> = {
+const TRIGGER_LABELS: Partial<Record<AutomationTriggerType, string>> = {
   IDLE_IN_STEP: "Tempo parado numa fase",
   ALL_TASKS_CLOSED: "Todas as tarefas concluídas",
   FIELD_CHANGED: "Campo do negócio alterado",
 };
 
-const ACTION_LABELS: Record<AutomationActionType, string> = {
+const ACTION_LABELS: Partial<Record<AutomationActionType, string>> = {
   MOVE_TO_STEP: "Mover para outra fase/funil",
   WEBHOOK: "Disparar webhook (n8n)",
 };
@@ -155,11 +155,62 @@ export function AutomationRuleDialog({ open, onClose, rule }: AutomationRuleDial
     };
   }
 
+  // Este editor só desenha regras de negócios com os gatilhos e ações de sempre. As outras (de tarefas e leads, criar
+  // tarefa, atribuir...) configuram-se pela API até ao editor genérico (3c): aqui só se ativam ou desativam, para não as
+  // estragar ao gravar.
+  const supported = !rule || (rule.entityType === "DEAL" && rule.trigger in TRIGGER_LABELS && rule.action in ACTION_LABELS);
+  const toggleMutation = useMutation({
+    mutationFn: () => updateAutomationRule(rule!.id, { name: form.name, active: form.active }),
+    onSuccess: () => {
+      invalidate();
+      onClose();
+    },
+  });
+
   const canSubmit =
     form.name.trim() &&
     (!needsScopeStage || form.stageId) &&
     (form.actionType !== "MOVE_TO_STEP" || form.targetStageId) &&
     (form.actionType !== "WEBHOOK" || form.webhookEvent.trim());
+
+  if (rule && !supported) {
+    return (
+      <Dialog open={open} onClose={onClose} className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{rule.name}</DialogTitle>
+        </DialogHeader>
+        <form
+          className="space-y-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            toggleMutation.mutate();
+          }}
+        >
+          <p className="text-sm text-muted-foreground">
+            {rule.systemKey ? "Regra do sistema: pode ser desativada, mas não apagada. " : ""}
+            O editor desta regra chega com o editor genérico de automações; por agora só se ativa ou desativa aqui.
+          </p>
+          <div className="space-y-2">
+            <Label htmlFor="name">Nome *</Label>
+            <Input id="name" value={form.name} onChange={handleChange("name")} required />
+          </div>
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={form.active} onChange={handleChange("active")} />
+            Ativa
+          </label>
+          {toggleMutation.isError && <p className="text-sm text-red-600">{errorMessage(toggleMutation.error, "Não foi possível guardar.")}</p>}
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={toggleMutation.isPending || !form.name.trim()}>
+              Guardar
+            </Button>
+          </div>
+        </form>
+      </Dialog>
+    );
+  }
 
   return (
     <Dialog open={open} onClose={onClose} className="max-w-lg">

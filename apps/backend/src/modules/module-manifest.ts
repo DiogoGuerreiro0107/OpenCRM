@@ -49,8 +49,9 @@ export const MODULE_MANIFESTS: ModuleManifest[] = [
   {
     id: "automations",
     label: "Automações",
-    description: "Regras que movem negócios entre fases e disparam webhooks (por agora atuam só sobre negócios).",
-    dependsOn: ["deals"],
+    description:
+      "Regras «quando… então…» sobre negócios, tarefas e leads: mover, criar tarefas, atribuir, webhooks. Inclui a tarefa de primeiro contacto das leads novas: desligar o módulo desliga-a também.",
+    dependsOn: [],
     defaultEnabled: true,
   },
 ];
