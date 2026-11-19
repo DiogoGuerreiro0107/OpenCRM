@@ -1,5 +1,7 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  // omitApi: esconder colunas internas (searchText) de todas as respostas — ver src/prisma/prisma.service.ts.
+  previewFeatures = ["omitApi"]
 }
 
 datasource db {
@@ -70,7 +72,7 @@ model TimelineEvent {
   metadata    Json?
   createdAt   DateTime           @default(now())
 
-  @@index([entityType, entityId])
+  @@index([entityType, entityId, createdAt(sort: Desc), id(sort: Desc)])
 }
 
 enum CompanyStatus {
@@ -114,6 +116,8 @@ model Company {
   ownerId     String?
   owner       User?          @relation(fields: [ownerId], references: [id], onDelete: SetNull)
   notes       String?
+  /// Nome, nome fiscal, NIF, telefone e email, em minúsculas e sem acentos (unaccent), para a pesquisa com pg_trgm (mantido por um trigger; não sai na API).
+  searchText  String         @default("")
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
   contacts    Contact[]
@@ -124,6 +128,8 @@ model Company {
   leads       Lead[]
 
   @@index([ownerId])
+  @@index([name, id])
+  @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin)
 }
 
 model Contact {
@@ -138,6 +144,8 @@ model Contact {
   isDecisionMaker  Boolean           @default(false)
   marketingConsent Boolean           @default(false)
   notes            String?
+  /// Nome, email, telefone e telemóvel, em minúsculas e sem acentos (unaccent), para a pesquisa com pg_trgm (mantido por um trigger; não sai na API).
+  searchText       String            @default("")
   companyId        String?
   company          Company?          @relation(fields: [companyId], references: [id], onDelete: SetNull)
   ownerId          String?
@@ -152,6 +160,8 @@ model Contact {
 
   @@index([companyId])
   @@index([ownerId])
+  @@index([name, id])
+  @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin)
 }
 
 /// Categoria fixa de um passo: o que a agenda e os relatórios usam sem conhecer o nome dado pelo utilizador.
@@ -220,6 +230,8 @@ model Deal {
   ownerId         String
   owner           User          @relation(fields: [ownerId], references: [id])
   closedAt        DateTime?
+  /// Coluna interna de pesquisa (título sem acentos), mantida por trigger.
+  searchText      String        @default("")
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
   tasks           Task[]
@@ -227,6 +239,8 @@ model Deal {
 
   @@index([pipelineId])
   @@index([stageId])
+  @@index([stageId, order, id])
+  @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin)
 }
 
 enum AutomationTriggerType {
@@ -303,11 +317,17 @@ model Task {
   leadId      String?
   lead        Lead?        @relation(fields: [leadId], references: [id], onDelete: SetNull)
   reminders   Reminder[]
+  /// Coluna interna mantida por trigger (prazo, ou 9999-12-31 sem prazo).
+  dueSort     DateTime     @default(dbgenerated("'9999-12-31 00:00:00'::timestamp without time zone"))
+  /// Coluna interna de pesquisa (título e descrição sem acentos), mantida por trigger.
+  searchText  String       @default("")
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
 
   @@index([assigneeId])
   @@index([dueDate])
+  @@index([dueSort, createdAt(sort: Desc), id(sort: Desc)])
+  @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin)
 }
 
 model Reminder {
@@ -360,11 +380,15 @@ model EmailMessage {
   company     Company?       @relation(fields: [companyId], references: [id], onDelete: SetNull)
   attachments Attachment[]
   sentAt      DateTime
+  /// Coluna interna de pesquisa (assunto, remetente, destinatários sem acentos), mantida por trigger.
+  searchText  String         @default("")
   createdAt   DateTime       @default(now())
 
   @@index([accountId])
   @@index([contactId])
   @@index([companyId])
+  @@index([sentAt(sort: Desc), id(sort: Desc)])
+  @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin)
 }
 
 model Attachment {
@@ -425,7 +449,7 @@ model CallRecord {
 
   @@index([contactId])
   @@index([companyId])
-  @@index([startedAt])
+  @@index([startedAt(sort: Desc), id(sort: Desc)])
 }
 
 enum BusinessArea {
@@ -476,7 +500,7 @@ model Lead {
   nextActionAt    DateTime?
   /// = nextActionAt, ou 9999-12-31 sem data: chave de ordenação/cursor da listagem (mantida por um trigger).
   nextActionSort  DateTime      @default(dbgenerated("'9999-12-31 00:00:00'::timestamp without time zone"))
-  /// Nome/empresa/NIF/email/telefone em minúsculas, para a pesquisa com pg_trgm (mantido por um trigger).
+  /// Nome/empresa/NIF/email/telefone em minúsculas e sem acentos (unaccent), para a pesquisa com pg_trgm (mantido por um trigger).
   searchText      String        @default("")
   notes           String?
   convertedDealId String?       @unique

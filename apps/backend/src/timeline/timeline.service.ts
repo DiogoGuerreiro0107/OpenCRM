@@ -1,21 +1,32 @@
 import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
+import { KeyField, orderByKey, readPage } from "../common/pagination";
 import { CreateTimelineEventDto } from "./dto/create-timeline-event.dto";
 import { UpdateTimelineEventDto } from "./dto/update-timeline-event.dto";
 import { QueryTimelineDto } from "./dto/query-timeline.dto";
 
 const USER_SELECT = { user: { select: { id: true, name: true } } } as const;
 
+/** Mais recente primeiro (createdAt, id): cursor e ordem do histórico. */
+const RECENT_FIRST: KeyField[] = [
+  { field: "createdAt", dir: "desc", kind: "date" },
+  { field: "id", dir: "desc", kind: "string" },
+];
+
 @Injectable()
 export class TimelineService {
   constructor(private readonly prisma: PrismaService) {}
 
   findAll(query: QueryTimelineDto) {
-    return this.prisma.timelineEvent.findMany({
-      where: { entityType: query.entityType, entityId: query.entityId },
-      orderBy: { createdAt: "desc" },
-      include: USER_SELECT,
-    });
+    const where = { entityType: query.entityType, entityId: query.entityId };
+    return readPage(RECENT_FIRST, query, (after, take) =>
+      this.prisma.timelineEvent.findMany({
+        where: after ? { AND: [where, after] } : where,
+        orderBy: orderByKey(RECENT_FIRST),
+        take,
+        include: USER_SELECT,
+      }),
+    );
   }
 
   create(dto: CreateTimelineEventDto, userId: string) {

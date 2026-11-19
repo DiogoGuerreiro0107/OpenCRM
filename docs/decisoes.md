@@ -469,3 +469,33 @@ O item "limite de tentativas de login por conta" andava no backlog desde o endur
 - **Conversão concorrente:** a marcação como convertida é condicional dentro da transação; a segunda conversão falha e desfaz o que criou.
 - `GET /leads` (lista sem limite) **removida**; a página usa `GET /leads/page` e `GET /leads/counts`. Medido por HTTP com 200 mil leads: p95 ≤ 49 ms em todos os pedidos da página.
 - O tipo de leads (empresa/pessoa/ambos) configura-se no cartão do módulo, na página Módulos.
+
+## Seletores de registos com pesquisa e pesquisa sem acentos (2026-11-19)
+- **Regra:** escolher uma empresa, um contacto ou um utilizador faz-se sempre com pesquisa, nunca com uma lista completa.
+  - Componente único `RecordPicker` (combobox acessível).
+  - Empresas e contactos pesquisam no servidor, com `limit` (máx. 20 no seletor); utilizadores filtram-se localmente (lista curta).
+- **Pesquisa sem acentos** em empresas, contactos e leads:
+  - Colunas `searchText` mantidas por trigger com `lower(unaccent(...))` e índice GIN `pg_trgm`.
+  - O termo é normalizado em TypeScript (`foldSearch`), e um e2e garante que dá o mesmo que o Postgres.
+  - A coluna está escondida globalmente no cliente Prisma (`omitApi`, pré-funcionalidade do Prisma 5.22; passa a estável no Prisma 6).
+- **Limpar ao editar envia `null`** (antes enviava `undefined`, e a ligação ficava). Campos opcionais vazios das fichas de empresa e contacto vão como `null`.
+
+## Paginação e pesquisa em todas as listagens que podem crescer (2026-11-19)
+- **Regra:** nenhuma rota de listagem devolve a tabela inteira.
+  - As listas de empresas, contactos, tarefas, negócios, emails, timeline e chamadas devolvem sempre `{ items, nextCursor }`, com `limit` de 1 a 100 (por omissão 50).
+  - Os caminhos são os mesmos. Os seletores usam a primeira página.
+  - Ficam completas só as listas curtas de configuração (funis, fases, utilizadores, chaves, campos, modelos, automações).
+- **Cursor por chave** (`src/common/pagination.ts`): os valores das colunas da ordenação mais o id, com a direção de cada coluna. Uma página funda custa o mesmo que a primeira.
+  - As tarefas ordenam por `dueSort` (o prazo, ou 9999-12-31), coluna mantida por trigger como `Lead.nextActionSort`.
+- **Pesquisa sem acentos** também em tarefas, negócios e emails (`searchText` por trigger, índice GIN).
+  - O `searchText` do negócio inclui o da empresa e o do contacto, e os triggers mantêm-no quando estes mudam. Com `LEFT JOIN … OR`, a pesquisa percorria a coluna inteira.
+- **Kanban:** cada coluna carrega 30 cartões de cada vez; os totais da coluna vêm do servidor (`GET /deals/summary`).
+  - Os negócios novos entram no **topo** da coluna.
+  - Com pesquisa ativa não se arrasta.
+  - Renumerar uma coluna é uma só instrução SQL e já não mexe no `updatedAt` dos outros negócios. Antes, mexia e estragava as «oportunidades paradas».
+  - `pipelineId` é obrigatório.
+- **Calendário:** `GET /tasks/calendar` com intervalo obrigatório (máx. 62 dias). Devolve as 3 primeiras tarefas de cada dia e a contagem por dia, no fuso do browser.
+- **Contagens sem ler tudo:** a ficha da empresa deixa de trazer os contactos (lista paginada à parte).
+  - O número de contactos por empresa conta-se só para as empresas da página: o `_count` do Prisma agregava a tabela inteira.
+  - O dashboard conta os negócios por fase na base de dados.
+- Medido por HTTP com cerca de um milhão de linhas (`scripts/bench-listagens`): todas as listas a ≤ 65 ms de mediana (dashboard 109 ms). Detalhes em `docs/plano-paginacao-listagens.md`.

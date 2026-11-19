@@ -1,4 +1,5 @@
-import type { TimelineEntityType, TimelineEvent, TimelineEventType } from "@opencrm/shared-types";
+import type { Page, TimelineEntityType, TimelineEvent, TimelineEventType } from "@opencrm/shared-types";
+import type { PageParams } from "./pagination";
 import { api } from "./api";
 
 export interface CreateTimelineEventInput {
@@ -8,8 +9,9 @@ export interface CreateTimelineEventInput {
   description: string;
 }
 
-export async function listTimeline(entityType: TimelineEntityType, entityId: string) {
-  const { data } = await api.get<TimelineEvent[]>("/timeline", { params: { entityType, entityId } });
+/** Uma página do histórico do registo (mais recente primeiro). */
+export async function listTimeline(entityType: TimelineEntityType, entityId: string, page: PageParams = {}) {
+  const { data } = await api.get<Page<TimelineEvent>>("/timeline", { params: { entityType, entityId, ...page } });
   return data;
 }
 

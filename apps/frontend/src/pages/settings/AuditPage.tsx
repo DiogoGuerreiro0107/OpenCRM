@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { listAudit, type AuditFilters } from "@/lib/audit-api";
 import { actionLabel, ACTION_GROUPS } from "@/lib/audit-labels";
-import { listManagedUsers } from "@/lib/users-api";
+import { UserPicker } from "@/components/pickers";
 import { errorMessage } from "@/lib/errors";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -22,7 +22,6 @@ export function AuditPage() {
   const [to, setTo] = useState("");
 
   const filters: AuditFilters = { action, actorId, from: startOfDay(from), to: endOfDay(to) };
-  const users = useQuery({ queryKey: ["users", "manage"], queryFn: listManagedUsers });
   const audit = useInfiniteQuery({
     queryKey: ["audit", filters],
     queryFn: ({ pageParam }) => listAudit(filters, pageParam),
@@ -57,14 +56,7 @@ export function AuditPage() {
           </label>
           <label className="space-y-1 text-sm">
             <span className="text-muted-foreground">Quem</span>
-            <Select value={actorId} onChange={(e) => setActorId(e.target.value)}>
-              <option value="">Todos</option>
-              {users.data?.map((u) => (
-                <option key={u.id} value={u.id}>
-                  {u.name}
-                </option>
-              ))}
-            </Select>
+            <UserPicker aria-label="Quem" value={actorId} onChange={(id) => setActorId(id)} emptyLabel="Todos" includeInactive />
           </label>
           <label className="space-y-1 text-sm">
             <span className="text-muted-foreground">Desde</span>

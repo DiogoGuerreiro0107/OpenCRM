@@ -1,5 +1,7 @@
-import type { ContactDetail, ContactSummary, PreferredChannel } from "@opencrm/shared-types";
+import type { ContactDetail, ContactSummary, PreferredChannel, Page } from "@opencrm/shared-types";
+import type { PageParams } from "./pagination";
 import { api } from "./api";
+import type { Clearable } from "./forms";
 
 export interface ContactInput {
   name: string;
@@ -22,8 +24,9 @@ export interface ContactFilters {
   companyId?: string;
 }
 
-export async function listContacts(filters: ContactFilters = {}) {
-  const { data } = await api.get<ContactSummary[]>("/contacts", { params: filters });
+/** Uma página da lista (por nome). Os seletores pedem só a primeira, com `limit` pequeno. */
+export async function listContacts(filters: ContactFilters & PageParams = {}) {
+  const { data } = await api.get<Page<ContactSummary>>("/contacts", { params: filters });
   return data;
 }
 
@@ -37,7 +40,7 @@ export async function createContact(input: ContactInput) {
   return data;
 }
 
-export async function updateContact(id: string, input: Partial<ContactInput>) {
+export async function updateContact(id: string, input: Clearable<ContactInput>) {
   const { data } = await api.patch<ContactDetail>(`/contacts/${id}`, input);
   return data;
 }

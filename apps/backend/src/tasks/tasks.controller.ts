@@ -18,7 +18,7 @@ import { CurrentUser } from "../auth/decorators/current-user.decorator";
 import { TasksService } from "./tasks.service";
 import { CreateTaskDto } from "./dto/create-task.dto";
 import { UpdateTaskDto } from "./dto/update-task.dto";
-import { QueryTasksDto } from "./dto/query-tasks.dto";
+import { QueryTaskCalendarDto, QueryTasksDto } from "./dto/query-tasks.dto";
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @WriteArea("dailyWork")
@@ -29,6 +29,11 @@ export class TasksController {
   @Get()
   findAll(@Query() query: QueryTasksDto) {
     return this.tasksService.findAll(query);
+  }
+
+  @Get("calendar")
+  findCalendar(@Query() query: QueryTaskCalendarDto) {
+    return this.tasksService.findCalendar(query);
   }
 
   @Get(":id")

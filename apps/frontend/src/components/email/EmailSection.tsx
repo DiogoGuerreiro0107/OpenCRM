@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import type { EmailMessage } from "@opencrm/shared-types";
 import { listEmailMessages } from "@/lib/email-api";
+import { LoadMore, usePagedList } from "@/lib/pagination";
 import { Button } from "@/components/ui/button";
 import { useCanWrite } from "@/lib/useCanWrite";
 import { Dialog, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -20,10 +20,7 @@ export function EmailSection({ contactId, companyId, defaultTo }: EmailSectionPr
   const [selected, setSelected] = useState<EmailMessage | null>(null);
   const [isComposeOpen, setIsComposeOpen] = useState(false);
 
-  const { data: messages, isLoading } = useQuery({
-    queryKey: ["email-messages", { contactId, companyId }],
-    queryFn: () => listEmailMessages({ contactId, companyId }),
-  });
+  const list = usePagedList(["email-messages", { contactId, companyId }], (cursor) => listEmailMessages({ contactId, companyId, cursor, limit: 20 }));
 
   return (
     <div className="space-y-3">
@@ -35,11 +32,14 @@ export function EmailSection({ contactId, companyId, defaultTo }: EmailSectionPr
         </div>
       )}
 
-      {isLoading ? (
+      {list.isLoading ? (
         <p className="text-sm text-muted-foreground">A carregar...</p>
       ) : (
         <div className="max-h-72 overflow-y-auto rounded-md border border-border">
-          <EmailMessageList messages={messages ?? []} onSelect={setSelected} />
+          <EmailMessageList messages={list.items} onSelect={setSelected} />
+          <div className="px-3">
+            <LoadMore shown={list.items.length} hasMore={list.hasNextPage} loading={list.isFetchingNextPage} onMore={() => list.fetchNextPage()} noun={["mensagem", "mensagens"]} label="Ver mais" />
+          </div>
         </div>
       )}
 

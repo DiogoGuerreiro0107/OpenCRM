@@ -1,5 +1,7 @@
-import type { CompanyDetail, CompanySource, CompanyStatus, CompanySummary } from "@opencrm/shared-types";
+import type { CompanyDetail, CompanySource, CompanyStatus, CompanySummary, Page } from "@opencrm/shared-types";
+import type { PageParams } from "./pagination";
 import { api } from "./api";
+import type { Clearable } from "./forms";
 
 export interface CompanyInput {
   name: string;
@@ -25,8 +27,9 @@ export interface CompanyFilters {
   ownerId?: string;
 }
 
-export async function listCompanies(filters: CompanyFilters = {}) {
-  const { data } = await api.get<CompanySummary[]>("/companies", { params: filters });
+/** Uma página da lista (por nome). Os seletores pedem só a primeira, com `limit` pequeno. */
+export async function listCompanies(filters: CompanyFilters & PageParams = {}) {
+  const { data } = await api.get<Page<CompanySummary>>("/companies", { params: filters });
   return data;
 }
 
@@ -40,7 +43,7 @@ export async function createCompany(input: CompanyInput) {
   return data;
 }
 
-export async function updateCompany(id: string, input: Partial<CompanyInput>) {
+export async function updateCompany(id: string, input: Clearable<CompanyInput>) {
   const { data } = await api.patch<CompanyDetail>(`/companies/${id}`, input);
   return data;
 }

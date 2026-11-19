@@ -52,8 +52,9 @@ export interface CompanySummary extends Company {
   _count: { contacts: number };
 }
 
+/** Ficha da empresa. Os contactos dela vêm à parte, paginados (GET /contacts?companyId). */
 export interface CompanyDetail extends Company {
-  contacts: ContactSummary[];
+  _count: { contacts: number };
 }
 
 export type PreferredChannel = "TELEFONE" | "EMAIL" | "WHATSAPP" | "PRESENCIAL";
@@ -268,9 +269,19 @@ export interface Lead {
   updatedAt: string;
 }
 
-export interface LeadPage {
-  items: Lead[];
+/** Página de uma listagem paginada por cursor (docs/plano-paginacao-listagens.md). */
+export interface Page<T> {
+  items: T[];
   nextCursor: string | null;
+}
+
+export type LeadPage = Page<Lead>;
+
+/** Cabeçalho de uma coluna do quadro de negócios (coluna inteira, não só os cartões carregados). */
+export interface DealStageSummary {
+  stageId: string;
+  count: number;
+  totalValue: number;
 }
 
 export interface LeadCounts {

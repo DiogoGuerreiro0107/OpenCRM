@@ -4,29 +4,36 @@ import { PrismaService } from "../prisma/prisma.service";
 import { CreateContactDto } from "./dto/create-contact.dto";
 import { UpdateContactDto } from "./dto/update-contact.dto";
 import { QueryContactsDto } from "./dto/query-contacts.dto";
+import { foldSearch } from "../common/search-text";
+import { KeyField, orderByKey, readPage } from "../common/pagination";
+
+/** Chave da lista de contactos (nome, id): cursor e ordem. */
+const NAME_KEY: KeyField[] = [
+  { field: "name", dir: "asc", kind: "string" },
+  { field: "id", dir: "asc", kind: "string" },
+];
 
 @Injectable()
 export class ContactsService {
   constructor(private readonly prisma: PrismaService) {}
 
+  /** Página da lista, por (nome, id). Os seletores pedem só a primeira, com `limit` pequeno. */
   findAll(query: QueryContactsDto) {
     const where: Prisma.ContactWhereInput = {};
-    if (query.search) {
-      where.OR = [
-        { name: { contains: query.search, mode: "insensitive" } },
-        { email: { contains: query.search, mode: "insensitive" } },
-        { phone: { contains: query.search, mode: "insensitive" } },
-        { mobilePhone: { contains: query.search, mode: "insensitive" } },
-      ];
-    }
+    // searchText = nome, email, telefone e telemóvel sem acentos (trigger); «contém» usa o índice pg_trgm.
+    const term = query.search ? foldSearch(query.search.trim()) : "";
+    if (term) where.searchText = { contains: term };
     if (query.ownerId) where.ownerId = query.ownerId;
     if (query.companyId) where.companyId = query.companyId;
 
-    return this.prisma.contact.findMany({
-      where,
-      orderBy: { name: "asc" },
-      include: { company: { select: { id: true, name: true } } },
-    });
+    return readPage(NAME_KEY, query, (after, take) =>
+      this.prisma.contact.findMany({
+        where: after ? { AND: [where, after] } : where,
+        orderBy: orderByKey(NAME_KEY),
+        take,
+        include: { company: { select: { id: true, name: true } } },
+      }),
+    );
   }
 
   async findOne(id: string) {

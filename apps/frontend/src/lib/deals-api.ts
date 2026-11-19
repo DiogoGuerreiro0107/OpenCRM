@@ -1,4 +1,5 @@
-import type { BusinessArea, Deal } from "@opencrm/shared-types";
+import type { BusinessArea, Deal, DealStageSummary, Page } from "@opencrm/shared-types";
+import type { PageParams } from "./pagination";
 import { api } from "./api";
 
 export interface DealInput {
@@ -10,12 +11,25 @@ export interface DealInput {
   type?: BusinessArea;
   estimatedMargin?: number;
   lossReason?: string;
-  contactId?: string;
-  companyId?: string;
+  /** `null` desliga (ao editar). */
+  contactId?: string | null;
+  companyId?: string | null;
 }
 
-export async function listDeals(pipelineId: string) {
-  const { data } = await api.get<Deal[]>("/deals", { params: { pipelineId } });
+export interface DealBoardFilters {
+  pipelineId: string;
+  search?: string;
+}
+
+/** Cartões de uma coluna do quadro, uma página de cada vez (pela ordem da coluna). */
+export async function listDeals(filters: DealBoardFilters & { stageId: string } & PageParams) {
+  const { data } = await api.get<Page<Deal>>("/deals", { params: filters });
+  return data;
+}
+
+/** Número de negócios e valor por fase (a coluna inteira), com os mesmos filtros. */
+export async function getDealSummary(filters: DealBoardFilters) {
+  const { data } = await api.get<DealStageSummary[]>("/deals/summary", { params: filters });
   return data;
 }
 

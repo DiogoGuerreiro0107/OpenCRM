@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { Building2, User } from "lucide-react";
 import type { Lead, LeadKind, LeadStatus } from "@opencrm/shared-types";
 import { getLeadCounts, getLeadSettings, listLeadPage, type LeadFilters } from "@/lib/leads-api";
-import { listUsers } from "@/lib/tasks-api";
+import { useDebounced } from "@/lib/pagination";
+import { UserPicker } from "@/components/pickers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
@@ -32,16 +33,6 @@ const STATUS_BADGE_CLASS: Record<LeadStatus, string> = {
 
 const dateFormat = new Intl.DateTimeFormat("pt-PT", { day: "2-digit", month: "2-digit", year: "numeric" });
 
-/** O valor só muda depois de `delay` ms sem alterações (evita um pedido por tecla na pesquisa). */
-function useDebounced<T>(value: T, delay = 300) {
-  const [debounced, setDebounced] = useState(value);
-  useEffect(() => {
-    const timer = setTimeout(() => setDebounced(value), delay);
-    return () => clearTimeout(timer);
-  }, [value, delay]);
-  return debounced;
-}
-
 function isOverdue(lead: Lead) {
   if (!lead.nextActionAt || lead.status === "CONVERTIDO" || lead.status === "PERDIDO") return false;
   return new Date(lead.nextActionAt).getTime() < new Date().setHours(0, 0, 0, 0);
@@ -57,7 +48,6 @@ export function LeadsListPage() {
   const [dialogState, setDialogState] = useState<{ lead: Lead | null } | null>(null);
 
   const { data: settings } = useQuery({ queryKey: ["leads", "settings"], queryFn: getLeadSettings });
-  const { data: users } = useQuery({ queryKey: ["users"], queryFn: listUsers });
   const showKind = settings?.mode === "BOTH";
 
   // Filtros comuns à lista e às contagens (o tipo só conta quando o filtro está visível).
@@ -102,14 +92,7 @@ export function LeadsListPage() {
             <option value="PERSON">Só pessoas</option>
           </Select>
         )}
-        <Select aria-label="Responsável" value={responsavelFilter} onChange={(e) => setResponsavelFilter(e.target.value)} className="w-52">
-          <option value="">Todos os responsáveis</option>
-          {users?.map((u) => (
-            <option key={u.id} value={u.id}>
-              {u.name}
-            </option>
-          ))}
-        </Select>
+        <UserPicker aria-label="Responsável" value={responsavelFilter} onChange={(id) => setResponsavelFilter(id)} emptyLabel="Todos os responsáveis" className="w-56" />
       </div>
 
       <div className="flex flex-wrap gap-2 border-b border-border" role="tablist">

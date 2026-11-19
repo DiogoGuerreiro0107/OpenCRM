@@ -3,6 +3,7 @@ import { Cron, CronExpression } from "@nestjs/schedule";
 import axios from "axios";
 import { CallDirection, ZadarmaAccount } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
+import { KeyField, orderByKey, readPage } from "../common/pagination";
 import { SaveZadarmaAccountDto } from "./dto/save-zadarma-account.dto";
 import { MakeCallDto } from "./dto/make-call.dto";
 import { QueryCallRecordsDto } from "./dto/query-call-records.dto";
@@ -11,6 +12,12 @@ import { ModulesService } from "../modules/modules.service";
 import { SecretsService } from "../common/secrets.service";
 
 const ZADARMA_API_BASE = "https://api.zadarma.com";
+
+/** Mais recente primeiro (startedAt, id): cursor e ordem das chamadas. */
+const CALLS_RECENT_FIRST: KeyField[] = [
+  { field: "startedAt", dir: "desc", kind: "date" },
+  { field: "id", dir: "desc", kind: "string" },
+];
 
 @Injectable()
 export class ZadarmaService {
@@ -60,10 +67,10 @@ export class ZadarmaService {
   }
 
   async listCallRecords(query: QueryCallRecordsDto) {
-    return this.prisma.callRecord.findMany({
-      where: { contactId: query.contactId, companyId: query.companyId },
-      orderBy: { startedAt: "desc" },
-    });
+    const where = { contactId: query.contactId, companyId: query.companyId };
+    return readPage(CALLS_RECENT_FIRST, query, (after, take) =>
+      this.prisma.callRecord.findMany({ where: after ? { AND: [where, after] } : where, orderBy: orderByKey(CALLS_RECENT_FIRST), take }),
+    );
   }
 
   /** Inicia uma chamada "click-to-call": a Zadarma liga primeiro para a extensão

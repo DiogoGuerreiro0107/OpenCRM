@@ -7,6 +7,7 @@ import { CreateLeadDto } from "./dto/create-lead.dto";
 import { UpdateLeadDto } from "./dto/update-lead.dto";
 import { isOpenStep } from "../workflows/workflow-steps";
 import { decodeCursor, encodeCursor } from "../common/cursor";
+import { foldSearch } from "../common/search-text";
 import { QueryLeadPageDto } from "./dto/query-lead-page.dto";
 import { assertKindAllowed, defaultKind, LeadMode, leadModeFrom } from "./lead-mode";
 import { companyNameOf, ConversionOutcome, hasPerson, MIN_PHONE_DIGITS, normalizePhone, normalizeTaxId, PHONE_SQL, TAX_ID_SQL } from "./lead-conversion";
@@ -62,8 +63,8 @@ export class LeadsService {
     if (query.status) where.status = query.status;
     if (query.kind) where.kind = query.kind;
     if (query.responsavelId) where.responsavelId = query.responsavelId;
-    const term = query.search?.trim().toLowerCase();
-    // searchText já está em minúsculas (trigger); «contém» usa o índice pg_trgm.
+    const term = query.search ? foldSearch(query.search.trim()) : "";
+    // searchText já está em minúsculas e sem acentos (trigger); «contém» usa o índice pg_trgm.
     if (term) where.searchText = { contains: term };
     return where;
   }

@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
+import { blankToNull } from "@/lib/forms";
+import { errorMessage } from "@/lib/errors";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { PreferredChannel } from "@opencrm/shared-types";
 import { deleteContact, getContact, updateContact } from "@/lib/contacts-api";
-import { listCompanies } from "@/lib/companies-api";
-import { listUsers } from "@/lib/tasks-api";
+import { CompanyPicker, UserPicker } from "@/components/pickers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -40,8 +41,6 @@ export function ContactDetailPage() {
     queryFn: () => getContact(id!),
     enabled: !!id,
   });
-  const { data: companies } = useQuery({ queryKey: ["companies"], queryFn: () => listCompanies() });
-  const { data: users } = useQuery({ queryKey: ["users"], queryFn: listUsers });
 
   const [form, setForm] = useState({
     name: "",
@@ -79,12 +78,8 @@ export function ContactDetailPage() {
 
   const updateMutation = useMutation({
     mutationFn: () =>
-      updateContact(id!, {
-        ...form,
-        companyId: form.companyId || undefined,
-        ownerId: form.ownerId || undefined,
-        preferredChannel: form.preferredChannel || undefined,
-      }),
+      // Campos opcionais apagados vão como null (limpam no servidor: empresa, responsável, email…).
+      updateContact(id!, { ...blankToNull(form), name: form.name }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["contacts", id] });
       queryClient.invalidateQueries({ queryKey: ["contacts"] });
@@ -133,14 +128,13 @@ export function ContactDetailPage() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="company">Empresa</Label>
-              <Select id="company" value={form.companyId} onChange={handleChange("companyId")}>
-                <option value="">Sem empresa</option>
-                {companies?.map((company) => (
-                  <option key={company.id} value={company.id}>
-                    {company.name}
-                  </option>
-                ))}
-              </Select>
+              <CompanyPicker
+                id="company"
+                value={form.companyId}
+                onChange={(id) => setForm((prev) => ({ ...prev, companyId: id }))}
+                selectedLabel={contact.companyId === form.companyId ? contact.company?.name : null}
+                emptyLabel="Sem empresa"
+              />
               {contact.company && (
                 <Link to={`/empresas/${contact.company.id}`} className="text-xs text-primary hover:underline">
                   Ver ficha da empresa
@@ -199,14 +193,7 @@ export function ContactDetailPage() {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="ownerId">Responsável</Label>
-                <Select id="ownerId" value={form.ownerId} onChange={handleChange("ownerId")}>
-                  <option value="">Sem responsável</option>
-                  {users?.map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.name}
-                    </option>
-                  ))}
-                </Select>
+                <UserPicker id="ownerId" value={form.ownerId} onChange={(id) => setForm((prev) => ({ ...prev, ownerId: id }))} />
               </div>
             </div>
             <div className="flex gap-6">
@@ -227,6 +214,9 @@ export function ContactDetailPage() {
               <Label htmlFor="notes">Notas</Label>
               <Textarea id="notes" value={form.notes} onChange={handleChange("notes")} />
             </div>
+            {updateMutation.isError && (
+              <p className="text-sm text-red-600">{errorMessage(updateMutation.error, "Não foi possível guardar o contacto.")}</p>
+            )}
             <div className="flex justify-between">
               <Button
                 type="button"

@@ -1,9 +1,8 @@
 import { useEffect, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Task, TaskPriority, TaskStatus, TaskType } from "@opencrm/shared-types";
-import { createTask, deleteTask, listUsers, updateTask } from "@/lib/tasks-api";
-import { listCompanies } from "@/lib/companies-api";
-import { listContacts } from "@/lib/contacts-api";
+import { createTask, deleteTask, updateTask } from "@/lib/tasks-api";
+import { CompanyPicker, ContactPicker, UserPicker } from "@/components/pickers";
 import { Dialog, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useCanWrite } from "@/lib/useCanWrite";
@@ -59,17 +58,6 @@ function toDateTimeLocal(iso: string | null | undefined) {
 export function TaskDialog({ open, onClose, task, defaultDueDate }: TaskDialogProps) {
   const queryClient = useQueryClient();
   const readOnly = !useCanWrite("dailyWork");
-  const { data: users } = useQuery({ queryKey: ["users"], queryFn: listUsers, enabled: open });
-  const { data: companies } = useQuery({
-    queryKey: ["companies"],
-    queryFn: () => listCompanies(),
-    enabled: open,
-  });
-  const { data: contacts } = useQuery({
-    queryKey: ["contacts"],
-    queryFn: () => listContacts(),
-    enabled: open,
-  });
 
   const [form, setForm] = useState({
     title: "",
@@ -119,8 +107,9 @@ export function TaskDialog({ open, onClose, task, defaultDueDate }: TaskDialogPr
         priority: form.priority,
         result: form.result || undefined,
         assigneeId: form.assigneeId || undefined,
-        contactId: form.contactId || undefined,
-        companyId: form.companyId || undefined,
+        // vazio = sem contacto/empresa (null limpa a ligação ao editar)
+        contactId: form.contactId || null,
+        companyId: form.companyId || null,
         reminders: reminders
           .filter((r) => r.remindAt)
           .map((r) => ({ remindAt: new Date(r.remindAt).toISOString(), message: r.message || undefined })),
@@ -212,37 +201,33 @@ export function TaskDialog({ open, onClose, task, defaultDueDate }: TaskDialogPr
         </div>
         <div className="space-y-2">
           <Label htmlFor="assigneeId">Responsável</Label>
-          <Select id="assigneeId" value={form.assigneeId} onChange={handleChange("assigneeId")}>
-            <option value="">Eu</option>
-            {users?.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.name}
-              </option>
-            ))}
-          </Select>
+          <UserPicker
+            id="assigneeId"
+            value={form.assigneeId}
+            onChange={(id) => setForm((prev) => ({ ...prev, assigneeId: id }))}
+            emptyLabel="Eu"
+          />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-2">
             <Label htmlFor="companyId">Empresa</Label>
-            <Select id="companyId" value={form.companyId} onChange={handleChange("companyId")}>
-              <option value="">Sem empresa</option>
-              {companies?.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </Select>
+            <CompanyPicker
+              id="companyId"
+              value={form.companyId}
+              onChange={(id) => setForm((prev) => ({ ...prev, companyId: id }))}
+              selectedLabel={task?.companyId === form.companyId ? task?.company?.name : null}
+              emptyLabel="Sem empresa"
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="contactId">Contacto</Label>
-            <Select id="contactId" value={form.contactId} onChange={handleChange("contactId")}>
-              <option value="">Sem contacto</option>
-              {contacts?.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </Select>
+            <ContactPicker
+              id="contactId"
+              value={form.contactId}
+              onChange={(id) => setForm((prev) => ({ ...prev, contactId: id }))}
+              selectedLabel={task?.contactId === form.contactId ? task?.contact?.name : null}
+              emptyLabel="Sem contacto"
+            />
           </div>
         </div>
         <div className="space-y-2">
