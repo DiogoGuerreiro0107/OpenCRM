@@ -4,14 +4,17 @@ import { PrismaService } from "../prisma/prisma.service";
 import { AutomationsService } from "../automations/automations.service";
 import { WorkItemTypesService } from "../work-item-types/work-item-types.service";
 import { OPEN_WORK_ITEM_STATUSES, isOpenStatus } from "./work-item-status";
+import { resolveWorkItemStep } from "./work-item-steps";
+import { DEFAULT_WORK_ITEM_TYPE } from "../work-item-types/system-types";
 import { CreateTaskDto } from "./dto/create-task.dto";
 import { UpdateTaskDto } from "./dto/update-task.dto";
-import { QueryTaskCalendarDto, QueryTasksDto } from "./dto/query-tasks.dto";
+import { QueryTaskBoardDto, QueryTaskCalendarDto, QueryTasksDto, TaskFiltersDto } from "./dto/query-tasks.dto";
 import { KeyField, orderByKey, readPage } from "../common/pagination";
 import { foldSearch } from "../common/search-text";
 
 const TASK_INCLUDE = {
   type: { select: { id: true, name: true, icon: true, color: true } },
+  step: { select: { id: true, name: true, category: true } },
   assignee: { select: { id: true, name: true } },
   contact: { select: { id: true, name: true } },
   company: { select: { id: true, name: true } },
@@ -51,13 +54,14 @@ export class TasksService {
     private readonly types: WorkItemTypesService,
   ) {}
 
-  /** Página da lista de tarefas. */
-  findAll(query: QueryTasksDto) {
+  /** Filtros comuns à lista e ao quadro por passos. */
+  private filtersWhere(query: TaskFiltersDto): Prisma.WorkItemWhereInput {
     const where: Prisma.WorkItemWhereInput = {};
     const term = query.search ? foldSearch(query.search.trim()) : "";
     if (term) where.searchText = { contains: term };
     if (query.status) where.status = query.status;
     if (query.typeId) where.typeId = query.typeId;
+    if (query.stepId) where.stepId = query.stepId;
     if (query.priority) where.priority = query.priority;
     if (query.assigneeId) where.assigneeId = query.assigneeId;
     if (query.companyId) where.companyId = query.companyId;
@@ -78,7 +82,12 @@ export class TasksService {
       where.status = { in: OPEN_WORK_ITEM_STATUSES };
       where.dueDate = query.overdue === "true" ? { lt: startOfToday } : { gte: startOfToday, lt: startOfTomorrow };
     }
+    return where;
+  }
 
+  /** Página da lista de tarefas (ou de uma coluna do quadro, com `stepId`). */
+  findAll(query: QueryTasksDto) {
+    const where = this.filtersWhere(query);
     return readPage(
       TASK_KEY,
       query,
@@ -131,6 +140,12 @@ export class TasksService {
     return { items, countsByDay };
   }
 
+  /** Quadro de um tipo com passos: quantas tarefas há em cada passo, com os mesmos filtros da lista. */
+  async board(query: QueryTaskBoardDto) {
+    const grouped = await this.prisma.workItem.groupBy({ by: ["stepId"], where: this.filtersWhere(query), _count: { _all: true } });
+    return grouped.filter((g) => g.stepId).map((g) => ({ stepId: g.stepId as string, count: g._count._all }));
+  }
+
   async findOne(id: string) {
     const task = await this.prisma.workItem.findUnique({ where: { id }, include: TASK_INCLUDE });
     if (!task) throw new NotFoundException("Tarefa não encontrada");
@@ -140,9 +155,13 @@ export class TasksService {
   async create(dto: CreateTaskDto, creatorId: string) {
     if (dto.typeId) await this.types.assertUsable(dto.typeId);
     const { reminders, ...rest } = dto;
+    // Num tipo com passos, o passo decide o estado (docs/plano-fase-2-itens-de-trabalho.md, pacote 2b).
+    const step = await resolveWorkItemStep(this.prisma, { typeId: dto.typeId ?? DEFAULT_WORK_ITEM_TYPE, stepId: dto.stepId, status: dto.status });
     return this.prisma.workItem.create({
       data: {
         ...rest,
+        stepId: step.stepId,
+        status: step.status,
         assigneeId: dto.assigneeId ?? creatorId,
         dueDate: dto.dueDate ? new Date(dto.dueDate) : undefined,
         reminders: reminders
@@ -159,10 +178,19 @@ export class TasksService {
     if (dto.typeId) await this.types.assertUsable(dto.typeId, existing.typeId);
     const { reminders, ...rest } = dto;
 
+    // Passo e estado só se resolvem quando algum deles (ou o tipo) vem no pedido; editar o título não mexe no passo.
+    const typeId = dto.typeId ?? existing.typeId;
+    const touchesStep = typeId !== existing.typeId || dto.stepId !== undefined || dto.status !== undefined;
+    const step = touchesStep
+      ? await resolveWorkItemStep(this.prisma, { typeId, stepId: dto.stepId, status: dto.status, currentStepId: existing.stepId }, existing.status)
+      : null;
+    const nextStatus = step?.status ?? existing.status;
+
     const task = await this.prisma.workItem.update({
       where: { id },
       data: {
         ...rest,
+        ...(step ? { stepId: step.stepId, status: nextStatus } : {}),
         dueDate: dto.dueDate !== undefined ? (dto.dueDate ? new Date(dto.dueDate) : null) : undefined,
         reminders:
           reminders !== undefined
@@ -176,7 +204,7 @@ export class TasksService {
     });
 
     // Fechar (concluir ou cancelar) regista-se na timeline da tarefa e dos registos ligados.
-    const closedAs = dto.status && dto.status !== existing.status && !isOpenStatus(dto.status) ? dto.status : null;
+    const closedAs = nextStatus !== existing.status && !isOpenStatus(nextStatus) ? nextStatus : null;
     if (closedAs) {
       const description = `Tarefa ${closedAs === "DONE" ? "concluída" : "cancelada"}: "${task.title}".`;
       const events: { entityType: "CONTACT" | "COMPANY" | "DEAL" | "LEAD" | "TASK"; entityId: string }[] = [
@@ -202,7 +230,11 @@ export class TasksService {
 
   async remove(id: string) {
     await this.ensureExists(id);
-    await this.prisma.workItem.delete({ where: { id } });
+    // Os valores dos campos personalizados não têm chave estrangeira (polimórficos): apagam-se juntamente.
+    await this.prisma.$transaction([
+      this.prisma.customFieldValue.deleteMany({ where: { entityType: "WORK_ITEM", entityId: id } }),
+      this.prisma.workItem.delete({ where: { id } }),
+    ]);
   }
 
   private async ensureExists(id: string) {

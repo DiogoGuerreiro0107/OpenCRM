@@ -38,6 +38,18 @@ export class WorkItemTypesController {
     return this.types.update(id, dto);
   }
 
+  @Audit("work_item_type.workflow_added", { target: "work_item_type" })
+  @Post(":id/workflow")
+  addWorkflow(@Param("id") id: string) {
+    return this.types.addWorkflow(id);
+  }
+
+  @Audit("work_item_type.workflow_removed", { target: "work_item_type" })
+  @Delete(":id/workflow")
+  removeWorkflow(@Param("id") id: string) {
+    return this.types.removeWorkflow(id);
+  }
+
   @Audit("work_item_type.deleted", { target: "work_item_type" })
   @Delete(":id")
   remove(@Param("id") id: string) {

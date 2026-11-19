@@ -1,6 +1,8 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { Company, Contact, Lead, Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
+import { resolveWorkItemStep } from "../tasks/work-item-steps";
+import { DEFAULT_WORK_ITEM_TYPE } from "../work-item-types/system-types";
 import { WebhooksService } from "../webhooks/webhooks.service";
 import { ModulesService } from "../modules/modules.service";
 import { CreateLeadDto } from "./dto/create-lead.dto";
@@ -133,10 +135,13 @@ export class LeadsService {
 
     const dueDate = new Date();
     dueDate.setDate(dueDate.getDate() + 1);
+    // Tipo por omissão («Tarefa»); se o administrador lhe deu passos, entra no primeiro passo «por fazer».
+    const step = await resolveWorkItemStep(this.prisma, { typeId: DEFAULT_WORK_ITEM_TYPE, status: "PENDING" });
     await this.prisma.workItem.create({
       data: {
         title: `Contactar lead: ${lead.name}`,
         status: "PENDING",
+        stepId: step.stepId,
         dueDate,
         assigneeId: lead.responsavelId ?? creatorId,
         leadId: lead.id,

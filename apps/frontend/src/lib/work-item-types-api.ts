@@ -31,3 +31,15 @@ export async function reorderWorkItemTypes(ids: string[]) {
   const { data } = await api.patch<WorkItemType[]>("/work-item-types/order", { ids });
   return data;
 }
+
+/** Dá passos a um tipo (os 4 por omissão); cada tarefa vai para o passo do seu estado. */
+export async function addWorkItemTypeWorkflow(id: string) {
+  const { data } = await api.post<WorkItemType>(`/work-item-types/${id}/workflow`);
+  return data;
+}
+
+/** Tira os passos a um tipo: as tarefas ficam sem passo e mantêm o estado. */
+export async function removeWorkItemTypeWorkflow(id: string) {
+  const { data } = await api.delete<WorkItemType>(`/work-item-types/${id}/workflow`);
+  return data;
+}

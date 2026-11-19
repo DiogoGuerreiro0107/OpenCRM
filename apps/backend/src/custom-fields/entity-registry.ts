@@ -17,6 +17,16 @@ export interface CustomFieldEntity {
   /** Área de permissões que decide quem pode preencher/alterar valores (a mesma da edição do registo; configurável). */
   writeArea: WriteArea;
   exists: (prisma: PrismaService, id: string) => Promise<boolean>;
+  /**
+   * Âmbitos dentro do tipo de registo (Fase 2b): um campo pode aplicar-se a todos ("") ou só a um âmbito (nas tarefas,
+   * um tipo de tarefa). Sem isto, só "" é aceite.
+   */
+  scopes?: {
+    label: string;
+    isValid: (prisma: PrismaService, scopeId: string) => Promise<boolean>;
+    /** Âmbito de um registo (o tipo da tarefa); `null` se o registo não existir. */
+    of: (prisma: PrismaService, entityId: string) => Promise<string | null>;
+  };
 }
 
 export const CUSTOM_FIELD_ENTITIES = {
@@ -43,6 +53,18 @@ export const CUSTOM_FIELD_ENTITIES = {
     module: "deals",
     writeArea: "deals",
     exists: async (prisma, id) => (await prisma.deal.count({ where: { id } })) > 0,
+  },
+  /** Tarefas (itens de trabalho, Fase 2b): campos para todas, ou só para um tipo de tarefa. */
+  WORK_ITEM: {
+    label: "Tarefas",
+    module: null,
+    writeArea: "dailyWork",
+    exists: async (prisma, id) => (await prisma.workItem.count({ where: { id } })) > 0,
+    scopes: {
+      label: "tipo de tarefa",
+      isValid: async (prisma, scopeId) => (await prisma.workItemType.count({ where: { id: scopeId } })) > 0,
+      of: async (prisma, entityId) => (await prisma.workItem.findUnique({ where: { id: entityId }, select: { typeId: true } }))?.typeId ?? null,
+    },
   },
 } satisfies Record<string, CustomFieldEntity>;
 

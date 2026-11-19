@@ -7,7 +7,7 @@ import { CreateCustomFieldDto } from "./dto/create-custom-field.dto";
 import { UpdateCustomFieldDto } from "./dto/update-custom-field.dto";
 import { QueryCustomFieldsDto } from "./dto/query-custom-fields.dto";
 import { UpsertCustomFieldValuesDto } from "./dto/upsert-custom-field-values.dto";
-import { CUSTOM_FIELD_ENTITIES, CustomFieldEntityType } from "./entity-registry";
+import { CUSTOM_FIELD_ENTITIES, CustomFieldEntity, CustomFieldEntityType } from "./entity-registry";
 import { fromValueColumns, toValueColumns } from "./custom-field-values";
 
 function slugify(label: string) {
@@ -29,7 +29,7 @@ export class CustomFieldsService {
   ) {}
 
   /** Tipo de registo de um módulo desligado = como se não existisse (404), tal como as rotas do módulo. */
-  private entity(entityType: CustomFieldEntityType) {
+  private entity(entityType: CustomFieldEntityType): CustomFieldEntity {
     const entity = CUSTOM_FIELD_ENTITIES[entityType];
     if (entity.module && !this.modules.isEnabled(entity.module)) throw new NotFoundException();
     return entity;
@@ -44,18 +44,34 @@ export class CustomFieldsService {
   }
 
   async create(dto: CreateCustomFieldDto) {
-    this.entity(dto.entityType);
+    const entity = this.entity(dto.entityType);
     const fieldName = dto.fieldName ? slugify(dto.fieldName) : slugify(dto.fieldLabel);
     if (!fieldName) throw new BadRequestException("Nome do campo inválido");
 
-    const existing = await this.prisma.customField.findUnique({
-      where: { entityType_fieldName: { entityType: dto.entityType, fieldName } },
+    const scopeId = dto.scopeId?.trim() ?? "";
+    if (scopeId) {
+      if (!entity.scopes) throw new BadRequestException(`Os campos de ${entity.label.toLowerCase()} não têm âmbito`);
+      if (!(await entity.scopes.isValid(this.prisma, scopeId))) throw new BadRequestException(`O ${entity.scopes.label} indicado não existe`);
+    }
+
+    // Um nome não se repete entre campos que se aplicam aos mesmos registos: um campo de todos ("") colide com os de
+    // qualquer âmbito, e um de um âmbito com os de todos e os desse âmbito.
+    const existing = await this.prisma.customField.findFirst({
+      where: { entityType: dto.entityType, fieldName, ...(scopeId ? { scopeId: { in: ["", scopeId] } } : {}) },
     });
     if (existing) throw new BadRequestException("Já existe um campo com este nome para esta entidade");
 
     return this.prisma.customField.create({
-      data: { ...dto, fieldName, options: dto.options as Prisma.InputJsonValue },
+      data: { ...dto, scopeId, fieldName, options: dto.options as Prisma.InputJsonValue },
     });
+  }
+
+  /** Âmbitos cujos campos se aplicam a um registo: todos ("") e, nos tipos com âmbitos, o do registo. */
+  private async scopesOf(entityType: CustomFieldEntityType, entityId: string) {
+    const scopes = (CUSTOM_FIELD_ENTITIES[entityType] as CustomFieldEntity).scopes;
+    if (!scopes) return [""];
+    const scope = await scopes.of(this.prisma, entityId);
+    return scope ? ["", scope] : [""];
   }
 
   async update(id: string, dto: UpdateCustomFieldDto) {
@@ -86,9 +102,11 @@ export class CustomFieldsService {
 
   async getValues(entityType: CustomFieldEntityType, entityId: string) {
     this.entity(entityType);
+    const scopeIds = await this.scopesOf(entityType, entityId);
     const values = await this.prisma.customFieldValue.findMany({
-      // Só os campos deste tipo de registo (um valor gravado por engano noutro tipo, antes da 0b, não aparece).
-      where: { entityType, entityId, customField: { entityType } },
+      // Só os campos deste tipo de registo (um valor gravado por engano noutro tipo, antes da 0b, não aparece) e que
+      // se aplicam a ele (numa tarefa que mudou de tipo, os valores dos campos do tipo antigo ficam guardados, ocultos).
+      where: { entityType, entityId, customField: { entityType, scopeId: { in: scopeIds } } },
       include: { customField: true },
     });
     return values.map((v) => ({ customFieldId: v.customFieldId, value: fromValueColumns(v.customField.fieldType, v) }));
@@ -110,6 +128,7 @@ export class CustomFieldsService {
     if (new Set(fieldIds).size !== fieldIds.length) throw new BadRequestException("O mesmo campo aparece mais de uma vez");
     const fields = await this.prisma.customField.findMany({ where: { id: { in: fieldIds } } });
     const fieldById = new Map(fields.map((f) => [f.id, f]));
+    const scopeIds = await this.scopesOf(dto.entityType, dto.entityId);
 
     // Valida TUDO antes de gravar o que quer que seja.
     const writes = dto.values.map(({ customFieldId, value }) => {
@@ -117,6 +136,9 @@ export class CustomFieldsService {
       if (!field) throw new NotFoundException(`Campo personalizado ${customFieldId} não encontrado`);
       if (field.entityType !== dto.entityType) {
         throw new BadRequestException(`O campo «${field.fieldLabel}» não pertence a ${entity.label.toLowerCase()}`);
+      }
+      if (!scopeIds.includes(field.scopeId)) {
+        throw new BadRequestException(`O campo «${field.fieldLabel}» não se aplica a este ${entity.scopes?.label ?? "registo"}`);
       }
       return { customFieldId, data: toValueColumns(field, value) };
     });

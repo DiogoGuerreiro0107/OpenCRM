@@ -21,6 +21,7 @@ import { NewContactPage } from "@/pages/contacts/NewContactPage";
 import { ContactDetailPage } from "@/pages/contacts/ContactDetailPage";
 import { DealsBoardPage } from "@/pages/deals/DealsBoardPage";
 import { TasksListPage } from "@/pages/tasks/TasksListPage";
+import { WorkItemTypePage } from "@/pages/tasks/WorkItemTypePage";
 import { EmailInboxPage } from "@/pages/email/EmailInboxPage";
 import { LeadsListPage } from "@/pages/leads/LeadsListPage";
 import { CustomFieldsSettingsPage } from "@/pages/settings/CustomFieldsSettingsPage";
@@ -50,6 +51,7 @@ export default function App() {
           <Route path="/contactos/:id" element={<ContactDetailPage />} />
           <Route path="/funis" element={<RequireModule id="deals"><DealsBoardPage /></RequireModule>} />
           <Route path="/tarefas" element={<TasksListPage />} />
+          <Route path="/tarefas/tipo/:typeId" element={<WorkItemTypePage />} />
           <Route path="/email" element={<RequireModule id="email"><EmailInboxPage /></RequireModule>} />
           <Route path="/leads" element={<RequireModule id="leads"><LeadsListPage /></RequireModule>} />
           <Route path="/configuracoes/campos-personalizados" element={<RequireRole roles={ADMIN_ONLY}><CustomFieldsSettingsPage /></RequireRole>} />

@@ -149,6 +149,7 @@ Estado atual: **todas as fases do roadmap consolidado e a revisão final conclu�
   - [x] Fase 0 da reorganização concluída: campos personalizados genéricos com validação (0b), funis sobre fluxos genéricos (0c) e permissões de escrita configuráveis em Configurações > Permissões (0d) — ver [docs/plano-fase-0-fundacoes.md](docs/plano-fase-0-fundacoes.md)
   - [x] Módulos opcionais (Fase 0a da [reorganização modular](docs/plano-reorganizacao-modular.md)): leads, funis/negócios, email, telefonia e automações podem ser ligados/desligados em Configurações > Módulos, sem apagar dados — ver [docs/plano-fase-0-fundacoes.md](docs/plano-fase-0-fundacoes.md)
   - [x] Tipos de tarefa configuráveis em Configurações > Tipos de tarefa (nome, ícone, cor, ordem, ativo) e estado «cancelada»; as tarefas passam a ser o item de trabalho da agenda (Fase 2a) — ver [docs/plano-fase-2-itens-de-trabalho.md](docs/plano-fase-2-itens-de-trabalho.md)
+  - [x] Passos por tipo de tarefa (o estado vem do passo), quadro por passos na página de cada tipo e campos personalizados por tipo (Fase 2b)
 
 ### Por fazer (backlog)
 

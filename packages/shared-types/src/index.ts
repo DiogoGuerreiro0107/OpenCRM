@@ -154,6 +154,26 @@ export interface WorkItemType {
   active: boolean;
   sortOrder: number;
   itemCount: number;
+  /** Fluxo de passos (Fase 2b); `null` = o tipo só usa o estado. */
+  workflowId: string | null;
+  /** Passos do fluxo, pela ordem (vazio sem fluxo). */
+  steps: WorkItemStep[];
+}
+
+/** Passo de um tipo de tarefa com passos. O estado da tarefa deriva da categoria (OPEN → PENDING). */
+export interface WorkItemStep {
+  id: string;
+  name: string;
+  order: number;
+  category: WorkflowStepCategory;
+}
+
+/** Fluxo lido pelas rotas genéricas (GET /workflows/:id), com quantos itens há em cada passo. */
+export interface WorkflowView {
+  id: string;
+  entityType: string;
+  name: string;
+  steps: Array<WorkItemStep & { outcome: "WON" | "LOST" | null; itemCount: number }>;
 }
 
 export type WorkItemTypeSummary = Pick<WorkItemType, "id" | "name" | "icon" | "color">;
@@ -192,6 +212,9 @@ export interface Task {
   status: TaskStatus;
   typeId: string;
   type: WorkItemTypeSummary;
+  /** Passo (só em tipos com passos). */
+  stepId: string | null;
+  step: Pick<WorkItemStep, "id" | "name" | "category"> | null;
   priority: TaskPriority;
   result: string | null;
   dueDate: string | null;
@@ -319,7 +342,7 @@ export interface LeadConversionResult {
   outcome: { company: ConversionOutcome | null; contact: ConversionOutcome | null };
 }
 
-export type CustomFieldEntityType = "COMPANY" | "CONTACT" | "LEAD" | "DEAL";
+export type CustomFieldEntityType = "COMPANY" | "CONTACT" | "LEAD" | "DEAL" | "WORK_ITEM";
 
 export type CustomFieldType =
   | "TEXT"
@@ -337,6 +360,8 @@ export type CustomFieldType =
 export interface CustomField {
   id: string;
   entityType: CustomFieldEntityType;
+  /** "" = todos os registos do tipo; nas tarefas, o id de um tipo de tarefa (Fase 2b). */
+  scopeId: string;
   sectionName: string | null;
   fieldName: string;
   fieldLabel: string;

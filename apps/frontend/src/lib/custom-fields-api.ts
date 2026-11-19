@@ -3,6 +3,8 @@ import { api } from "./api";
 
 export interface CustomFieldInput {
   entityType: CustomFieldEntityType;
+  /** Âmbito ("" = todos); nas tarefas, o id de um tipo. Só ao criar. */
+  scopeId?: string;
   sectionName?: string;
   fieldName?: string;
   fieldLabel: string;
@@ -25,7 +27,7 @@ export async function createCustomField(input: CustomFieldInput) {
   return data;
 }
 
-export async function updateCustomField(id: string, input: Partial<Omit<CustomFieldInput, "entityType">>) {
+export async function updateCustomField(id: string, input: Partial<Omit<CustomFieldInput, "entityType" | "scopeId">>) {
   const { data } = await api.patch<CustomField>(`/custom-fields/${id}`, input);
   return data;
 }
