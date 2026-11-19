@@ -6,6 +6,9 @@ export interface TaskInput {
   title: string;
   description?: string;
   dueDate?: string;
+  /** Horário marcado (Fase 2d); `null` limpa ao editar. */
+  scheduledStart?: string | null;
+  scheduledEnd?: string | null;
   status?: TaskStatus;
   /** Tipo de tarefa (sem ele, «Tarefa»). */
   typeId?: string;

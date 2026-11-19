@@ -151,6 +151,7 @@ Estado atual: **todas as fases do roadmap consolidado e a revisão final conclu�
   - [x] Tipos de tarefa configuráveis em Configurações > Tipos de tarefa (nome, ícone, cor, ordem, ativo) e estado «cancelada»; as tarefas passam a ser o item de trabalho da agenda (Fase 2a) — ver [docs/plano-fase-2-itens-de-trabalho.md](docs/plano-fase-2-itens-de-trabalho.md)
   - [x] Passos por tipo de tarefa (o estado vem do passo), quadro por passos na página de cada tipo e campos personalizados por tipo (Fase 2b)
   - [x] Menu configurável em Configurações > Menu (ordem, nomes, grupos, ocultar; tipos de tarefa com item próprio) e registo de contribuições dos módulos no frontend, com as páginas carregadas à parte (Fase 2c)
+  - [x] Agenda (mês, semana e dia) com tarefas e próxima ação das leads, e horário marcado nas tarefas além do prazo (Fase 2d)
 
 ### Por fazer (backlog)
 

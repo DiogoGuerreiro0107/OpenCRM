@@ -28,6 +28,8 @@ const CORE_CONTROLLERS = [
   // Rotas genéricas de fluxos (2b): o módulo de cada fluxo é verificado no serviço (registo de fluxos).
   "WorkflowsController",
   "MenuSettingsController",
+  // Agenda (2d): o módulo de cada fonte é verificado no serviço (registo de fontes).
+  "AgendaController",
   "DashboardController",
   "ModulesController",
 ];

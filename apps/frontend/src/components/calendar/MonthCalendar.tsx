@@ -9,7 +9,7 @@ function startOfMonth(date: Date) {
   return new Date(date.getFullYear(), date.getMonth(), 1);
 }
 
-function toDayKey(date: Date) {
+export function toDayKey(date: Date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
@@ -24,7 +24,7 @@ export function monthGridRange(current: Date) {
   return { from: days[0].toISOString(), to: end.toISOString() };
 }
 
-function buildMonthGrid(current: Date): Date[] {
+export function buildMonthGrid(current: Date): Date[] {
   const first = startOfMonth(current);
   const firstWeekday = (first.getDay() + 6) % 7; // 0 = Monday
   const gridStart = new Date(first);

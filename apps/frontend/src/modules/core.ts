@@ -1,5 +1,5 @@
 import { lazy } from "react";
-import { Building2, CheckSquare, KeyRound, LayoutDashboard, ListChecks, PanelLeft, Puzzle, ScrollText, Settings, ShieldCheck, UserCog, Users, Webhook } from "lucide-react";
+import { Building2, CalendarDays, CheckSquare, KeyRound, LayoutDashboard, ListChecks, PanelLeft, Puzzle, ScrollText, Settings, ShieldCheck, UserCog, Users, Webhook } from "lucide-react";
 import { ADMIN_ONLY } from "@/lib/permissions";
 import type { FrontendModule } from "./types";
 
@@ -8,6 +8,7 @@ export const coreModule: FrontendModule = {
   id: "core",
   nav: [
     { id: "core:dashboard", label: "Dashboard", icon: LayoutDashboard, to: "/dashboard", section: "main", order: 0 },
+    { id: "core:agenda", label: "Agenda", icon: CalendarDays, to: "/agenda", section: "main", order: 25 },
     { id: "core:tasks", label: "Tarefas", icon: CheckSquare, to: "/tarefas", section: "main", order: 30 },
     { id: "core:companies", label: "Empresas", icon: Building2, to: "/empresas", section: "main", order: 50 },
     { id: "core:contacts", label: "Contactos", icon: Users, to: "/contactos", section: "main", order: 60 },
@@ -29,6 +30,7 @@ export const coreModule: FrontendModule = {
     { path: "/contactos", page: lazy(() => import("@/pages/contacts/ContactsListPage").then((m) => ({ default: m.ContactsListPage }))) },
     { path: "/contactos/novo", page: lazy(() => import("@/pages/contacts/NewContactPage").then((m) => ({ default: m.NewContactPage }))) },
     { path: "/contactos/:id", page: lazy(() => import("@/pages/contacts/ContactDetailPage").then((m) => ({ default: m.ContactDetailPage }))) },
+    { path: "/agenda", page: lazy(() => import("@/pages/agenda/AgendaPage").then((m) => ({ default: m.AgendaPage }))) },
     { path: "/tarefas", page: lazy(() => import("@/pages/tasks/TasksListPage").then((m) => ({ default: m.TasksListPage }))) },
     { path: "/tarefas/tipo/:typeId", page: lazy(() => import("@/pages/tasks/WorkItemTypePage").then((m) => ({ default: m.WorkItemTypePage }))) },
     { path: "/configuracoes/campos-personalizados", roles: ADMIN_ONLY, page: lazy(() => import("@/pages/settings/CustomFieldsSettingsPage").then((m) => ({ default: m.CustomFieldsSettingsPage }))) },
@@ -41,4 +43,5 @@ export const coreModule: FrontendModule = {
     { path: "/configuracoes/webhooks", roles: ADMIN_ONLY, page: lazy(() => import("@/pages/settings/WebhooksPage").then((m) => ({ default: m.WebhooksPage }))) },
     { path: "/configuracoes/auditoria", roles: ADMIN_ONLY, page: lazy(() => import("@/pages/settings/AuditPage").then((m) => ({ default: m.AuditPage }))) },
   ],
+  agendaSources: [{ id: "WORK_ITEM", label: "Tarefas", open: lazy(() => import("@/pages/agenda/openers").then((m) => ({ default: m.TaskOpener }))) }],
 };

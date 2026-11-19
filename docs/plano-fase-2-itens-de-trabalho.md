@@ -326,6 +326,94 @@ id e de uma `key` à parte.
 
 ---
 
+## Pacote 2d — Agenda (plano, 2026-11-19)
+
+### Modelo
+- **Horário marcado** opcional na tarefa: `WorkItem.scheduledStart` e `scheduledEnd`. Uma visita tem hora marcada;
+  uma tarefa tem prazo. Restrição na base de dados: o fim exige início e não pode ser antes dele.
+- **Momento na agenda** (`agendaAt`, coluna interna com índice, mantida pelo trigger que já calcula a pesquisa e a
+  ordem): o início marcado quando existe, senão o prazo. A agenda e o calendário das tarefas passam a usá-lo, por isso
+  uma visita marcada sem prazo também aparece. Não sai nas respostas (como `dueSort`).
+- Um horário que atravessa vários dias aparece no dia em que começa (simplificação; mostra-se a hora de fim).
+
+### Fontes da agenda
+- **No servidor** (`src/agenda/agenda-sources.ts`), um registo de fontes, como os de fluxos e campos personalizados:
+  - **Tarefas** (núcleo): pelo `agendaAt`, com o tipo (ícone e cor), o estado e o responsável; com horário marcado
+    mostram início e fim, senão a hora do prazo.
+  - **Próxima ação das leads** (módulo `leads`): leads em aberto (novo, contactado, sem resposta) com próxima ação no
+    intervalo, como entradas de dia inteiro (a próxima ação é só uma data). Com o módulo desligado, a fonte não existe.
+  - As férias e as visitas dos mapas juntam-se depois com uma linha cada.
+- **No frontend**, a mesma fonte regista-se no registo de contribuições (2c): o nome do filtro e o que acontece ao abrir
+  uma entrada (a tarefa abre o diálogo da tarefa; a lead abre o diálogo da lead).
+
+### API
+- `GET /agenda?from&to&tz&perDay&sources&typeId&assigneeId`: entradas de todas as fontes pedidas no intervalo, com o
+  dia (no fuso do browser) e quantas há em cada dia.
+  - Intervalo no máximo de 62 dias; `perDay` entre 1 e 50 (o mês pede 3, a semana 20, o dia 50); o resto aparece como
+    «+N», como no calendário atual. Cada fonte devolve só as primeiras de cada dia, por isso a resposta tem um tamanho
+    limitado seja qual for o volume.
+  - `assigneeId` filtra o responsável nas duas fontes (ver a agenda de um colega); `typeId` só se aplica às tarefas e,
+    quando vem, a fonte das leads não entra.
+  - Todos os utilizadores com sessão leem (as tarefas e as leads já são visíveis a todos).
+- `/tasks`: `scheduledStart` e `scheduledEnd` na escrita e na leitura; o calendário das tarefas passa a usar o momento na
+  agenda.
+
+### Interface
+- Página **Agenda** (`/agenda`, item «Agenda» no menu principal, configurável como os outros):
+  - vistas **mês** (a grelha atual), **semana** (7 colunas, entradas pela hora) e **dia** (lista pela hora);
+  - navegação anterior/seguinte/hoje; filtros por responsável, por tipo de tarefa e por fonte;
+  - clicar num dia vazio cria uma tarefa nesse dia (quem pode escrever).
+- **Formulário da tarefa:** «Marcado para» (início e fim, opcionais) além do prazo.
+
+### Validação prevista
+- Migração ensaiada numa cópia da base de desenvolvimento (dados iguais; `agendaAt` = prazo em todas as tarefas
+  existentes), reversão testada, sem desvio face ao esquema.
+- **e2e:** horário marcado (gravar, limpar, fim antes do início recusado, também na base de dados); `agendaAt` segue o
+  início marcado ou o prazo; agenda com as duas fontes, dias no fuso pedido, `perDay` e contagens, filtros
+  (responsável, tipo, fontes), leads fechadas fora, módulo de leads desligado tira a fonte, intervalo e parâmetros
+  inválidos recusados; o calendário das tarefas usa o horário marcado.
+- **Prova por mutação** nas regras novas; **browser** (base de testes): as três vistas, filtros, abrir uma tarefa e uma
+  lead a partir da agenda, marcar horário no formulário.
+
+### Execução do 2d (2026-11-19)
+**Implementado como planeado**, com estes pormenores decididos na implementação:
+- Dentro de um dia, as entradas de dia inteiro vêm primeiro, depois pela hora. O corte em `perDay` faz-se **depois** de
+  juntar as fontes, por isso o «+N» conta todas.
+- O fuso horário passou para `src/common/time-zone.ts`, partilhado pelo calendário das tarefas e pela agenda.
+- No frontend, cada fonte regista o filtro e o diálogo que abre uma entrada (`src/pages/agenda/openers.tsx`, carregado
+  à parte). O item «Agenda» entra no menu entre Funis e Tarefas.
+- **Migração** `20261119160000_agenda`, ensaiada numa cópia da base de desenvolvimento:
+  - tarefas e leads iguais antes e depois, incluindo o `updatedAt`;
+  - o momento na agenda ficou igual ao prazo em todas as tarefas existentes;
+  - a reversão (`prisma/rollbacks/20261119160000_agenda.down.sql`) repõe exatamente o mesmo esquema e os mesmos dados;
+  - sem desvio face ao `schema.prisma`; aplicada à base de desenvolvimento, com cópia de segurança antes.
+- **Testes:** 11 e2e novos em `test/agenda.e2e-spec.ts` e 5 unitários (registo de fontes e fusos). Total: 270
+  unitários e 444 e2e, todos a passar.
+- **Prova por mutação:** 11 mutações.
+  - Na primeira volta escaparam duas: o corte por dia depois de juntar as fontes e o «dia inteiro primeiro».
+  - Juntei um teste para esses dois casos e, na segunda volta, as 11 foram apanhadas:
+    - fim antes do início aceite;
+    - fim sem início aceite;
+    - o calendário volta ao prazo;
+    - entram leads fechadas;
+    - o tipo não tira as leads;
+    - o módulo desligado é ignorado;
+    - `perDay` não corta a junção;
+    - o dia inteiro não vem primeiro;
+    - intervalo sem limite;
+    - o responsável não filtra as leads;
+    - o dia das tarefas é contado em UTC.
+- **Browser** (base de testes):
+  - **mês:** a lead primeiro, a visita marcada, «+7»; a lead convertida não aparece; a visita marcada sem prazo
+    aparece;
+  - **semana e dia** pela hora;
+  - **filtros:** por tipo (só visitas, com o aviso de que as leads saem) e por fonte;
+  - **abrir:** a lead e a tarefa abrem a partir da agenda;
+  - **horário marcado** pelo formulário: aparece logo na agenda;
+  - **título:** só com a primeira letra em maiúscula (antes saía «Novembro De 2026»).
+
+---
+
 ## Pacotes seguintes (esboço; cada um terá plano detalhado antes de começar)
 
 ### 2b — Passos, campos e página por tipo
@@ -335,12 +423,7 @@ Plano detalhado acima («Pacote 2b»).
 Plano detalhado acima («Pacote 2c»).
 
 ### 2d — Agenda
-- **Horário marcado** opcional (`scheduledStart`, `scheduledEnd`) além do prazo: uma visita tem hora marcada, uma tarefa
-  tem prazo. A agenda mostra o horário quando existe, senão o prazo.
-- Página **Agenda**: mês (a grelha atual), semana e dia; filtros por tipo e responsável (ver a agenda de um colega).
-  Intervalo limitado e número de itens por dia limitado com «+N», como no calendário atual.
-- **Fontes da agenda** no registo de contribuições: os itens de trabalho e a **próxima ação das leads** (segunda fonte
-  real; as férias e as visitas dos mapas juntam-se depois).
+Plano detalhado acima («Pacote 2d»).
 
 ## Decisões assumidas (a rever)
 - Renomear `Task` → `WorkItem` na base de dados e no código, mantendo `/tasks` e «Tarefas» para quem usa (como na 0c).

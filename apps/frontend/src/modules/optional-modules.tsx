@@ -12,6 +12,9 @@ export const leadsModule: FrontendModule = {
   id: "leads",
   nav: [{ id: "leads:leads", label: "Leads", icon: UserPlus, to: "/leads", section: "main", order: 10 }],
   routes: [{ path: "/leads", page: lazy(() => import("@/pages/leads/LeadsListPage").then((m) => ({ default: m.LeadsListPage }))) }],
+  agendaSources: [
+    { id: "LEAD_NEXT_ACTION", label: "Próxima ação das leads", open: lazy(() => import("@/pages/agenda/openers").then((m) => ({ default: m.LeadOpener }))) },
+  ],
 };
 
 export const dealsModule: FrontendModule = {

@@ -1,5 +1,5 @@
 import { Type } from "class-transformer";
-import { IsArray, IsDateString, IsEnum, IsOptional, IsString, MaxLength, MinLength, ValidateNested } from "class-validator";
+import { IsArray, IsDateString, IsEnum, IsOptional, IsString, MaxLength, MinLength, ValidateIf, ValidateNested } from "class-validator";
 import { WorkItemPriority, WorkItemStatus } from "@prisma/client";
 import { ReminderInputDto } from "./reminder-input.dto";
 
@@ -15,6 +15,17 @@ export class CreateTaskDto {
   @IsOptional()
   @IsDateString()
   dueDate?: string;
+
+  /** Horário marcado (Fase 2d), além do prazo. `null` limpa (ao editar). */
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsDateString()
+  scheduledStart?: string | null;
+
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsDateString()
+  scheduledEnd?: string | null;
 
   @IsOptional()
   @IsEnum(WorkItemStatus)

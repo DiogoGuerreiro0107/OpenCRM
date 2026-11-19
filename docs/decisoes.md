@@ -539,3 +539,13 @@ Terceiro pacote da [Fase 2](plano-fase-2-itens-de-trabalho.md).
   - **Ocultar não é proibir**: a página continua acessível a quem tem permissão (está escrito no ecrã).
 - **Tipos de tarefa no menu:** `WorkItemType.showInMenu` («Aparece no menu» no diálogo do tipo) dá ao tipo um item próprio, com a sua página.
 - **Validação:** 5 e2e novos (433 no total, e 265 unitários), 7 verificações da junção do menu, 9 mutações todas apanhadas, migração ensaiada e revertida até ao mesmo esquema e dados, e verificação no browser com a base de testes. Detalhes no plano, em «Execução do 2c».
+
+## Fase 2d: agenda (2026-11-19)
+Último pacote da [Fase 2](plano-fase-2-itens-de-trabalho.md).
+- **Horário marcado** opcional nas tarefas (`scheduledStart`, `scheduledEnd`), além do prazo: uma visita tem hora marcada, uma tarefa tem prazo. O fim exige início e não é antes dele (400 no serviço e restrição `CHECK` na base de dados).
+- **Momento na agenda** (`agendaAt`, coluna interna com índice, mantida pelo trigger que já calculava a pesquisa e a ordem): o início marcado, senão o prazo. A agenda e o calendário das tarefas passaram a usá-lo, por isso uma visita marcada sem prazo também aparece. Um horário de vários dias aparece no dia em que começa.
+- **Fontes da agenda**, num registo no servidor (`src/agenda/agenda-sources.ts`) e no frontend (registo de contribuições): **tarefas** (núcleo) e **próxima ação das leads em aberto** (módulo `leads`, dia inteiro). Com o módulo desligado a fonte não entra. As férias e as visitas dos mapas juntam-se depois com uma linha cada.
+  - `GET /agenda`: intervalo até 62 dias, dias no fuso do browser, `perDay` entre 1 e 50 com «+N» (cada fonte devolve só as primeiras de cada dia, por isso a resposta tem tamanho limitado). O filtro por responsável aplica-se às duas fontes; o filtro por tipo só às tarefas, e tira as leads.
+  - A próxima ação das leads é só uma data (meia-noite UTC): conta-se no dia gravado, não no fuso do browser.
+- **Página Agenda** (`/agenda`, item no menu principal, configurável como os outros): mês, semana e dia; filtros por responsável, tipo e fonte; abrir uma entrada usa o diálogo da sua fonte (tarefa ou lead); clicar num dia cria uma tarefa nesse dia.
+- **Validação:** 11 e2e e 5 unitários novos (444 e2e e 270 unitários no total), 11 mutações todas apanhadas (duas só depois de acrescentar um teste), migração ensaiada e revertida até ao mesmo esquema e dados, e verificação no browser com a base de testes. Detalhes no plano, em «Execução do 2d». **A Fase 2 fica concluída.**
