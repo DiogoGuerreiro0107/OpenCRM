@@ -10,7 +10,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
       omit: {
         company: { searchText: true },
         contact: { searchText: true },
-        task: { searchText: true, dueSort: true },
+        workItem: { searchText: true, dueSort: true },
         deal: { searchText: true },
         emailMessage: { searchText: true },
       },

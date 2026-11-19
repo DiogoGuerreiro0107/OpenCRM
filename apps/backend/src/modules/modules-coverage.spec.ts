@@ -23,6 +23,7 @@ const CORE_CONTROLLERS = [
   "ContactsController",
   "TimelineController",
   "TasksController",
+  "WorkItemTypesController",
   "CustomFieldsController",
   "DashboardController",
   "ModulesController",

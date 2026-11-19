@@ -1,3 +1,4 @@
+import { OPEN_WORK_ITEM_STATUSES } from "../tasks/work-item-status";
 import { Injectable } from "@nestjs/common";
 import { PrismaService } from "../prisma/prisma.service";
 import { ModulesService } from "../modules/modules.service";
@@ -34,11 +35,11 @@ export class DashboardService {
       this.prisma.company.count(),
       this.prisma.contact.count(),
       leadsOn ? this.prisma.lead.count({ where: { status: "NOVO" } }) : Promise.resolve(null),
-      this.prisma.task.count({
-        where: { status: { not: "DONE" }, dueDate: { gte: startOfToday, lt: startOfTomorrow } },
+      this.prisma.workItem.count({
+        where: { status: { in: OPEN_WORK_ITEM_STATUSES }, dueDate: { gte: startOfToday, lt: startOfTomorrow } },
       }),
-      this.prisma.task.count({
-        where: { status: { not: "DONE" }, dueDate: { lt: startOfToday } },
+      this.prisma.workItem.count({
+        where: { status: { in: OPEN_WORK_ITEM_STATUSES }, dueDate: { lt: startOfToday } },
       }),
       dealsOn
         ? this.prisma.deal.count({ where: { stage: OPEN_STEP_WHERE, updatedAt: { lt: staleThreshold } } })

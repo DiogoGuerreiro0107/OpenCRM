@@ -24,6 +24,7 @@ import { TasksListPage } from "@/pages/tasks/TasksListPage";
 import { EmailInboxPage } from "@/pages/email/EmailInboxPage";
 import { LeadsListPage } from "@/pages/leads/LeadsListPage";
 import { CustomFieldsSettingsPage } from "@/pages/settings/CustomFieldsSettingsPage";
+import { WorkItemTypesSettingsPage } from "@/pages/settings/WorkItemTypesSettingsPage";
 import { EmailTemplatesSettingsPage } from "@/pages/settings/EmailTemplatesSettingsPage";
 import { AutomationsSettingsPage } from "@/pages/settings/AutomationsSettingsPage";
 import { ZadarmaSettingsPage } from "@/pages/settings/ZadarmaSettingsPage";
@@ -52,6 +53,7 @@ export default function App() {
           <Route path="/email" element={<RequireModule id="email"><EmailInboxPage /></RequireModule>} />
           <Route path="/leads" element={<RequireModule id="leads"><LeadsListPage /></RequireModule>} />
           <Route path="/configuracoes/campos-personalizados" element={<RequireRole roles={ADMIN_ONLY}><CustomFieldsSettingsPage /></RequireRole>} />
+          <Route path="/configuracoes/tipos-de-tarefa" element={<RequireRole roles={ADMIN_ONLY}><WorkItemTypesSettingsPage /></RequireRole>} />
           <Route path="/configuracoes/templates-email" element={<RequireWrite area="emailTemplates"><RequireModule id="email"><EmailTemplatesSettingsPage /></RequireModule></RequireWrite>} />
           <Route path="/configuracoes/automacoes" element={<RequireRole roles={ADMIN_ONLY}><RequireModule id="automations"><AutomationsSettingsPage /></RequireModule></RequireRole>} />
           <Route path="/configuracoes/chaves-api" element={<RequireRole roles={ADMIN_ONLY}><ApiKeysPage /></RequireRole>} />

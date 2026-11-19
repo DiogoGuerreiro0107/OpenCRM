@@ -1,4 +1,4 @@
-import type { Task, TaskPriority, TaskStatus, TaskType, UserSummary, Page } from "@opencrm/shared-types";
+import type { Task, TaskPriority, TaskStatus, UserSummary, Page } from "@opencrm/shared-types";
 import type { PageParams } from "./pagination";
 import { api } from "./api";
 
@@ -7,7 +7,8 @@ export interface TaskInput {
   description?: string;
   dueDate?: string;
   status?: TaskStatus;
-  type?: TaskType;
+  /** Tipo de tarefa (sem ele, «Tarefa»). */
+  typeId?: string;
   priority?: TaskPriority;
   result?: string;
   assigneeId?: string;
@@ -20,7 +21,7 @@ export interface TaskInput {
 
 export interface TaskFilters {
   status?: TaskStatus;
-  type?: TaskType;
+  typeId?: string;
   priority?: TaskPriority;
   assigneeId?: string;
   companyId?: string;
@@ -45,7 +46,7 @@ export interface CalendarTasks {
 }
 
 /** Intervalo do calendário (no máximo 62 dias); os dias contam-se no fuso horário do browser. */
-export async function listCalendarTasks(range: { from: string; to: string; assigneeId?: string }) {
+export async function listCalendarTasks(range: { from: string; to: string; assigneeId?: string; typeId?: string }) {
   const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const { data } = await api.get<CalendarTasks>("/tasks/calendar", { params: { ...range, tz } });
   return data;

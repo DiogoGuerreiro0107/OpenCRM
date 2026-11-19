@@ -1,4 +1,4 @@
-import { TaskPriority, TaskStatus, TaskType } from "@prisma/client";
+import { WorkItemPriority, WorkItemStatus } from "@prisma/client";
 import { IsBooleanString, IsDateString, IsEnum, IsOptional, IsString, MaxLength } from "class-validator";
 import { PageQueryDto } from "../../common/pagination";
 
@@ -11,16 +11,17 @@ export class QueryTasksDto extends PageQueryDto {
   search?: string;
 
   @IsOptional()
-  @IsEnum(TaskStatus)
-  status?: TaskStatus;
+  @IsEnum(WorkItemStatus)
+  status?: WorkItemStatus;
 
   @IsOptional()
-  @IsEnum(TaskType)
-  type?: TaskType;
+  @IsString()
+  @MaxLength(64)
+  typeId?: string;
 
   @IsOptional()
-  @IsEnum(TaskPriority)
-  priority?: TaskPriority;
+  @IsEnum(WorkItemPriority)
+  priority?: WorkItemPriority;
 
   @IsOptional()
   @IsString()
@@ -65,6 +66,11 @@ export class QueryTaskCalendarDto {
   @IsOptional()
   @IsString()
   assigneeId?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(64)
+  typeId?: string;
 
   /** Fuso horário IANA do browser (ex.: Europe/Lisbon), para os dias baterem com a grelha. Por omissão, UTC. */
   @IsOptional()

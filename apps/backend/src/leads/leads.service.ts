@@ -133,7 +133,7 @@ export class LeadsService {
 
     const dueDate = new Date();
     dueDate.setDate(dueDate.getDate() + 1);
-    await this.prisma.task.create({
+    await this.prisma.workItem.create({
       data: {
         title: `Contactar lead: ${lead.name}`,
         status: "PENDING",

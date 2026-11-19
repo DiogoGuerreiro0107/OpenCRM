@@ -138,9 +138,25 @@ export interface Deal {
   updatedAt: string;
 }
 
-export type TaskStatus = "PENDING" | "IN_PROGRESS" | "DONE";
+/** Concluída e cancelada estão fechadas; as outras estão em aberto (Fase 2a). */
+export type TaskStatus = "PENDING" | "IN_PROGRESS" | "DONE" | "CANCELLED";
 
-export type TaskType = "CHAMADA" | "EMAIL" | "VISITA" | "PROPOSTA" | "COBRANCA" | "ASSISTENCIA" | "OUTRO";
+/** Tipo de tarefa (item de trabalho), configurável pelo Administrador. O id é o código estável (ex.: "VISITA"). */
+export interface WorkItemType {
+  id: string;
+  name: string;
+  /** Nome de um ícone da lista fechada (ver WORK_ITEM_ICONS no frontend). */
+  icon: string;
+  /** Nome de uma cor da paleta fechada. */
+  color: string;
+  isSystem: boolean;
+  isDefault: boolean;
+  active: boolean;
+  sortOrder: number;
+  itemCount: number;
+}
+
+export type WorkItemTypeSummary = Pick<WorkItemType, "id" | "name" | "icon" | "color">;
 
 export type TaskPriority = "BAIXA" | "NORMAL" | "ALTA" | "URGENTE";
 
@@ -148,7 +164,7 @@ export interface Reminder {
   id: string;
   remindAt: string;
   message: string | null;
-  taskId: string;
+  workItemId: string;
   createdAt: string;
 }
 
@@ -174,7 +190,8 @@ export interface Task {
   title: string;
   description: string | null;
   status: TaskStatus;
-  type: TaskType | null;
+  typeId: string;
+  type: WorkItemTypeSummary;
   priority: TaskPriority;
   result: string | null;
   dueDate: string | null;

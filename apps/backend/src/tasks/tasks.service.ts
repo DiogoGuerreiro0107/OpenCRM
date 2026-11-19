@@ -2,6 +2,8 @@ import { BadRequestException, Injectable, NotFoundException } from "@nestjs/comm
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { AutomationsService } from "../automations/automations.service";
+import { WorkItemTypesService } from "../work-item-types/work-item-types.service";
+import { OPEN_WORK_ITEM_STATUSES, isOpenStatus } from "./work-item-status";
 import { CreateTaskDto } from "./dto/create-task.dto";
 import { UpdateTaskDto } from "./dto/update-task.dto";
 import { QueryTaskCalendarDto, QueryTasksDto } from "./dto/query-tasks.dto";
@@ -9,6 +11,7 @@ import { KeyField, orderByKey, readPage } from "../common/pagination";
 import { foldSearch } from "../common/search-text";
 
 const TASK_INCLUDE = {
+  type: { select: { id: true, name: true, icon: true, color: true } },
   assignee: { select: { id: true, name: true } },
   contact: { select: { id: true, name: true } },
   company: { select: { id: true, name: true } },
@@ -45,15 +48,16 @@ export class TasksService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly automations: AutomationsService,
+    private readonly types: WorkItemTypesService,
   ) {}
 
   /** Página da lista de tarefas. */
   findAll(query: QueryTasksDto) {
-    const where: Prisma.TaskWhereInput = {};
+    const where: Prisma.WorkItemWhereInput = {};
     const term = query.search ? foldSearch(query.search.trim()) : "";
     if (term) where.searchText = { contains: term };
     if (query.status) where.status = query.status;
-    if (query.type) where.type = query.type;
+    if (query.typeId) where.typeId = query.typeId;
     if (query.priority) where.priority = query.priority;
     if (query.assigneeId) where.assigneeId = query.assigneeId;
     if (query.companyId) where.companyId = query.companyId;
@@ -71,7 +75,7 @@ export class TasksService {
       const startOfTomorrow = new Date(startOfToday);
       startOfTomorrow.setDate(startOfTomorrow.getDate() + 1);
 
-      where.status = { not: "DONE" };
+      where.status = { in: OPEN_WORK_ITEM_STATUSES };
       where.dueDate = query.overdue === "true" ? { lt: startOfToday } : { gte: startOfToday, lt: startOfTomorrow };
     }
 
@@ -79,7 +83,7 @@ export class TasksService {
       TASK_KEY,
       query,
       (after, take) =>
-        this.prisma.task.findMany({ where: after ? { AND: [where, after] } : where, orderBy: orderByKey(TASK_KEY), take, include: TASK_INCLUDE }),
+        this.prisma.workItem.findMany({ where: after ? { AND: [where, after] } : where, orderBy: orderByKey(TASK_KEY), take, include: TASK_INCLUDE }),
       // dueSort não sai nas respostas (coluna interna): calcula-se do prazo, como no trigger.
       (task) => [task.dueDate ?? NO_DUE_DATE, task.createdAt, task.id],
     );
@@ -100,6 +104,7 @@ export class TasksService {
     const tz = query.tz ?? "UTC";
     if (!isTimeZone(tz)) throw new BadRequestException("Fuso horário desconhecido");
     const assignee = query.assigneeId ? Prisma.sql`AND t."assigneeId" = ${query.assigneeId}` : Prisma.empty;
+    const type = query.typeId ? Prisma.sql`AND t."typeId" = ${query.typeId}` : Prisma.empty;
     // O prazo está guardado em UTC; o dia conta-se no fuso do browser, como a grelha.
     const rows = await this.prisma
       .$queryRaw<Array<{ id: string; day: string; n: bigint }>>`
@@ -107,9 +112,9 @@ export class TasksService {
         SELECT t.id, d.day,
           row_number() OVER (PARTITION BY d.day ORDER BY t."dueDate", t.id) AS rn,
           count(*) OVER (PARTITION BY d.day) AS n
-        FROM "Task" t
+        FROM "WorkItem" t
         CROSS JOIN LATERAL (SELECT to_char((t."dueDate" AT TIME ZONE 'UTC') AT TIME ZONE ${tz}, 'YYYY-MM-DD') AS day) d
-        WHERE t."dueDate" >= ${from} AND t."dueDate" <= ${to} ${assignee}
+        WHERE t."dueDate" >= ${from} AND t."dueDate" <= ${to} ${assignee} ${type}
       ) x
       WHERE rn <= ${CALENDAR_PER_DAY}`
       .catch((err: unknown) => {
@@ -117,7 +122,7 @@ export class TasksService {
         if (/time zone .* not recognized/i.test(String(err))) throw new BadRequestException("Fuso horário desconhecido");
         throw err;
       });
-    const items = await this.prisma.task.findMany({
+    const items = await this.prisma.workItem.findMany({
       where: { id: { in: rows.map((r) => r.id) } },
       orderBy: [{ dueDate: "asc" }, { id: "asc" }],
       include: TASK_INCLUDE,
@@ -127,14 +132,15 @@ export class TasksService {
   }
 
   async findOne(id: string) {
-    const task = await this.prisma.task.findUnique({ where: { id }, include: TASK_INCLUDE });
+    const task = await this.prisma.workItem.findUnique({ where: { id }, include: TASK_INCLUDE });
     if (!task) throw new NotFoundException("Tarefa não encontrada");
     return task;
   }
 
-  create(dto: CreateTaskDto, creatorId: string) {
+  async create(dto: CreateTaskDto, creatorId: string) {
+    if (dto.typeId) await this.types.assertUsable(dto.typeId);
     const { reminders, ...rest } = dto;
-    return this.prisma.task.create({
+    return this.prisma.workItem.create({
       data: {
         ...rest,
         assigneeId: dto.assigneeId ?? creatorId,
@@ -148,11 +154,12 @@ export class TasksService {
   }
 
   async update(id: string, dto: UpdateTaskDto, actingUserId: string) {
-    const existing = await this.prisma.task.findUnique({ where: { id } });
+    const existing = await this.prisma.workItem.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException("Tarefa não encontrada");
+    if (dto.typeId) await this.types.assertUsable(dto.typeId, existing.typeId);
     const { reminders, ...rest } = dto;
 
-    const task = await this.prisma.task.update({
+    const task = await this.prisma.workItem.update({
       where: { id },
       data: {
         ...rest,
@@ -168,8 +175,10 @@ export class TasksService {
       include: TASK_INCLUDE,
     });
 
-    if (dto.status === "DONE" && existing.status !== "DONE") {
-      const description = `Tarefa concluída: "${task.title}".`;
+    // Fechar (concluir ou cancelar) regista-se na timeline da tarefa e dos registos ligados.
+    const closedAs = dto.status && dto.status !== existing.status && !isOpenStatus(dto.status) ? dto.status : null;
+    if (closedAs) {
+      const description = `Tarefa ${closedAs === "DONE" ? "concluída" : "cancelada"}: "${task.title}".`;
       const events: { entityType: "CONTACT" | "COMPANY" | "DEAL" | "LEAD" | "TASK"; entityId: string }[] = [
         { entityType: "TASK", entityId: task.id },
       ];
@@ -182,7 +191,8 @@ export class TasksService {
         data: events.map((e) => ({ ...e, type: "SYSTEM", description, userId: actingUserId })),
       });
 
-      if (task.dealId) {
+      // A regra «tarefas do negócio concluídas» olha para as que ficam em aberto: cancelar a última também conta.
+      if (task.dealId && isOpenStatus(existing.status)) {
         await this.automations.evaluateTaskCompletedRules(task.dealId);
       }
     }
@@ -192,11 +202,11 @@ export class TasksService {
 
   async remove(id: string) {
     await this.ensureExists(id);
-    await this.prisma.task.delete({ where: { id } });
+    await this.prisma.workItem.delete({ where: { id } });
   }
 
   private async ensureExists(id: string) {
-    const exists = await this.prisma.task.findUnique({ where: { id }, select: { id: true } });
+    const exists = await this.prisma.workItem.findUnique({ where: { id }, select: { id: true } });
     if (!exists) throw new NotFoundException("Tarefa não encontrada");
   }
 }

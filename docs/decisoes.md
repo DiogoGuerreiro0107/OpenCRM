@@ -499,3 +499,17 @@ O item "limite de tentativas de login por conta" andava no backlog desde o endur
   - O número de contactos por empresa conta-se só para as empresas da página: o `_count` do Prisma agregava a tabela inteira.
   - O dashboard conta os negócios por fase na base de dados.
 - Medido por HTTP com cerca de um milhão de linhas (`scripts/bench-listagens`): todas as listas a ≤ 65 ms de mediana (dashboard 109 ms). Detalhes em `docs/plano-paginacao-listagens.md`.
+
+## Fase 2a: tipos de tarefa configuráveis e `Task` → `WorkItem` (2026-11-19)
+Primeiro pacote da [Fase 2](plano-fase-2-itens-de-trabalho.md) (itens de trabalho, agenda e menu).
+- **`Task` passa a `WorkItem`** (tabela, chaves, índices, trigger, enums e `Reminder.workItemId`), numa só migração e **sem copiar dados**, como `Pipeline` → `Workflow` na 0c. Para quem usa nada muda de nome: a API continua em `/tasks`, a interface diz «Tarefas» e a timeline continua a usar `TASK`.
+- **Tipos em tabela (`WorkItemType`)**, configuráveis em Configurações > Tipos de tarefa (só Administrador, auditado): nome, ícone e cor (listas fechadas, nunca SVG ou CSS vindos da base de dados), ordem e ativo.
+  - **O id é o código estável** (`VISITA`, `INSTALACAO_DE_REDE`), gerado do nome ao criar e fixo depois. Assim o tipo por omissão («Tarefa», `TAREFA`) é o valor por omissão da coluna, sem ser preciso procurá-lo.
+  - **Todo o item tem tipo**: os que não tinham ficaram «Tarefa». O enum `TaskType` desapareceu.
+  - Os 8 tipos de sistema estão também em código; o arranque repõe os que faltem e nunca altera os existentes. Renomeiam-se e desativam-se, não se apagam; o por omissão não se desativa. Um tipo com tarefas desativa-se em vez de se apagar.
+  - Um tipo desativado sai dos formulários de criação e é recusado em tarefas novas ou que mudam de tipo; as tarefas que já o têm mantêm-no e continuam a filtrar-se.
+- **Estado «cancelada»** (`CANCELLED`). «Em aberto» passa a ser pendente ou em progresso em todo o lado (atrasadas, de hoje, dashboard, automações).
+  - Cancelar regista «Tarefa cancelada» na timeline (concluir continua a registar «concluída»).
+  - A regra de automação «tarefas do negócio concluídas» olha para as que ficam em aberto: uma cancelada não a bloqueia, e cancelar a última também a dispara.
+- Migração ensaiada numa cópia da base de desenvolvimento: os mesmos dados antes e depois (impressão digital por linha, incluindo tipo, pesquisa e ordem), e reversão (`prisma/rollbacks/20261119130000_itens_de_trabalho.down.sql`) até ao mesmo esquema, salvo a posição de uma coluna.
+- **Validação:** 13 e2e novos (407 no total, e 261 unitários), 7 mutações todas apanhadas, migração sem desvio face ao esquema, e verificação no browser com a base de testes. Detalhes no plano, em «Execução do 2a».

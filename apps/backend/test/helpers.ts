@@ -8,6 +8,7 @@ import { configureApp } from "../src/app.setup";
 import { PrismaService } from "../src/prisma/prisma.service";
 import { ModulesService } from "../src/modules/modules.service";
 import { PermissionsService } from "../src/auth/permissions.service";
+import { ensureSystemWorkItemTypes } from "../src/work-item-types/system-types";
 
 export async function createTestApp(): Promise<INestApplication> {
   const moduleRef = await Test.createTestingModule({ imports: [AppModule] }).compile();
@@ -24,13 +25,17 @@ export async function createTestApp(): Promise<INestApplication> {
   return app;
 }
 
-/** Apaga todos os dados (menos o histórico de migrações). Só corre em bases de dados de teste (ver env.ts). */
+/**
+ * Apaga todos os dados (menos o histórico de migrações) e repõe os tipos de tarefa do sistema, como no arranque.
+ * Só corre em bases de dados de teste (ver env.ts).
+ */
 export async function resetDatabase(prisma: PrismaClient) {
   const tables = await prisma.$queryRaw<Array<{ tablename: string }>>`
     SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> '_prisma_migrations'`;
   if (tables.length === 0) return;
   const list = tables.map((t) => `"${t.tablename}"`).join(", ");
   await prisma.$executeRawUnsafe(`TRUNCATE TABLE ${list} RESTART IDENTITY CASCADE`);
+  await ensureSystemWorkItemTypes(prisma);
 }
 
 export const TEST_PASSWORD = "Teste-E2E-1";

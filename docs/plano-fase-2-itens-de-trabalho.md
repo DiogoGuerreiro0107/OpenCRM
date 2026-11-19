@@ -40,9 +40,11 @@ A ordem é a da tabela: o 2b precisa dos tipos, o 2c do «aparece no menu» e o 
   transacional e **sem copiar dados**: os ids mantêm-se, como em `Pipeline` → `Workflow` (0c).
   - **A API não muda de caminho:** `/tasks` continua a ser a rota dos itens de trabalho, e a interface continua a dizer
     «Tarefas». Na timeline, o tipo de registo continua a ser `TASK`.
-- **`WorkItemType`** (tabela nova): `key` (código estável e único, p. ex. `VISITA`), `name`, `icon`, `color`,
-  `isSystem`, `active`, `sortOrder`.
-  - A migração cria os 7 tipos da lista atual e um tipo **«Tarefa»** (`TAREFA`), que é o **tipo por omissão**.
+- **`WorkItemType`** (tabela nova): `id` = **código estável** (p. ex. `VISITA`; não muda depois de criado), `name`,
+  `icon`, `color`, `isSystem`, `active`, `sortOrder`. Sendo o id o código, o tipo por omissão é o valor por omissão
+  da coluna (`typeId` = `TAREFA`), sem ser preciso procurá-lo.
+  - A migração cria os 7 tipos da lista atual e um tipo **«Tarefa»** (`TAREFA`), que é o **tipo por omissão**. Os
+    tipos de sistema estão também em código, e o arranque da aplicação repõe os que faltem (nunca altera os existentes).
   - **Todo o item tem tipo** (`typeId` obrigatório): os que hoje não têm ficam «Tarefa». Simplifica filtros, cores e o menu,
     e é o que as assistências e encomendas vão precisar.
   - O enum `TaskType` desaparece (expandir → migrar → contrair na mesma migração; uma só instância).
@@ -60,7 +62,7 @@ A ordem é a da tabela: o 2b precisa dos tipos, o 2c do «aparece no menu» e o 
 - Um tipo personalizado só se apaga **sem itens**; com itens, desativa-se (como os campos personalizados).
 - **Desativar** esconde o tipo dos formulários de criação; os itens existentes mantêm-no e continuam a aparecer e a
   filtrar-se.
-- A `key` é gerada a partir do nome ao criar e **não muda** depois (é o que os filtros guardados, as integrações e os
+- O código (id) é gerado a partir do nome ao criar e **não muda** depois (é o que os filtros guardados, as integrações e os
   módulos usam). Renomear muda só o `name`.
 - O ícone vem de uma lista fechada (nomes do `lucide-react` que a interface conhece); a cor de uma paleta fechada.
   Nada de SVG ou CSS livre vindo da base de dados.
@@ -69,7 +71,7 @@ A ordem é a da tabela: o 2b precisa dos tipos, o 2c do «aparece no menu» e o 
 ### API
 - `GET /work-item-types` (todos; `?active=true` para os formulários), `POST`, `PATCH /:id`, `DELETE /:id`,
   `PATCH /work-item-types/order`.
-- `/tasks`: o campo `type` (enum) passa a `typeId` na escrita e a `type { id, key, name, icon, color }` na leitura; filtro
+- `/tasks`: o campo `type` (enum) passa a `typeId` na escrita e a `type { id, name, icon, color }` na leitura; filtro
   `typeId`. Criar sem `typeId` usa o tipo por omissão. Um tipo desativado é recusado ao criar (400) e aceite em itens que
   já o têm.
 - A API pública não expõe tarefas (nada muda nela). Os webhooks de saída também não têm eventos de tarefas.
@@ -86,11 +88,33 @@ A ordem é a da tabela: o 2b precisa dos tipos, o 2c do «aparece no menu» e o 
   itens por tipo novo; lembretes, ligações e timeline intactos) e **reversão** testada (`prisma/rollbacks/`).
 - Migração sem desvio face ao esquema (`prisma migrate diff`).
 - **e2e:** CRUD dos tipos e permissões (só Administrador escreve; todos leem); regras (sistema não se apaga, por omissão
-  não se desativa, apagar com itens recusado, desativado recusado ao criar e aceite ao editar); `key` estável ao
+  não se desativa, apagar com itens recusado, desativado recusado ao criar e aceite ao editar); código estável ao
   renomear; tarefas com `typeId` e filtro; estado cancelado fora de «atrasadas», «hoje», dashboard e regra de
   automação; timeline de cancelar; triggers (`searchText`, `dueSort`) a funcionar depois de renomear.
 - **Prova por mutação** nas regras de tipos e no «em aberto».
 - **Browser** (base de testes): página dos tipos, criar uma tarefa com um tipo novo, filtrar, cancelar.
+
+### Execução do 2a (2026-11-19)
+**Implementado como planeado**, com um acerto: o id do tipo é o próprio código estável (ver «Modelo»), em vez de um
+id e de uma `key` à parte.
+- **Migração** `20261119130000_itens_de_trabalho`, ensaiada numa cópia da base de desenvolvimento:
+  - impressão digital de cada linha (título, prazo, estado, responsável, tipo, `searchText`, `dueSort`) igual antes e
+    depois; tarefas com tipo mapeadas para o tipo com o mesmo código, as sem tipo para «Tarefa»;
+  - lembretes e ligações intactos; o trigger renomeado continua a calcular a pesquisa e a ordem;
+  - reversão (`prisma/rollbacks/20261119130000_itens_de_trabalho.down.sql`) até ao mesmo esquema, salvo a posição da
+    coluna `type`, que passa a ser a última;
+  - sem desvio face ao `schema.prisma`; aplicada à base de desenvolvimento, com cópia de segurança antes.
+- **Os tipos de sistema** estão na migração e em código (`src/work-item-types/system-types.ts`). O arranque repõe os
+  que faltem, e o `resetDatabase` dos testes também (limpa todas as tabelas).
+- **e2e:** 12 novos em `test/work-items.e2e-spec.ts` e 1 em `test/automations.e2e-spec.ts` (cancelar a última tarefa
+  em aberto dispara a regra «tarefas concluídas»). Total: 261 unitários e 407 e2e, todos a passar.
+- **Prova por mutação:** 7 mutações, todas apanhadas: cancelada como «em aberto», apagar tipo do sistema, desativar o
+  tipo por omissão, aceitar tipo desativado, código repetido, cancelar sem timeline, apagar tipo com tarefas.
+- **Browser** (base de testes): criar o tipo «Instalação de rede» (código `INSTALACAO_DE_REDE`) e subi-lo na ordem;
+  diálogos com as regras certas (sistema não se apaga, por omissão não se desativa, tipo com tarefas não se apaga);
+  lista de tarefas com o tipo e filtro por tipo (incluindo desativados); o formulário de uma tarefa nova não mostra os
+  desativados e começa em «Tarefa»; a de um tipo desativado mantém-no e cancela-se; calendário com a cor de cada tipo
+  e as canceladas riscadas.
 
 ---
 

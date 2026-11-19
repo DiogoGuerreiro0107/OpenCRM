@@ -294,7 +294,7 @@ describe("API pública /api/v1 e chaves de API (e2e)", () => {
       expect(res.body.data).toMatchObject({ name: "Maria Silva", email: "maria@e2e.test", status: "NOVO", source: "API: Formulário do site", notes: "Quer um orçamento" });
       expect(Object.keys(res.body.data)).not.toContain("responsavelId");
 
-      const task = await prisma().task.findFirstOrThrow({ where: { leadId: res.body.data.id } });
+      const task = await prisma().workItem.findFirstOrThrow({ where: { leadId: res.body.data.id } });
       expect(task).toMatchObject({ assigneeId: admin.id, status: "PENDING" });
       expect(task.title).toContain("Maria Silva");
     });
@@ -322,7 +322,7 @@ describe("API pública /api/v1 e chaves de API (e2e)", () => {
       expect(reordered.body).toEqual(first.body);
 
       expect(await prisma().lead.count()).toBe(1);
-      expect(await prisma().task.count()).toBe(1);
+      expect(await prisma().workItem.count()).toBe(1);
     });
 
     it("a mesma Idempotency-Key com outro corpo dá 422 e não cria nada", async () => {
