@@ -234,7 +234,7 @@ export class TasksService {
 
       // A regra «tarefas do negócio concluídas» olha para as que ficam em aberto: cancelar a última também conta.
       if (task.dealId && isOpenStatus(existing.status)) {
-        await this.automations.evaluateTaskCompletedRules(task.dealId);
+        await this.automations.dispatch({ entityType: "DEAL", entityId: task.dealId, trigger: "ALL_TASKS_CLOSED" });
       }
     }
 

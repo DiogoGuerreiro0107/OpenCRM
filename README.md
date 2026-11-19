@@ -152,6 +152,7 @@ Estado atual: **todas as fases do roadmap consolidado e a revisão final conclu�
   - [x] Passos por tipo de tarefa (o estado vem do passo), quadro por passos na página de cada tipo e campos personalizados por tipo (Fase 2b)
   - [x] Menu configurável em Configurações > Menu (ordem, nomes, grupos, ocultar; tipos de tarefa com item próprio) e registo de contribuições dos módulos no frontend, com as páginas carregadas à parte (Fase 2c)
   - [x] Agenda (mês, semana e dia) com tarefas e próxima ação das leads, e horário marcado nas tarefas além do prazo (Fase 2d)
+  - [x] Motor de automações genérico: regras por tipo de registo, condições validadas, proteção contra ciclos e histórico de execuções (Fase 3a) — ver [docs/plano-fase-3-automacoes.md](docs/plano-fase-3-automacoes.md)
 
 ### Por fazer (backlog)
 
