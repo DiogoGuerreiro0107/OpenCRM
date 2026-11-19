@@ -13,11 +13,9 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { TimelineSection } from "@/components/TimelineSection";
-import { EmailSection } from "@/components/email/EmailSection";
 import { CustomFieldsSection } from "@/components/CustomFieldsSection";
 import { CallButton } from "@/components/CallButton";
-import { CallHistorySection } from "@/components/CallHistorySection";
-import { useModuleEnabled } from "@/lib/useModules";
+import { RecordPanels } from "@/modules/hooks";
 import { useCanWrite } from "@/lib/useCanWrite";
 import { ReadOnlyFieldset } from "@/components/ReadOnly";
 
@@ -29,8 +27,6 @@ const CHANNEL_LABELS: Record<PreferredChannel, string> = {
 };
 
 export function ContactDetailPage() {
-  const emailOn = useModuleEnabled("email");
-  const callsOn = useModuleEnabled("zadarma");
   const canEditContact = useCanWrite("contacts");
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -255,27 +251,8 @@ export function ContactDetailPage() {
           </CardContent>
         </Card>
 
-        {emailOn && (
-<Card>
-          <CardHeader>
-            <CardTitle>Email</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <EmailSection contactId={contact.id} defaultTo={contact.email ?? undefined} />
-          </CardContent>
-        </Card>
-)}
-
-        {callsOn && (
-<Card>
-          <CardHeader>
-            <CardTitle>Chamadas</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <CallHistorySection contactId={contact.id} />
-          </CardContent>
-        </Card>
-)}
+        {/* Cartões dos módulos (Email, Chamadas...), pelo registo de contribuições (Fase 2c). */}
+        <RecordPanels entity="contact" contactId={contact.id} email={contact.email} />
       </div>
     </div>
   );

@@ -19,6 +19,7 @@ import { WorkflowsModule } from "./workflows/workflows.module";
 import { DealsModule } from "./deals/deals.module";
 import { TasksModule } from "./tasks/tasks.module";
 import { WorkItemTypesModule } from "./work-item-types/work-item-types.module";
+import { MenuSettingsModule } from "./menu-settings/menu-settings.module";
 import { EmailModule } from "./email/email.module";
 import { EmailTemplatesModule } from "./email-templates/email-templates.module";
 import { LeadsModule } from "./leads/leads.module";
@@ -55,6 +56,7 @@ import { RealtimeInterceptor } from "./realtime/realtime.interceptor";
     DealsModule,
     TasksModule,
     WorkItemTypesModule,
+    MenuSettingsModule,
     EmailModule,
     EmailTemplatesModule,
     LeadsModule,

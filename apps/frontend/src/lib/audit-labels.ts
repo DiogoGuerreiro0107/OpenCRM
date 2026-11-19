@@ -21,6 +21,7 @@ const ACTION_LABELS: Record<string, string> = {
   "workflow.steps_reordered": "Passos reordenados",
   "workflow.step_updated": "Passo alterado",
   "workflow.step_deleted": "Passo apagado",
+  "menu_settings.updated": "Menu alterado",
   "pipeline.created": "Funil criado",
   "pipeline.updated": "Funil alterado",
   "pipeline.deleted": "Funil eliminado",

@@ -60,7 +60,7 @@ export class WorkItemTypesService implements OnApplicationBootstrap {
     return this.prisma.$transaction(async (tx) => {
       // O fluxo tem o nome do tipo (só aparece na auditoria e nas rotas genéricas): acompanha a mudança de nome.
       if (name && type.workflowId) await tx.workflow.update({ where: { id: type.workflowId }, data: { name } });
-      return tx.workItemType.update({ where: { id }, data: { name, icon: dto.icon, color: dto.color, active: dto.active } });
+      return tx.workItemType.update({ where: { id }, data: { name, icon: dto.icon, color: dto.color, active: dto.active, showInMenu: dto.showInMenu } });
     });
   }
 

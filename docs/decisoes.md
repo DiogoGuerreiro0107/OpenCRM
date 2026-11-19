@@ -526,3 +526,16 @@ Segundo pacote da [Fase 2](plano-fase-2-itens-de-trabalho.md).
 - **Campos personalizados por tipo:** `CustomField.scopeId` (`""` = todas as tarefas; um id de tipo = só esse tipo), fixo depois de criado. Texto vazio em vez de `NULL` para a chave única continuar a valer (no Postgres, `NULL` não colide). Um nome não se repete entre campos que se aplicam às mesmas tarefas. Numa tarefa que muda de tipo, os valores dos campos do tipo antigo ficam guardados mas ocultos.
 - **Página de cada tipo** (`/tarefas/tipo/:id`): lista, calendário e, com passos, quadro por passos (arrastar muda o passo; ordem por prazo; paginação por coluna). Até ao menu configurável (2c), chega-se lá pelo filtro de tipo da lista de tarefas e pelas configurações dos tipos.
 - **Validação:** 20 e2e novos e 1 de automação (428 no total, e 263 unitários), 11 mutações todas apanhadas, migração ensaiada e revertida até ao mesmo esquema e dados, sem desvio face ao esquema, e verificação no browser com a base de testes. Detalhes no plano, em «Execução do 2b».
+
+## Fase 2c: registo de contribuições e menu configurável (2026-11-19)
+Terceiro pacote da [Fase 2](plano-fase-2-itens-de-trabalho.md).
+- **Registo de contribuições no frontend** (`apps/frontend/src/modules/`): cada módulo declara os seus itens de menu, rotas e cartões nas fichas; `App.tsx`, o menu e as fichas de empresa e contacto leem o registo em vez de listas escritas à mão. As guardas de cada rota (módulo, papel, área de escrita) vêm da mesma declaração que o item de menu, por isso não podem divergir.
+  - **As páginas carregam à parte** (`React.lazy`): o pacote inicial deixou de ter todas as páginas.
+  - Email e Chamadas passaram a cartões registados pelos módulos `email` e `zadarma`.
+  - **Widgets do dashboard ficam de fora** (regra de dois): os indicadores vêm de um único resumo do servidor que já respeita os módulos, e ainda não há um módulo com um gráfico próprio. As fontes da agenda entram com a agenda (2d).
+- **Menu configurável pelo Administrador** (decisão D5), em Configurações > Menu: ordenar, renomear, ocultar e agrupar os itens do **menu principal**; as configurações ficam fixas. «Repor» volta ao menu por omissão.
+  - **O servidor guarda só as preferências** (`MenuSetting`: lista ordenada de itens e cabeçalhos de grupo, por id). Desvio ao §3.10 da reorganização, que previa um `GET /menu` já filtrado: o servidor não conhece as rotas do frontend, e o backend continua a impor módulos e permissões em cada rota.
+  - Itens novos (módulo ligado, tipo de tarefa no menu) aparecem no fim; preferências de itens indisponíveis guardam a posição para quando voltarem; grupos sem itens visíveis não aparecem.
+  - **Ocultar não é proibir**: a página continua acessível a quem tem permissão (está escrito no ecrã).
+- **Tipos de tarefa no menu:** `WorkItemType.showInMenu` («Aparece no menu» no diálogo do tipo) dá ao tipo um item próprio, com a sua página.
+- **Validação:** 5 e2e novos (433 no total, e 265 unitários), 7 verificações da junção do menu, 9 mutações todas apanhadas, migração ensaiada e revertida até ao mesmo esquema e dados, e verificação no browser com a base de testes. Detalhes no plano, em «Execução do 2c».

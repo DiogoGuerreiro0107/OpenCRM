@@ -19,6 +19,11 @@ export class UpdateWorkItemTypeDto extends PartialType(CreateWorkItemTypeDto) {
   @IsOptional()
   @IsBoolean()
   active?: boolean;
+
+  /** Item próprio no menu principal (Fase 2c). */
+  @IsOptional()
+  @IsBoolean()
+  showInMenu?: boolean;
 }
 
 export class QueryWorkItemTypesDto {

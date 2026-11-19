@@ -18,6 +18,8 @@ const KEYS_BY_RESOURCE: Record<string, string[]> = {
   "work-item-types": ["work-item-types", "tasks", "custom-fields"],
   // Passos de um fluxo (tipos de tarefa ou funis) mudaram: tipos, tarefas, quadros e funis atualizam-se.
   workflows: ["workflows", "work-item-types", "tasks", "pipelines", "deals"],
+  // O Administrador mudou o menu: o menu de todas as sessões atualiza-se.
+  "menu-settings": ["menu-settings"],
   leads: ["leads", "dashboard-summary"],
   companies: ["dashboard-summary"],
   contacts: ["dashboard-summary"],

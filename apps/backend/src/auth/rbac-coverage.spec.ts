@@ -116,6 +116,9 @@ describe("cobertura de permissões nos controllers", () => {
       "PipelinesController",
       "CustomFieldsController",
       "ZadarmaController",
+      "WorkItemTypesController",
+      "WorkflowsController",
+      "MenuSettingsController",
     ];
     const ALLOWED = ["CustomFieldsController.upsertValues", "ZadarmaController.makeCall"];
     const found = new Set(routes.map((r) => r.controller));

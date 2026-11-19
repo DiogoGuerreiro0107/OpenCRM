@@ -154,6 +154,8 @@ export interface WorkItemType {
   active: boolean;
   sortOrder: number;
   itemCount: number;
+  /** Tem item próprio no menu principal (Fase 2c). */
+  showInMenu: boolean;
   /** Fluxo de passos (Fase 2b); `null` = o tipo só usa o estado. */
   workflowId: string | null;
   /** Passos do fluxo, pela ordem (vazio sem fluxo). */
@@ -548,4 +550,17 @@ export interface WebhookDeliveryView {
 export interface WebhookEventInfo {
   type: string;
   description: string;
+}
+
+/**
+ * Entrada das preferências do menu principal (Fase 2c), pela ordem: um item (renomeado e/ou oculto) ou um cabeçalho de
+ * grupo (os itens a seguir ficam nesse grupo). Os itens em si vivem no frontend (src/modules/).
+ */
+export type MenuEntry =
+  | { type: "item"; id: string; label?: string; hidden?: boolean }
+  | { type: "group"; id: string; label: string };
+
+export interface MenuSettings {
+  entries: MenuEntry[];
+  updatedAt: string | null;
 }

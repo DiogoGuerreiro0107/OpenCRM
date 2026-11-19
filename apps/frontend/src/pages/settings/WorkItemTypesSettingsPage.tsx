@@ -98,6 +98,7 @@ export function WorkItemTypesSettingsPage() {
                 <td className="px-4 py-2">
                   <div className="flex flex-wrap gap-1">
                     {!type.active && <Badge>Desativado</Badge>}
+                    {type.showInMenu && <Badge>No menu</Badge>}
                     {type.isDefault && <Badge>Por omissão</Badge>}
                     {type.isSystem && <Badge>Sistema</Badge>}
                   </div>
@@ -115,9 +116,9 @@ export function WorkItemTypesSettingsPage() {
 
 function WorkItemTypeDialog({ type, onClose }: { type: WorkItemType | null; onClose: () => void }) {
   const queryClient = useQueryClient();
-  const [form, setForm] = useState({ name: "", icon: "check-square", color: "blue", active: true });
+  const [form, setForm] = useState({ name: "", icon: "check-square", color: "blue", active: true, showInMenu: false });
   useEffect(() => {
-    setForm({ name: type?.name ?? "", icon: type?.icon ?? "check-square", color: type?.color ?? "blue", active: type?.active ?? true });
+    setForm({ name: type?.name ?? "", icon: type?.icon ?? "check-square", color: type?.color ?? "blue", active: type?.active ?? true, showInMenu: type?.showInMenu ?? false });
     // Só ao abrir outro tipo: a lista refaz-se em tempo real e não deve apagar o que se está a escrever.
   }, [type?.id]);
 
@@ -128,7 +129,7 @@ function WorkItemTypeDialog({ type, onClose }: { type: WorkItemType | null; onCl
   const save = useMutation({
     mutationFn: () =>
       type
-        ? updateWorkItemType(type.id, { name: form.name, icon: form.icon, color: form.color, active: form.active })
+        ? updateWorkItemType(type.id, { name: form.name, icon: form.icon, color: form.color, active: form.active, showInMenu: form.showInMenu })
         : createWorkItemType({ name: form.name, icon: form.icon, color: form.color }),
     onSuccess: done,
   });
@@ -198,6 +199,12 @@ function WorkItemTypeDialog({ type, onClose }: { type: WorkItemType | null; onCl
             <input type="checkbox" checked={form.active} disabled={type.isDefault} onChange={(e) => setForm({ ...form, active: e.target.checked })} />
             Ativo (aparece ao criar tarefas)
             {type.isDefault && <span className="text-xs text-muted-foreground">— o tipo por omissão está sempre ativo</span>}
+          </label>
+        )}
+        {type && (
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={form.showInMenu} onChange={(e) => setForm({ ...form, showInMenu: e.target.checked })} />
+            Aparece no menu (item próprio com a página do tipo)
           </label>
         )}
         {type && !canDelete && (

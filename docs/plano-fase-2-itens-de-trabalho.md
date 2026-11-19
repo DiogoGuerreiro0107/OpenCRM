@@ -288,6 +288,42 @@ id e de uma `key` à parte.
   um tipo com «aparece no menu»; módulo desligado tira o item e os cartões da ficha; um Comercial vê o menu configurado
   mas não as configurações; as páginas dos módulos carregam à parte.
 
+### Execução do 2c (2026-11-19)
+**Implementado como planeado**, com estes pormenores decididos na implementação:
+- Registo em `apps/frontend/src/modules/`: `types.ts` (contratos), `core.ts` e `optional-modules.tsx` (as contribuições),
+  `registry.ts` (junta-as; cada contribuição herda o módulo que a declara), `menu.ts` (junção do menu, funções puras) e
+  `hooks.tsx` (quem vê o quê, menu, cartões das fichas).
+- **Páginas carregadas à parte:** o pacote inicial passou de um só ficheiro com mais de 500 kB (o build avisava) para
+  388 kB, com 49 ficheiros de JavaScript carregados a pedido.
+- Os tipos de tarefa no menu entram, por omissão, logo a seguir a «Tarefas».
+- Um item cujo destino é o início do de outro item (Tarefas e a página de um tipo) só fica marcado no endereço exato;
+  sem isto, na página da Visita ficavam marcados os dois.
+- O editor do menu mantém as entradas de itens indisponíveis (módulo desligado), para não perder a posição deles ao
+  gravar.
+- **Migração** `20261119150000_menu_configuravel` ensaiada numa cópia da base de desenvolvimento: dados iguais antes e
+  depois, e a reversão (`prisma/rollbacks/20261119150000_menu_configuravel.down.sql`) repõe exatamente o mesmo esquema e
+  os mesmos dados; sem desvio face ao `schema.prisma`; aplicada à base de desenvolvimento, com cópia de segurança antes.
+- **e2e:** 5 novos em `test/menu-settings.e2e-spec.ts`. Total: 265 unitários e 433 e2e, todos a passar.
+- **Junção do menu:** 7 verificações num script (o frontend não tem executor de testes), todas a passar.
+- **Prova por mutação:** 9 mutações, todas apanhadas (e, sem mutações, tudo passa):
+  - ids repetidos aceites;
+  - qualquer papel grava o menu;
+  - «oculto: falso» gravado;
+  - «aparece no menu» não grava;
+  - id sem formato fechado;
+  - item oculto aparece no menu;
+  - itens novos caem dentro do último grupo;
+  - grupos vazios aparecem;
+  - o editor perde os itens indisponíveis.
+- **Browser** (base de testes):
+  - sem preferências, o menu é igual ao de antes;
+  - «Aparece no menu» na Visita põe-na no menu a seguir a Tarefas;
+  - em Configurações > Menu: renomear Tarefas, ocultar Email, criar o grupo «Vendas» e gravar; o menu reflete tudo;
+  - desligar a telefonia tira o cartão «Chamadas» da ficha da empresa e o item «Zadarma» das configurações, e o endereço
+    direto mostra «Módulo desligado»;
+  - o Comercial vê o menu configurado e nenhuma configuração; «Menu» dá «Sem permissão»; o Email oculto continua a
+    abrir pelo endereço.
+
 ---
 
 ## Pacotes seguintes (esboço; cada um terá plano detalhado antes de começar)
