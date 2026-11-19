@@ -181,7 +181,7 @@ describe("Tempo real: Socket.io (e2e)", () => {
       await api()
         .post("/automation-rules")
         .set("Authorization", `Bearer ${adminToken}`)
-        .send({ name: "r", pipelineId: pipeline.id, triggerType: "FIELD_CHANGED", triggerConfig: { field: "value", operator: "gt", value: 10 }, actionType: "MOVE_STAGE", actionConfig: { targetStageId: negociacao.id } })
+        .send({ name: "r", entityType: "DEAL", workflowId: pipeline.id, trigger: "FIELD_CHANGED", triggerConfig: { field: "value" }, conditions: [{ field: "value", operator: "gt", value: 10 }], action: "MOVE_TO_STEP", actionConfig: { targetStepId: negociacao.id } })
         .expect(201);
       const deal = (await api().post("/deals").set("Authorization", `Bearer ${adminToken}`).send({ title: "d", pipelineId: pipeline.id, stageId: novo.id, value: 1 }).expect(201)).body;
 

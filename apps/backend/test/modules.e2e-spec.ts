@@ -192,10 +192,10 @@ describe("Módulos opcionais (e2e)", () => {
       beforeEach(async () => {
         pipeline = (await api().post("/pipelines").set(as(admin)).send({ name: "Vendas" }).expect(201)).body;
         const [novo, negociacao] = pipeline.stages;
-        const make = (name: string, triggerType: string, triggerConfig: object) =>
-          api().post("/automation-rules").set(as(admin)).send({ name, stageId: novo.id, pipelineId: pipeline.id, triggerType, triggerConfig, actionType: "MOVE_STAGE", actionConfig: { targetStageId: negociacao.id } }).expect(201);
-        await make("tempo", "STAGE_IDLE_TIME", { days: 1 });
-        await make("valor", "FIELD_CHANGED", { field: "value", operator: "gt", value: 10 });
+        const make = (name: string, trigger: string, triggerConfig: object, conditions: object[] = []) =>
+          api().post("/automation-rules").set(as(admin)).send({ name, entityType: "DEAL", stepId: novo.id, workflowId: pipeline.id, trigger, triggerConfig, conditions, action: "MOVE_TO_STEP", actionConfig: { targetStepId: negociacao.id } }).expect(201);
+        await make("tempo", "IDLE_IN_STEP", { days: 1 });
+        await make("valor", "FIELD_CHANGED", { field: "value" }, [{ field: "value", operator: "gt", value: 10 }]);
         dealId = (await api().post("/deals").set(as(admin)).send({ title: "d", pipelineId: pipeline.id, stageId: novo.id, value: 1 }).expect(201)).body.id;
       });
 
@@ -215,11 +215,11 @@ describe("Módulos opcionais (e2e)", () => {
         const automations = app.get(AutomationsService);
 
         await setModule("automations", false);
-        await automations.evaluateIdleRules();
+        await automations.runScheduled();
         expect(await stageOf()).toBe(pipeline.stages[0].id);
 
         await setModule("automations", true);
-        await automations.evaluateIdleRules();
+        await automations.runScheduled();
         expect(await stageOf()).toBe(pipeline.stages[1].id);
       });
     });

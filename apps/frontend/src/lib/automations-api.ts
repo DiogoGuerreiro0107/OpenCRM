@@ -1,14 +1,16 @@
-import type { AutomationActionType, AutomationRule, AutomationTriggerType } from "@opencrm/shared-types";
+import type { AutomationActionType, AutomationCondition, AutomationRule, AutomationTriggerType } from "@opencrm/shared-types";
 import { api } from "./api";
 
 export interface AutomationRuleInput {
   name: string;
   active?: boolean;
-  pipelineId?: string;
-  stageId?: string;
-  triggerType: AutomationTriggerType;
+  entityType: string;
+  workflowId?: string | null;
+  stepId?: string | null;
+  trigger: AutomationTriggerType;
   triggerConfig: Record<string, unknown>;
-  actionType: AutomationActionType;
+  conditions: AutomationCondition[];
+  action: AutomationActionType;
   actionConfig: Record<string, unknown>;
 }
 

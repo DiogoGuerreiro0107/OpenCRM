@@ -245,35 +245,59 @@ model Deal {
   @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin)
 }
 
-enum AutomationTriggerType {
-  STAGE_IDLE_TIME
-  TASK_COMPLETED
-  FIELD_CHANGED
-}
-
-enum AutomationActionType {
-  MOVE_STAGE
-  TRIGGER_WEBHOOK
-}
-
+// Regra de automação (Fase 3a, docs/plano-fase-3-automacoes.md): «quando <gatilho> num <tipo de registo> e as
+// condições se verificam → <ação>». Gatilhos, ações e campos vêm de registos em src/automations/registry/ (texto
+// validado, não enums: um módulo novo junta os seus sem migração).
 model AutomationRule {
-  id            String                @id @default(uuid())
+  id            String          @id @default(uuid())
   name          String
-  active        Boolean               @default(true)
-  pipelineId    String?
-  pipeline      Workflow?             @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
-  stageId       String?
-  stage         WorkflowStep?         @relation(fields: [stageId], references: [id], onDelete: Cascade)
-  triggerType   AutomationTriggerType
-  triggerConfig Json
-  actionType    AutomationActionType
-  actionConfig  Json
-  createdAt     DateTime              @default(now())
-  updatedAt     DateTime              @updatedAt
+  active        Boolean         @default(true)
+  /// Tipo de registo ("DEAL"; os outros entram no 3b).
+  entityType    String          @default("DEAL")
+  /// Âmbito opcional: só registos deste fluxo / neste passo (alguns gatilhos exigem o passo).
+  workflowId    String?
+  workflow      Workflow?       @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  stepId        String?
+  step          WorkflowStep?   @relation(fields: [stepId], references: [id], onDelete: Cascade)
+  trigger       String
+  triggerConfig Json            @default("{}")
+  /// Lista de { field, operator, value }: todas têm de se verificar.
+  conditions    Json            @default("[]")
+  action        String
+  actionConfig  Json            @default("{}")
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  runs          AutomationRun[]
 
-  @@index([pipelineId])
-  @@index([stageId])
-  @@index([triggerType, active])
+  @@index([workflowId])
+  @@index([stepId])
+  @@index([entityType, trigger, active])
+}
+
+enum AutomationRunOutcome {
+  SUCCEEDED
+  SKIPPED
+  FAILED
+}
+
+/// Histórico de execuções (só de acrescentar; limpeza ao fim de 90 dias): o que correu, o que foi ignorado e porquê.
+model AutomationRun {
+  id         String               @id @default(uuid())
+  ruleId     String
+  rule       AutomationRule       @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  entityType String
+  entityId   String
+  trigger    String
+  outcome    AutomationRunOutcome
+  /// Motivo (ignorada) ou erro (falhou), em texto para o administrador.
+  message    String?
+  /// Profundidade na cadeia (0 = causada por uma pessoa ou pelo agendamento; 1+ = por outra automação).
+  depth      Int                  @default(0)
+  createdAt  DateTime             @default(now())
+
+  @@index([createdAt, id])
+  @@index([ruleId, createdAt])
+  @@index([entityType, entityId])
 }
 
 enum WorkItemStatus {

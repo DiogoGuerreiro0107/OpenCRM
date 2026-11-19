@@ -114,14 +114,10 @@ export class DealsService {
 
     const deal = await this.prisma.deal.update({ where: { id }, data: dto, include: DEAL_INCLUDE });
 
-    const changes: Record<string, { before: unknown; after: unknown }> = {};
-    for (const field of WATCHED_FIELDS) {
-      if (dto[field] !== undefined && dto[field] !== existing[field]) {
-        changes[field] = { before: existing[field], after: dto[field] };
-      }
-    }
-    if (Object.keys(changes).length > 0) {
-      await this.automations.evaluateFieldChangedRules(id, deal.pipelineId, changes);
+    // Gatilho «campo alterado» das automações (Fase 3a): os campos que mudaram de facto.
+    const changedFields = WATCHED_FIELDS.filter((field) => dto[field] !== undefined && dto[field] !== existing[field]);
+    if (changedFields.length > 0) {
+      await this.automations.dispatch({ entityType: "DEAL", entityId: id, trigger: "FIELD_CHANGED", changedFields: [...changedFields] });
     }
 
     return deal;

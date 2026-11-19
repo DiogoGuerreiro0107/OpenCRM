@@ -46,11 +46,13 @@ describe("Motor de automações (e2e)", () => {
         .set("Authorization", admin)
         .send({
           name: "Valor alto avança",
-          pipelineId: pipeline.id,
-          triggerType: "FIELD_CHANGED",
-          triggerConfig: { field: "value", operator: "gt", value: 1000 },
-          actionType: "MOVE_STAGE",
-          actionConfig: { targetStageId: stage("Em negociação").id },
+          entityType: "DEAL",
+          workflowId: pipeline.id,
+          trigger: "FIELD_CHANGED",
+          triggerConfig: { field: "value" },
+          conditions: [{ field: "value", operator: "gt", value: 1000 }],
+          action: "MOVE_TO_STEP",
+          actionConfig: { targetStepId: stage("Em negociação").id },
         })
         .expect(201);
     });
@@ -84,11 +86,12 @@ describe("Motor de automações (e2e)", () => {
         .set("Authorization", admin)
         .send({
           name: "Tarefas feitas avança",
-          stageId: stage("Novo").id,
-          triggerType: "TASK_COMPLETED",
+          entityType: "DEAL",
+          stepId: stage("Novo").id,
+          trigger: "ALL_TASKS_CLOSED",
           triggerConfig: {},
-          actionType: "MOVE_STAGE",
-          actionConfig: { targetStageId: stage("Em negociação").id },
+          action: "MOVE_TO_STEP",
+          actionConfig: { targetStepId: stage("Em negociação").id },
         })
         .expect(201);
     });
@@ -140,11 +143,13 @@ describe("Motor de automações (e2e)", () => {
       .set("Authorization", admin)
       .send({
         name: "Valor mínimo perde",
-        pipelineId: pipeline.id,
-        triggerType: "FIELD_CHANGED",
-        triggerConfig: { field: "value", operator: "lt", value: 10 },
-        actionType: "MOVE_STAGE",
-        actionConfig: { targetStageId: stage("Perdido").id },
+        entityType: "DEAL",
+        workflowId: pipeline.id,
+        trigger: "FIELD_CHANGED",
+        triggerConfig: { field: "value" },
+        conditions: [{ field: "value", operator: "lt", value: 10 }],
+        action: "MOVE_TO_STEP",
+        actionConfig: { targetStepId: stage("Perdido").id },
       })
       .expect(201);
 
@@ -157,7 +162,7 @@ describe("Motor de automações (e2e)", () => {
     await api()
       .post("/automation-rules")
       .set("Authorization", comercial)
-      .send({ name: "x", triggerType: "FIELD_CHANGED", triggerConfig: {}, actionType: "TRIGGER_WEBHOOK", actionConfig: {} })
+      .send({ name: "x", entityType: "DEAL", trigger: "FIELD_CHANGED", triggerConfig: { field: "value" }, action: "WEBHOOK", actionConfig: {} })
       .expect(403);
   });
 });

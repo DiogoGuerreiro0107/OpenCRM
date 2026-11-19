@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { AutomationActionType, AutomationRule, AutomationTriggerType } from "@opencrm/shared-types";
+import type { AutomationActionType, AutomationCondition, AutomationRule, AutomationTriggerType } from "@opencrm/shared-types";
+import { errorMessage } from "@/lib/errors";
 import {
   createAutomationRule,
   deleteAutomationRule,
@@ -14,14 +15,14 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 
 const TRIGGER_LABELS: Record<AutomationTriggerType, string> = {
-  STAGE_IDLE_TIME: "Tempo parado numa fase",
-  TASK_COMPLETED: "Todas as tarefas concluídas",
+  IDLE_IN_STEP: "Tempo parado numa fase",
+  ALL_TASKS_CLOSED: "Todas as tarefas concluídas",
   FIELD_CHANGED: "Campo do negócio alterado",
 };
 
 const ACTION_LABELS: Record<AutomationActionType, string> = {
-  MOVE_STAGE: "Mover para outra fase/funil",
-  TRIGGER_WEBHOOK: "Disparar webhook (n8n)",
+  MOVE_TO_STEP: "Mover para outra fase/funil",
+  WEBHOOK: "Disparar webhook (n8n)",
 };
 
 const FIELD_LABELS: Record<string, string> = {
@@ -53,12 +54,12 @@ export function AutomationRuleDialog({ open, onClose, rule }: AutomationRuleDial
     active: true,
     pipelineId: "",
     stageId: "",
-    triggerType: "STAGE_IDLE_TIME" as AutomationTriggerType,
+    triggerType: "IDLE_IN_STEP" as AutomationTriggerType,
     idleDays: "7",
     fieldChangedField: "value",
     fieldChangedOperator: "gt",
     fieldChangedValue: "",
-    actionType: "MOVE_STAGE" as AutomationActionType,
+    actionType: "MOVE_TO_STEP" as AutomationActionType,
     targetPipelineId: "",
     targetStageId: "",
     webhookEvent: "",
@@ -68,19 +69,21 @@ export function AutomationRuleDialog({ open, onClose, rule }: AutomationRuleDial
     if (!open) return;
     const trigger = rule?.triggerConfig ?? {};
     const action = rule?.actionConfig ?? {};
+    // Este editor mostra a primeira condição (o editor genérico chega no 3c).
+    const condition: Partial<AutomationCondition> = rule?.conditions[0] ?? {};
     setForm({
       name: rule?.name ?? "",
       active: rule?.active ?? true,
-      pipelineId: rule?.pipelineId ?? "",
-      stageId: rule?.stageId ?? "",
-      triggerType: rule?.triggerType ?? "STAGE_IDLE_TIME",
+      pipelineId: rule?.workflowId ?? "",
+      stageId: rule?.stepId ?? "",
+      triggerType: rule?.trigger ?? "IDLE_IN_STEP",
       idleDays: trigger.days != null ? String(trigger.days) : "7",
       fieldChangedField: (trigger.field as string) ?? "value",
-      fieldChangedOperator: (trigger.operator as string) ?? "gt",
-      fieldChangedValue: trigger.value != null ? String(trigger.value) : "",
-      actionType: rule?.actionType ?? "MOVE_STAGE",
+      fieldChangedOperator: condition.operator ?? "gt",
+      fieldChangedValue: condition.value != null ? String(condition.value) : "",
+      actionType: rule?.action ?? "MOVE_TO_STEP",
       targetPipelineId: "",
-      targetStageId: (action.targetStageId as string) ?? "",
+      targetStageId: (action.targetStepId as string) ?? "",
       webhookEvent: (action.event as string) ?? "",
     });
   }, [open, rule]);
@@ -98,32 +101,35 @@ export function AutomationRuleDialog({ open, onClose, rule }: AutomationRuleDial
 
   const scopeStages = pipelines?.find((p) => p.id === form.pipelineId)?.stages ?? [];
   const targetStages = pipelines?.find((p) => p.id === form.targetPipelineId)?.stages ?? [];
-  const needsScopeStage = form.triggerType === "STAGE_IDLE_TIME" || form.triggerType === "TASK_COMPLETED";
+  const needsScopeStage = form.triggerType === "IDLE_IN_STEP" || form.triggerType === "ALL_TASKS_CLOSED";
 
   const saveMutation = useMutation({
     mutationFn: () => {
       const triggerConfig: Record<string, unknown> =
-        form.triggerType === "STAGE_IDLE_TIME"
+        form.triggerType === "IDLE_IN_STEP"
           ? { days: Number(form.idleDays) || 1 }
           : form.triggerType === "FIELD_CHANGED"
-            ? {
-                field: form.fieldChangedField,
-                operator: form.fieldChangedOperator,
-                value: Number(form.fieldChangedValue) || 0,
-              }
+            ? { field: form.fieldChangedField }
             : {};
+      // «Campo alterado»: o campo que muda é também o da condição (como sempre neste editor).
+      const conditions: AutomationCondition[] =
+        form.triggerType === "FIELD_CHANGED"
+          ? [{ field: form.fieldChangedField, operator: form.fieldChangedOperator as AutomationCondition["operator"], value: Number(form.fieldChangedValue) || 0 }]
+          : [];
 
       const actionConfig: Record<string, unknown> =
-        form.actionType === "MOVE_STAGE" ? { targetStageId: form.targetStageId } : { event: form.webhookEvent };
+        form.actionType === "MOVE_TO_STEP" ? { targetStepId: form.targetStageId } : { event: form.webhookEvent };
 
       const payload = {
         name: form.name,
         active: form.active,
-        pipelineId: form.pipelineId || undefined,
-        stageId: needsScopeStage ? form.stageId || undefined : undefined,
-        triggerType: form.triggerType,
+        entityType: "DEAL",
+        workflowId: form.pipelineId || null,
+        stepId: needsScopeStage ? form.stageId || null : null,
+        trigger: form.triggerType,
         triggerConfig,
-        actionType: form.actionType,
+        conditions,
+        action: form.actionType,
         actionConfig,
       };
       return rule ? updateAutomationRule(rule.id, payload) : createAutomationRule(payload);
@@ -152,8 +158,8 @@ export function AutomationRuleDialog({ open, onClose, rule }: AutomationRuleDial
   const canSubmit =
     form.name.trim() &&
     (!needsScopeStage || form.stageId) &&
-    (form.actionType !== "MOVE_STAGE" || form.targetStageId) &&
-    (form.actionType !== "TRIGGER_WEBHOOK" || form.webhookEvent.trim());
+    (form.actionType !== "MOVE_TO_STEP" || form.targetStageId) &&
+    (form.actionType !== "WEBHOOK" || form.webhookEvent.trim());
 
   return (
     <Dialog open={open} onClose={onClose} className="max-w-lg">
@@ -214,7 +220,7 @@ export function AutomationRuleDialog({ open, onClose, rule }: AutomationRuleDial
           )}
         </div>
 
-        {form.triggerType === "STAGE_IDLE_TIME" && (
+        {form.triggerType === "IDLE_IN_STEP" && (
           <div className="space-y-2">
             <Label htmlFor="idleDays">Dias parado na fase</Label>
             <Input
@@ -282,7 +288,7 @@ export function AutomationRuleDialog({ open, onClose, rule }: AutomationRuleDial
           </Select>
         </div>
 
-        {form.actionType === "MOVE_STAGE" && (
+        {form.actionType === "MOVE_TO_STEP" && (
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-2">
               <Label htmlFor="targetPipelineId">Funil de destino</Label>
@@ -313,7 +319,7 @@ export function AutomationRuleDialog({ open, onClose, rule }: AutomationRuleDial
           </div>
         )}
 
-        {form.actionType === "TRIGGER_WEBHOOK" && (
+        {form.actionType === "WEBHOOK" && (
           <div className="space-y-2">
             <Label htmlFor="webhookEvent">Nome do evento *</Label>
             <Input
@@ -332,7 +338,7 @@ export function AutomationRuleDialog({ open, onClose, rule }: AutomationRuleDial
         </label>
 
         {saveMutation.isError && (
-          <p className="text-sm text-red-600">Não foi possível guardar a regra. Tenta novamente.</p>
+          <p className="text-sm text-red-600">{errorMessage(saveMutation.error, "Não foi possível guardar a regra. Tenta novamente.")}</p>
         )}
 
         <div className="flex justify-between pt-2">

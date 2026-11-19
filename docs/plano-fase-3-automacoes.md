@@ -71,8 +71,9 @@ calendário configurável), gatilhos de módulos que ainda não existem (cronóm
   regras. A cadeia tem profundidade máxima 3 e a mesma regra não corre duas vezes para o mesmo registo na mesma
   cadeia; o que for cortado fica no histórico como `SKIPPED` com o motivo.
 - **Uma falha numa ação não desfaz a operação que a causou** (como hoje): fica no histórico como `FAILED`.
-- **Módulos:** o módulo «Automações» deixa de depender do de negócios (as regras de negócios só correm com o módulo de
-  negócios ativo; as de outros tipos com o seu).
+- **Módulos:** as regras de cada tipo de registo só correm com o módulo desse tipo ativo (verificado no motor). O módulo
+  «Automações» continua a depender do de negócios até ao 3b: enquanto só houver regras de negócios, sem eles não
+  haveria nada a automatizar.
 
 ### Validação das regras
 - Ao criar ou alterar: tipo de registo conhecido e com o módulo ativo; gatilho e ação deste tipo de registo; passo e
@@ -97,6 +98,41 @@ calendário configurável), gatilhos de módulos que ainda não existem (cronóm
   ciclos cortados; módulo de negócios desligado; catálogo.
 - **Prova por mutação** nas regras novas; **browser:** a página de automações atual continua a criar e editar as três
   regras de sempre.
+
+### Execução do 3a (2026-11-19)
+**Implementado como planeado**, com estes pormenores decididos na implementação:
+- **Gatilho «campo alterado»:** só aceita os campos cuja mudança o serviço do registo comunica (`changeTracked`: valor,
+  probabilidade, tipo, margem). O responsável serve para condições, mas não se muda pela edição do negócio.
+- **Histórico e regras com várias condições:** cada regra vê o registo como está no momento em que corre (uma regra
+  anterior pode tê-lo mudado), como antes. Nos gatilhos agendados, só sucessos e falhas vão ao histórico.
+- **Webhook:** passa a levar `entityType` e `entityId`; nos negócios mantém o `dealId` de sempre.
+- **Dependência do módulo:** «Automações» continua a depender de «Negócios» até ao 3b (ver «Despacho e execução»).
+- **Migração** `20261119170000_automacoes_genericas`, ensaiada numa cópia da base de desenvolvimento com quatro regras
+  no formato antigo, uma de cada caso:
+  - campo alterado com condição: a condição passou para a lista e o passo saiu;
+  - campo alterado sem operador: ficou desativada;
+  - parado X dias: código e passo de destino convertidos;
+  - tarefas concluídas com webhook: código convertido.
+  - A reversão (`prisma/rollbacks/20261119170000_automacoes_genericas.down.sql`) repõe o esquema; só muda a posição de
+    duas colunas. Não se desfazem as duas normalizações acima, que não mudam o comportamento.
+  - Sem desvio face ao `schema.prisma`; aplicada à base de desenvolvimento, com cópia de segurança antes.
+- **Testes:**
+  - Os testes de automações de sempre passam, adaptados só nos nomes dos campos: é a prova de que o comportamento não
+    mudou.
+  - Novos: 10 e2e em `test/automation-engine.e2e-spec.ts` e 10 unitários (registos, condições e motor, incluindo
+    ciclos com um registo de teste que se volta a disparar).
+  - Total: 280 unitários e 454 e2e, todos a passar.
+  - Nas duas primeiras voltas da suite completa falharam testes já existentes (paginação e outros), que passam sozinhos
+    e passaram todos na terceira volta. A máquina estava carregada (ficheiros de 60 a 80 s): falhas por tempo, sem
+    relação com o 3a.
+- **Prova por mutação:** 13 mutações.
+  - Na primeira volta escaparam duas: o limite estrito do «maior que» e o «campo alterado» reagir a qualquer campo.
+  - Juntei os testes que faltavam e, na segunda volta, as 13 foram apanhadas (e, sem mutações, tudo passa).
+- **Browser** (base de testes):
+  - criar pela página atual uma regra «campo alterado» (valor > 1000 → mover) e outra «parado 5 dias» com webhook;
+  - reabrir e alterar (o formulário carrega o que foi gravado);
+  - subir o valor de um negócio no diálogo do funil moveu-o para «Em negociação», com sucesso no histórico e as três
+    ações na auditoria.
 
 ---
 

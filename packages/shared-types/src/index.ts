@@ -424,21 +424,30 @@ export interface EmailTemplate {
   updatedAt: string;
 }
 
-export type AutomationTriggerType = "STAGE_IDLE_TIME" | "TASK_COMPLETED" | "FIELD_CHANGED";
+/** Gatilhos e ações das automações (Fase 3a): códigos dos registos do servidor (src/automations/registry/). */
+export type AutomationTriggerType = "IDLE_IN_STEP" | "ALL_TASKS_CLOSED" | "FIELD_CHANGED";
 
-export type AutomationActionType = "MOVE_STAGE" | "TRIGGER_WEBHOOK";
+export type AutomationActionType = "MOVE_TO_STEP" | "WEBHOOK";
+
+export interface AutomationCondition {
+  field: string;
+  operator: "eq" | "neq" | "gt" | "gte" | "lt" | "lte" | "empty" | "not_empty";
+  value?: string | number | null;
+}
 
 export interface AutomationRule {
   id: string;
   name: string;
   active: boolean;
-  pipelineId: string | null;
-  pipeline: { id: string; name: string } | null;
-  stageId: string | null;
-  stage: { id: string; name: string } | null;
-  triggerType: AutomationTriggerType;
+  entityType: string;
+  workflowId: string | null;
+  workflow: { id: string; name: string } | null;
+  stepId: string | null;
+  step: { id: string; name: string } | null;
+  trigger: AutomationTriggerType;
   triggerConfig: Record<string, unknown>;
-  actionType: AutomationActionType;
+  conditions: AutomationCondition[];
+  action: AutomationActionType;
   actionConfig: Record<string, unknown>;
   createdAt: string;
   updatedAt: string;

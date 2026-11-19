@@ -7,15 +7,15 @@ import { Badge } from "@/components/ui/badge";
 import { AutomationRuleDialog } from "./AutomationRuleDialog";
 
 const TRIGGER_SUMMARY: Record<string, (rule: AutomationRule) => string> = {
-  STAGE_IDLE_TIME: (rule) => `Parado ${rule.triggerConfig.days ?? "?"} dias em "${rule.stage?.name ?? "?"}"`,
-  TASK_COMPLETED: (rule) => `Tarefas concluídas em "${rule.stage?.name ?? "?"}"`,
+  IDLE_IN_STEP: (rule) => `Parado ${rule.triggerConfig.days ?? "?"} dias em "${rule.step?.name ?? "?"}"`,
+  ALL_TASKS_CLOSED: (rule) => `Tarefas concluídas em "${rule.step?.name ?? "?"}"`,
   FIELD_CHANGED: (rule) =>
-    `Campo "${rule.triggerConfig.field ?? "?"}" ${rule.triggerConfig.operator ?? "?"} ${rule.triggerConfig.value ?? "?"}`,
+    `Campo "${rule.triggerConfig.field ?? "?"}"${rule.conditions.map((c) => ` ${c.operator} ${c.value ?? ""}`).join(" e")}`,
 };
 
 const ACTION_SUMMARY: Record<string, (rule: AutomationRule) => string> = {
-  MOVE_STAGE: () => "Move para outra fase",
-  TRIGGER_WEBHOOK: (rule) => `Dispara webhook "${rule.actionConfig.event ?? "?"}"`,
+  MOVE_TO_STEP: () => "Move para outra fase",
+  WEBHOOK: (rule) => `Dispara webhook "${rule.actionConfig.event ?? "?"}"`,
 };
 
 export function AutomationsSettingsPage() {
@@ -69,8 +69,8 @@ export function AutomationsSettingsPage() {
                 onClick={() => setDialogState({ rule })}
               >
                 <td className="px-4 py-2 font-medium">{rule.name}</td>
-                <td className="px-4 py-2 text-muted-foreground">{TRIGGER_SUMMARY[rule.triggerType]?.(rule)}</td>
-                <td className="px-4 py-2 text-muted-foreground">{ACTION_SUMMARY[rule.actionType]?.(rule)}</td>
+                <td className="px-4 py-2 text-muted-foreground">{TRIGGER_SUMMARY[rule.trigger]?.(rule)}</td>
+                <td className="px-4 py-2 text-muted-foreground">{ACTION_SUMMARY[rule.action]?.(rule)}</td>
                 <td className="px-4 py-2">
                   <Badge className={rule.active ? "bg-green-100 text-green-800 border-green-200" : ""}>
                     {rule.active ? "Ativa" : "Inativa"}
