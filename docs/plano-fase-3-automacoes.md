@@ -136,19 +136,73 @@ calendário configurável), gatilhos de módulos que ainda não existem (cronóm
 
 ---
 
+## Pacote 3b — Gatilhos e ações novos (plano, 2026-11-19)
+
+### Tipos de registo
+- **`WORK_ITEM` (tarefas, núcleo):** campos para condições `typeId` (tipo de tarefa), `status`, `priority`,
+  `assigneeId`; acompanha a mudança de estado, prioridade, responsável e tipo; âmbito pelo fluxo do tipo e pelo passo.
+- **`LEAD` (módulo `leads`):** campos `status`, `kind` (empresa/pessoa), `interest`, `source`, `responsavelId`;
+  acompanha a mudança de estado, interesse e responsável; sem fluxo (as regras de leads não têm passo).
+- **`DEAL`:** como no 3a, mais os campos personalizados.
+- **Campos personalizados nas condições:** os marcados «disponível em automações» (`isAutomationEnabled`, já existe), de
+  todos os registos do tipo ou (nas tarefas) do tipo de tarefa. Texto, email, telefone e URL → texto; número e valor →
+  número; lista de opções → opções; sim/não → opções «sim»/«não». Datas e seleção múltipla ficam de fora (os
+  operadores atuais não servem para elas). Os campos passam a ser lidos da base de dados quando são precisos.
+- **O módulo «Automações» deixa de depender de «Negócios»**: as regras de cada tipo de registo correm só com o módulo
+  desse tipo ativo (como no 3a). Os testes das dependências entre módulos passam a usar manifestos de teste.
+
+### Gatilhos novos
+- **`CREATED`** (negócios, tarefas, leads): criado por uma pessoa, pela API pública ou por outra automação.
+- **`ENTERED_STEP`** (negócios, tarefas; passo obrigatório): mudou para o passo da regra — ao arrastar, ao editar, ao
+  mover um negócio ou por uma automação. Criar já num passo não conta como entrar (para isso, `CREATED` com o passo).
+- **`CLOSED`** (negócios ganhos ou perdidos, tarefas concluídas ou canceladas, leads convertidas ou perdidas): as
+  condições sobre o estado dizem qual.
+- **`FIELD_CHANGED`** passa a servir também tarefas e leads.
+- Cada evento leva **quem o causou** (`actorId`, quando há uma pessoa), para as ações que atribuem a quem fez.
+
+### Ações novas
+- **`CREATE_WORK_ITEM` (criar tarefa)**, em todos os tipos de registo, com um modelo:
+  - **tipo** (ativo) e **título** com variáveis do registo de origem (negócio: `{titulo}`, `{empresa}`, `{contacto}`;
+    tarefa: `{titulo}`, `{empresa}`, `{contacto}`; lead: `{nome}`, `{empresa}`, `{telefone}`, `{email}`). Uma
+    variável sem valor fica vazia;
+  - **responsável:** o do registo de origem (se não tiver, quem causou o evento), quem causou o evento (se não houver,
+    o do registo), ou um utilizador fixo (ativo);
+  - **prazo** opcional: daqui a N dias ou N dias úteis (segunda a sexta; feriados ficam para depois) ou N horas;
+    prioridade opcional;
+  - **ligada ao registo de origem** e às mesmas empresa, contacto, negócio e lead;
+  - a tarefa nova entra no passo certo se o tipo tiver passos e **dispara o `CREATED` das tarefas** (cadeia, com a
+    proteção do 3a).
+- **`ASSIGN` (atribuir)**, em todos: muda o responsável para um utilizador fixo (ativo) e dispara `FIELD_CHANGED`.
+- **`MOVE_TO_STEP`** passa a servir tarefas (com o estado derivado do passo) e dispara `ENTERED_STEP` (e `CLOSED` quando o
+  passo fecha) — também nos negócios.
+
+### A tarefa da lead nova passa a regra
+- Hoje está escrita em `LeadsService.create`. Passa a **regra do sistema** «Primeiro contacto da lead» (`CREATED` em
+  leads → criar tarefa «Contactar lead: {nome}», tipo por omissão, prazo daqui a 1 dia, responsável o da lead ou quem a
+  criou): o mesmo efeito, mas desativável e editável.
+  - As regras do sistema têm uma chave (`systemKey`) e o arranque cria as que faltem, como os tipos de tarefa do
+    sistema; **não se apagam** (desativam-se), senão voltavam no arranque seguinte.
+  - **Mudança assumida:** com o módulo «Automações» desligado, a lead nova deixa de criar a tarefa (desligar as
+    automações desliga todas, incluindo esta). Fica escrito na descrição do módulo.
+- O seguimento a +2 dias úteis depois de «Proposta enviada» fica como exemplo a criar pelo administrador
+  (`ENTERED_STEP` na fase → criar tarefa), sem se criar sozinho.
+
+### Validação prevista
+- Migração (coluna `systemKey` e a regra do sistema) ensaiada e revertida; sem desvio face ao esquema.
+- **e2e:** cada gatilho novo em cada tipo de registo (incluindo pela API pública e pelo arrastar no quadro); criar
+  tarefa (variáveis, responsável nos três modos, prazo em dias, dias úteis e horas, passo do tipo, ligações, cadeia que
+  dispara outra regra); atribuir; mover tarefas; condições sobre campos personalizados; a lead nova continua a criar a
+  mesma tarefa (os testes de leads atuais passam sem mudanças) e deixa de a criar com a regra desativada; regra do
+  sistema não se apaga; módulos (leads desligado, negócios desligado com regras de tarefas a correr).
+- Unitários: dias úteis, variáveis, campos personalizados nas condições; prova por mutação; browser (a página atual
+  continua a funcionar; as regras novas configuram-se pela API até ao editor do 3c).
+
+---
+
 ## Pacotes seguintes (esboço; cada um terá plano detalhado antes de começar)
 
 ### 3b — Gatilhos e ações novos
-- **Tipos de registo** `WORK_ITEM` (tarefas, com tipo e passo) e `LEAD`.
-- **Gatilhos:** `CREATED` (criado), `ENTERED_STEP` (entrou num passo; nas tarefas e negócios), `CLOSED` (tarefa
-  concluída/cancelada, negócio ganho/perdido, lead convertida/perdida), mais os do 3a para os novos tipos onde fizer
-  sentido.
-- **Ações:** `CREATE_WORK_ITEM` (tipo, título com variáveis como `{nome}` e `{empresa}`, responsável — o do registo, quem
-  fez a ação ou um utilizador fixo —, prazo relativo em dias ou dias úteis, ligado ao registo de origem) e `ASSIGN`.
-- **Condições sobre campos personalizados** marcados «disponível em automações» (`isAutomationEnabled`, que já existe).
-- **A tarefa automática da lead nova passa a regra** criada pela migração com o mesmo efeito (desativável e editável),
-  em vez de código fixo. A regra «proposta enviada → seguimento a +2 dias úteis» fica disponível como exemplo a
-  criar pelo administrador (não se cria sozinha, para não mudar o comportamento de quem a tem no n8n).
+Plano detalhado acima («Pacote 3b»).
 
 ### 3c — Interface
 - Editor de regras genérico: escolher o tipo de registo, o gatilho (e o passo, quando se aplica), as condições
