@@ -118,18 +118,87 @@ id e de uma `key` à parte.
 
 ---
 
+## Pacote 2b — Passos, campos e página por tipo (plano, 2026-11-19)
+
+### Modelo
+- **`WorkItemType.workflowId`** (opcional, único): um tipo **com passos** tem um `Workflow` próprio, de `entityType`
+  `WORK_ITEM` (segunda entrada do registo de fluxos). Um tipo sem `workflowId` funciona como hoje (só estado).
+- **`WorkItem.stepId`** (opcional, `onDelete: Restrict`, com índice). Num tipo com passos, todo o item tem passo e o
+  **estado deriva da categoria do passo**, gravado na mesma escrita:
+  `OPEN` → `PENDING`, `IN_PROGRESS` → `IN_PROGRESS`, `DONE` → `DONE`, `CANCELLED` → `CANCELLED`. As listas, o
+  calendário, o dashboard e as automações continuam a olhar só para o estado (com os índices de hoje).
+- **Integridade na base de dados:** um trigger em `WorkItem` recusa um passo que não seja do fluxo do tipo do item, ou um
+  estado que não corresponda à categoria do passo. O serviço valida antes (400 com mensagem); o trigger é a rede de
+  segurança contra um erro de programação.
+- **`CustomField.scopeId`** (texto, `""` = sem âmbito): nos campos de `WORK_ITEM`, `""` = todas as tarefas e um id de
+  tipo = só as tarefas desse tipo. A unicidade passa a `(entityType, scopeId, fieldName)`. Texto vazio e não `NULL`
+  porque no Postgres um `NULL` não colide numa chave única (dois campos «Equipamento» em empresas passariam a ser
+  aceites). O âmbito fixa-se ao criar (como o tipo de registo).
+
+### Regras
+- **Dar passos a um tipo** (`POST /work-item-types/:id/workflow`, Administrador): cria o fluxo com 4 passos por omissão
+  («Por fazer» `OPEN`, «Em curso» `IN_PROGRESS`, «Concluída» `DONE`, «Cancelada» `CANCELLED`) e põe cada item no
+  primeiro passo da categoria do seu estado, tudo numa transação. Os estados dos itens não mudam.
+- **Tirar os passos** (`DELETE /work-item-types/:id/workflow`): os itens ficam sem passo e **mantêm o estado**; o fluxo
+  é apagado. A interface pede confirmação.
+- **Criar um item** num tipo com passos: com `stepId`, tem de ser um passo do fluxo do tipo; sem ele, vai para o
+  primeiro passo (pela ordem) da categoria do estado pedido, ou para o primeiro `OPEN` se não pedir estado. Sem passo
+  dessa categoria → 400.
+- **Editar:** `stepId` muda o passo (e o estado); só `status` (o «Concluir» das listas) vai para o primeiro passo dessa
+  categoria (400 se não houver); os dois juntos têm de bater certo. **Mudar de tipo** resolve o passo no tipo novo pela
+  mesma regra (para um tipo sem passos, o item fica sem passo e mantém o estado).
+- Concluir/cancelar por passo tem o mesmo efeito que pelo estado: timeline «Tarefa concluída/cancelada» e regra de
+  automação «tarefas do negócio concluídas».
+- **Mudar a categoria de um passo** com itens atualiza o estado desses itens na mesma transação (o registo de fluxos
+  ganha esse gancho; nos negócios não faz nada, como hoje).
+- **Apagar um passo** com itens exige destino do mesmo fluxo (como nas fases dos negócios); os itens ficam com o estado
+  do destino. **O último passo de um fluxo não se apaga** (regra nova para todos os fluxos: um funil sem fases também
+  não servia para nada).
+- **Resultado** (`WON`/`LOST`): só onde o registo o permite (negócios); nos passos de tarefas é recusado.
+- Apagar um tipo (só sem itens) apaga também o seu fluxo e os seus campos personalizados.
+- Apagar uma tarefa apaga os valores dos seus campos personalizados (como nas outras fichas).
+
+### API
+- **Rotas genéricas de fluxos** (a regra de dois manda-as entrar agora, com o segundo tipo com fluxos):
+  `GET /workflows/:id` (passos com a contagem de itens), `POST /workflows/:id/steps`, `PATCH /workflows/:id/steps/order`,
+  `PATCH /workflow-steps/:id`, `DELETE /workflow-steps/:id?moveTo=`. Ler: todos; escrever: Administrador, com
+  auditoria. Respeitam o módulo do tipo de registo (módulo desligado → 404). Servem qualquer tipo registado, negócios
+  incluídos; a API `/pipelines` continua igual (fachada).
+- `/work-item-types`: cada tipo traz `workflowId` e os passos (`id`, `name`, `order`, `category`), para os formulários.
+- `/tasks`: `stepId` na escrita e no filtro; `step { id, name, category }` na leitura; `GET /tasks/board?typeId=`
+  devolve o número de itens por passo com os mesmos filtros da lista (cabeçalho das colunas).
+- `/custom-fields`: `entityType=WORK_ITEM` e `scopeId` ao criar; os valores só aceitam campos sem âmbito ou do tipo do
+  item. Lista curta: devolve todos os campos de tarefas e a interface filtra pelo tipo.
+- Tempo real: `workflows` como recurso (avisa tipos, tarefas e funis).
+
+### Interface
+- **Configurações > Tipos de tarefa**, no diálogo do tipo: secção «Passos» («Dar passos a este tipo»; depois editar
+  nome e categoria, ordenar, acrescentar, apagar com destino, «Tirar os passos»).
+- **Configurações > Campos personalizados:** «Tarefas» como tipo de registo, com o âmbito (todas ou um tipo).
+- **Formulário da tarefa:** num tipo com passos, escolhe-se o passo em vez do estado; ao editar, os campos
+  personalizados que se aplicam ao tipo (como nos negócios).
+- **Página de cada tipo** (`/tarefas/tipo/:id`): lista (a de hoje, filtrada pelo tipo) e, se tiver passos, **quadro por
+  passos**: arrastar muda o passo; dentro da coluna a ordem é a do prazo (sem ordem manual); paginação por coluna
+  («Mostrar mais»), como no quadro dos negócios. Até ao menu configurável (2c), chega-se lá pela lista de tarefas
+  (filtro por tipo) e pelas configurações dos tipos.
+
+### Validação prevista
+- Migração ensaiada numa cópia da base de desenvolvimento (contagens e impressão digital antes e depois; campos
+  personalizados intactos com `scopeId` vazio), reversão testada e sem desvio face ao esquema.
+- **e2e:** rotas genéricas (negócios e tarefas, permissões, módulo desligado, resultado recusado em tarefas, último
+  passo); dar e tirar passos com itens; criar/editar/mudar de tipo com passos; concluir por passo regista na timeline e
+  avalia a automação; mudar a categoria de um passo atualiza os itens; apagar passo com destino; trigger recusa
+  incoerências; quadro (contagens e filtro por passo); campos com âmbito (criar, unicidade por âmbito, valores de outro
+  tipo recusados, apagar tarefa apaga valores); lead cria a tarefa no primeiro passo quando «Tarefa» tem passos.
+- **Prova por mutação** nas regras novas; **browser** (base de testes): dar passos a um tipo, quadro com arrastar,
+  formulário com passo, campos de um tipo.
+
+---
+
 ## Pacotes seguintes (esboço; cada um terá plano detalhado antes de começar)
 
 ### 2b — Passos, campos e página por tipo
-- `WorkItemType.workflowId` opcional: um tipo **com passos** usa um `Workflow` do tipo `WORK_ITEM` (segunda entidade
-  do registo de fluxos → a regra de dois manda generalizar agora as rotas `/workflows`).
-  - Num tipo com passos, o item tem `stepId` e o **estado deriva da categoria do passo**, gravado na mesma escrita (a
-    agenda e as listas continuam a filtrar só pelo estado, com os índices de hoje).
-  - Dar passos a um tipo com itens põe cada item no primeiro passo da categoria do seu estado; tirá-los mantém o estado.
-- **Campos personalizados por tipo:** `CustomField` ganha um âmbito opcional (`scopeId` = tipo), e `WORK_ITEM` entra no
-  registo de entidades com a área `dailyWork`.
-- **Página de cada tipo:** lista (a de hoje, filtrada) e, se tiver passos, **quadro por passos** (arrastar muda o passo;
-  sem ordem manual dentro da coluna, que fica por prazo). Paginação por coluna como no kanban.
+Plano detalhado acima («Pacote 2b»).
 
 ### 2c — Registo de contribuições e menu configurável
 - Cada módulo do frontend regista as suas **contribuições**: itens de menu, rotas (carregadas à parte), cartões nas
