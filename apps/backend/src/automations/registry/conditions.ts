@@ -12,6 +12,8 @@ export interface AutomationField {
   kind: FieldKind;
   /** Opções fechadas (campos «option»). */
   options?: Array<{ value: string; label: string }>;
+  /** Opções lidas da base de dados quando são precisas (ex.: os tipos de tarefa que existem). Fase 3c. */
+  optionsFrom?: "workItemTypes";
 }
 
 export const OPERATORS = {

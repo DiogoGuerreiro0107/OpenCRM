@@ -572,3 +572,13 @@ Segundo pacote da [Fase 3](plano-fase-3-automacoes.md).
 - O serviço das tarefas regista-se no das automações ao arrancar (as ações escrevem tarefas por ele), para não haver dependência circular entre os dois.
 - A página de automações atual mostra as regras novas, mas só as edita se forem das de sempre (negócios); as outras abrem só para ativar ou desativar até ao editor genérico (3c), para não serem estragadas ao gravar.
 - **Validação:** 13 e2e e 4 unitários novos (467 e2e e 284 unitários no total; os testes de leads de sempre passam sem mudanças), 15 mutações todas apanhadas (uma só depois de acrescentar um teste), migração ensaiada e revertida, e verificação no browser com a base de testes. Detalhes no plano, em «Execução do 3b».
+
+## Fase 3c: editor de regras e histórico de automações (2026-11-20)
+Último pacote da [Fase 3](plano-fase-3-automacoes.md).
+- **Editor de regras genérico** (Configurações > Automações), que **lê o catálogo do servidor**: tipo de registo → gatilho → âmbito (funil e fase, ou tipo de tarefa com passos e passo) → condições em linhas (campo, operador por tipo de campo, valor escolhido de uma lista sempre que há opções ou utilizadores) → ação e a sua configuração (mover, webhook, criar tarefa com botões para as variáveis, atribuir). Um módulo novo aparece no editor sem o mudar. A validação continua no servidor e os erros aparecem como vêm.
+- **A mesma frase resume a regra** na lista e na pré-visualização («Quando uma lead é criada e Interesse igual a POS, então atribuir a Rui.»).
+- As regras do sistema editam-se como as outras, mas sem «Eliminar». O modo restrito do 3b (só ativar ou desativar) deixou de ser preciso.
+- **Histórico** (Configurações > Automações > Histórico, rota do módulo «Automações»): data, regra, gatilho, registo (pelo nome; «(apagado)» se já não existe), resultado e detalhe; filtros por regra e resultado; paginado. As execuções desencadeadas por outra automação mostram o nível na cadeia.
+- **Servidor:** o tipo de tarefa nas condições passou a lista de opções lida da base de dados (também os desativados), em vez de texto livre; o histórico devolve o nome de cada registo, lido de uma vez por tipo de registo para a página toda.
+- Tempo real: as regras, o histórico (que nasce das alterações a negócios, tarefas e leads) e o catálogo (que muda com os tipos de tarefa e os campos personalizados) atualizam-se sozinhos.
+- **Validação:** 2 e2e novos (469 e2e e 284 unitários no total), 4 mutações nos acertos do servidor todas apanhadas, e verificação no browser com a base de testes (encontrou e corrigiu-se um erro do editor: o responsável por omissão de «criar tarefa» não ia no pedido). Detalhes no plano, em «Execução do 3c». **A Fase 3 fica concluída.**

@@ -232,16 +232,87 @@ calendário configurável), gatilhos de módulos que ainda não existem (cronóm
 
 ---
 
+## Pacote 3c — Interface (plano, 2026-11-20)
+
+### Editor de regras genérico (Configurações > Automações)
+- Substitui o editor atual (que só desenhava as três regras de negócios) por um que **lê o catálogo do servidor**
+  (`GET /automation-rules/catalog`): o que aparece em cada lista vem dos registos, por isso um módulo novo aparece sem
+  mudar o editor.
+- **Quando:** tipo de registo → gatilho → âmbito (negócios: funil e fase; tarefas: tipo de tarefa com passos e passo;
+  leads: sem âmbito), com o passo obrigatório quando o gatilho o pede; a configuração do gatilho (dias parado; campo
+  que muda, só entre os acompanhados).
+- **E se:** condições em linhas (campo, operador, valor). O valor é sempre escolhido de uma lista quando há opções
+  (opções, utilizadores, tipos de tarefa) e é um número nos campos numéricos; os operadores dependem do tipo de campo.
+- **Então:** a ação e a sua configuração — mover (passo de destino), webhook (nome do evento), criar tarefa (tipo,
+  título com botões para inserir as variáveis do tipo de registo, responsável, prazo, prioridade) e atribuir
+  (utilizador).
+- **Frase de pré-visualização** («Quando uma lead é criada e Interesse é igual a POS, então atribuir a Rui») e os erros
+  do servidor mostrados como vêm (a validação continua no servidor).
+- As regras do sistema editam-se como as outras, mas não têm «Apagar».
+- A lista de regras passa a resumir cada uma pela mesma frase, com o tipo de registo.
+
+### Histórico de automações
+- Página **Configurações > Automações > Histórico** (botão na página das automações, rota do módulo «Automações»):
+  data, regra, registo, gatilho, resultado (sucesso, ignorada, falha) e a mensagem; filtros por regra e resultado;
+  paginada («Mostrar mais»).
+- O servidor passa a devolver também o **nome do registo** de cada execução (título do negócio, da tarefa, nome da
+  lead), lido de uma vez para a página toda; um registo que já não exista aparece como «(apagado)».
+
+### Servidor (pequenos acertos)
+- **Tipo de tarefa nas condições passa a lista de opções** (os tipos que existem, lidos da base de dados), em vez de
+  texto livre: o editor mostra uma lista e o servidor recusa um tipo que não existe.
+- Os funis, as fases e os tipos de tarefa com os seus passos vêm das rotas que já existem (`/pipelines`,
+  `/work-item-types`); o catálogo não os repete.
+
+### Validação prevista
+- **e2e:** tipo de tarefa como opção (recusa um tipo inexistente; o catálogo traz os tipos); nomes dos registos no
+  histórico (negócio, tarefa, lead, apagado). Os testes de automações atuais continuam a passar.
+- **Prova por mutação** nos dois acertos do servidor.
+- **Browser** (base de testes): criar pelo editor uma regra de cada tipo de registo (incluindo «criar tarefa» com
+  variáveis e «atribuir»), editar uma existente (o editor carrega tudo o que foi gravado), a regra do sistema sem
+  «Apagar», disparar uma regra e vê-la no histórico com o nome do registo, filtros do histórico.
+
+### Execução do 3c (2026-11-20)
+**Implementado como planeado**, com estes pormenores decididos na implementação:
+- **Ficheiros do editor:** `AutomationRuleDialog.tsx` (editor), `automation-text.ts` (a frase, usada na lista e na
+  pré-visualização) e `useAutomationLookups.ts` (catálogo, funis, tipos de tarefa e utilizadores, com os nomes por id).
+- **Âmbito e destino:** num negócio, o destino de «mover» pode ser de outro funil (escolhe-se o funil e depois a fase).
+  Numa tarefa, o destino é sempre um passo do tipo escolhido no âmbito.
+- **Erro encontrado no browser e corrigido:** ao escolher «criar tarefa», o responsável aparecia escolhido («o
+  responsável do registo») mas não ia no pedido, e o servidor recusava. Cada ação passou a começar com a configuração
+  que o editor mostra.
+- Os nomes das execuções no histórico são lidos por tipo de registo, uma vez para a página toda.
+- **Testes:**
+  - 2 e2e novos em `test/automation-engine.e2e-spec.ts` (tipo de tarefa como opção; nomes no histórico).
+  - Total: 284 unitários e 469 e2e.
+  - Numa volta da suite completa falhou um teste de passos das tarefas por tempo: a suite demorou 85 s em vez de cerca
+    de 20 s, com a máquina carregada. Passa sozinho; o limite por teste é 30 s.
+  - Uma volta anterior foi descartada: correu ao mesmo tempo que outra na mesma base de testes, por um comando lançado
+    mal.
+- **Prova por mutação:** 4 mutações nos acertos do servidor, todas apanhadas:
+  - sem opções nos tipos de tarefa;
+  - desativados de fora das opções;
+  - histórico sem nomes;
+  - nomes trocados entre tipos de registo.
+- **Browser** (base de testes):
+  - a lista resume as regras pela frase (incluindo a do sistema);
+  - criar pelo editor «leads de POS → atribuir à Rita» (condição com lista, atribuir com o seletor de utilizadores) e
+    «negócio entra em Em negociação → criar a tarefa "Ligar sobre {titulo}", chamada, prazo daqui a 2 dias úteis» (com o
+    botão da variável);
+  - reabrir: o editor carrega tudo o que foi gravado;
+  - a regra do sistema tem o aviso e não tem «Eliminar»;
+  - uma lead de POS criada pela interface disparou as duas regras de leads, com o nome da lead no histórico;
+  - filtros do histórico por regra e por resultado.
+
+---
+
 ## Pacotes seguintes (esboço; cada um terá plano detalhado antes de começar)
 
 ### 3b — Gatilhos e ações novos
 Plano detalhado acima («Pacote 3b»).
 
 ### 3c — Interface
-- Editor de regras genérico: escolher o tipo de registo, o gatilho (e o passo, quando se aplica), as condições
-  (campo, operador, valor — listas, sem texto livre onde há opções) e a ação com a sua configuração; pré-visualização
-  da frase «Quando … e … então …».
-- Página **Histórico de automações** (Configurações): o que correu, o que foi ignorado e porquê, falhas.
+Plano detalhado acima («Pacote 3c»).
 
 ## Decisões assumidas (a rever)
 - Uma regra = uma ação.

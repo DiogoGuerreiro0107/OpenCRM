@@ -38,6 +38,8 @@ export interface AutomationEntity {
   variables: Record<string, string>;
   load: (prisma: PrismaService, id: string) => Promise<LoadedRecord | null>;
   setOwner: (prisma: PrismaService, id: string, userId: string) => Promise<void>;
+  /** Nome de cada registo (para o histórico); os que já não existem ficam de fora. */
+  labels: (prisma: PrismaService, ids: string[]) => Promise<Map<string, string>>;
 }
 
 const BUSINESS_AREAS = [
@@ -86,6 +88,7 @@ export const AUTOMATION_ENTITIES = {
     setOwner: async (prisma, id, userId) => {
       await prisma.deal.update({ where: { id }, data: { ownerId: userId } });
     },
+    labels: async (prisma, ids) => new Map((await prisma.deal.findMany({ where: { id: { in: ids } }, select: { id: true, title: true } })).map((d) => [d.id, d.title])),
   },
   /** Tarefas (itens de trabalho, núcleo). */
   WORK_ITEM: {
@@ -94,7 +97,7 @@ export const AUTOMATION_ENTITIES = {
     workflowEntity: "WORK_ITEM",
     customFieldEntity: "WORK_ITEM",
     fields: [
-      { name: "typeId", label: "Tipo de tarefa", kind: "text" },
+      { name: "typeId", label: "Tipo de tarefa", kind: "option", optionsFrom: "workItemTypes" },
       {
         name: "status", label: "Estado", kind: "option",
         options: [{ value: "PENDING", label: "Pendente" }, { value: "IN_PROGRESS", label: "Em progresso" }, { value: "DONE", label: "Concluída" }, { value: "CANCELLED", label: "Cancelada" }],
@@ -126,6 +129,7 @@ export const AUTOMATION_ENTITIES = {
     setOwner: async (prisma, id, userId) => {
       await prisma.workItem.update({ where: { id }, data: { assigneeId: userId } });
     },
+    labels: async (prisma, ids) => new Map((await prisma.workItem.findMany({ where: { id: { in: ids } }, select: { id: true, title: true } })).map((t) => [t.id, t.title])),
   },
   /** Leads (módulo leads): sem fluxo. */
   LEAD: {
@@ -165,6 +169,7 @@ export const AUTOMATION_ENTITIES = {
     setOwner: async (prisma, id, userId) => {
       await prisma.lead.update({ where: { id }, data: { responsavelId: userId } });
     },
+    labels: async (prisma, ids) => new Map((await prisma.lead.findMany({ where: { id: { in: ids } }, select: { id: true, name: true } })).map((l) => [l.id, l.name])),
   },
 } satisfies Record<string, AutomationEntity>;
 

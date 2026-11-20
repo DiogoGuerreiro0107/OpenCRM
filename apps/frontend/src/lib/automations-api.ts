@@ -1,4 +1,5 @@
-import type { AutomationActionType, AutomationCondition, AutomationRule, AutomationTriggerType } from "@opencrm/shared-types";
+import type { AutomationActionType, AutomationCatalog, AutomationCondition, AutomationRule, AutomationRun, AutomationTriggerType, Page } from "@opencrm/shared-types";
+import type { PageParams } from "./pagination";
 import { api } from "./api";
 
 export interface AutomationRuleInput {
@@ -31,4 +32,16 @@ export async function updateAutomationRule(id: string, input: Partial<Automation
 
 export async function deleteAutomationRule(id: string) {
   await api.delete(`/automation-rules/${id}`);
+}
+
+/** O que os registos do servidor oferecem (tipos de registo ativos, gatilhos, ações, campos, operadores). */
+export async function getAutomationCatalog() {
+  const { data } = await api.get<AutomationCatalog>("/automation-rules/catalog");
+  return data;
+}
+
+/** Histórico de execuções, do mais recente para o mais antigo. */
+export async function listAutomationRuns(filters: { ruleId?: string; outcome?: AutomationRun["outcome"] } & PageParams) {
+  const { data } = await api.get<Page<AutomationRun>>("/automation-runs", { params: filters });
+  return data;
 }

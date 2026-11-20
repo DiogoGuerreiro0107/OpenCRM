@@ -15,7 +15,10 @@ describe("registos das automações (3a)", () => {
       const names = entity.fields.map((f) => f.name);
       expect({ type, unique: new Set(names).size === names.length }).toEqual({ type, unique: true });
       for (const tracked of entity.changeTracked) expect({ type, tracked, ok: names.includes(tracked) }).toEqual({ type, tracked, ok: true });
-      for (const f of entity.fields) if (f.kind === "option") expect({ type, field: f.name, ok: (f.options?.length ?? 0) > 0 }).toEqual({ type, field: f.name, ok: true });
+      for (const f of entity.fields as AutomationField[]) {
+        if (f.kind === "option") expect({ type, field: f.name, ok: (f.options?.length ?? 0) > 0 || !!f.optionsFrom }).toEqual({ type, field: f.name, ok: true });
+      }
+      expect({ type, ok: typeof entity.labels === "function" }).toEqual({ type, ok: true });
     }
   });
 

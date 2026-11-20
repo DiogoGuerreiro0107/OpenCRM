@@ -11,21 +11,23 @@ import { api, getAccessToken } from "./api";
  * diálogos (lead, negócio, tarefa) não há esse risco: trabalham sobre uma cópia que não vem da consulta.
  */
 const KEYS_BY_RESOURCE: Record<string, string[]> = {
-  deals: ["deals", "pipelines", "dashboard-summary"],
+  deals: ["deals", "pipelines", "dashboard-summary", "automation-runs"],
   pipelines: ["pipelines", "deals", "dashboard-summary"],
-  tasks: ["tasks", "dashboard-summary", "work-item-types", "agenda"],
+  tasks: ["tasks", "dashboard-summary", "work-item-types", "agenda", "automation-runs"],
   // Um administrador mudou os tipos de tarefa: formulários, filtros e listas atualizam-se.
-  "work-item-types": ["work-item-types", "tasks", "custom-fields", "agenda"],
+  "work-item-types": ["work-item-types", "tasks", "custom-fields", "agenda", "automation-rules"],
   // Passos de um fluxo (tipos de tarefa ou funis) mudaram: tipos, tarefas, quadros e funis atualizam-se.
   workflows: ["workflows", "work-item-types", "tasks", "pipelines", "deals"],
   // O Administrador mudou o menu: o menu de todas as sessões atualiza-se.
   "menu-settings": ["menu-settings"],
-  leads: ["leads", "dashboard-summary", "agenda"],
+  // Regras de automação; o catálogo («automation-rules», "catalog") muda também com os tipos de tarefa e os campos.
+  "automation-rules": ["automation-rules"],
+  leads: ["leads", "dashboard-summary", "agenda", "automation-runs"],
   companies: ["dashboard-summary"],
   contacts: ["dashboard-summary"],
   timeline: ["timeline"],
   email: ["email-messages"],
-  "custom-fields": ["custom-fields", "custom-field-values"],
+  "custom-fields": ["custom-fields", "custom-field-values", "automation-rules"],
   zadarma: ["call-records"],
   users: ["users"],
   // Um administrador ligou/desligou um módulo: menu, rotas e dashboard de todas as sessões atualizam-se.
