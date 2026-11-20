@@ -70,7 +70,15 @@ export class AutomationsService implements OnApplicationBootstrap {
   /** Campos das condições de um tipo de registo: os do registo e os personalizados «disponíveis em automações». */
   private async fieldsOf(entityType: AutomationEntityType): Promise<AutomationField[]> {
     const entity = automationEntity(entityType);
-    return [...entity.fields, ...(await customAutomationFields(this.prisma, entity.customFieldEntity))];
+    const base = await Promise.all(entity.fields.map((field) => this.withOptions(field)));
+    return [...base, ...(await customAutomationFields(this.prisma, entity.customFieldEntity))];
+  }
+
+  /** Opções lidas da base de dados (Fase 3c): os tipos de tarefa que existem, também os desativados. */
+  private async withOptions(field: AutomationField): Promise<AutomationField> {
+    if (field.optionsFrom !== "workItemTypes") return field;
+    const types = await this.prisma.workItemType.findMany({ orderBy: [{ sortOrder: "asc" }, { name: "asc" }], select: { id: true, name: true, active: true } });
+    return { ...field, options: types.map((t) => ({ value: t.id, label: t.active ? t.name : `${t.name} (desativado)` })) };
   }
 
   /** As regras de um tipo de registo só correm com o módulo de automações E o do tipo de registo ativos. */
@@ -214,13 +222,13 @@ export class AutomationsService implements OnApplicationBootstrap {
 
   // -------------------------------------------------------------------------------------------------------- histórico
 
-  findRuns(query: QueryAutomationRunsDto & PageQueryDto) {
+  async findRuns(query: QueryAutomationRunsDto & PageQueryDto) {
     const where: Prisma.AutomationRunWhereInput = {
       ...(query.ruleId ? { ruleId: query.ruleId } : {}),
       ...(query.entityId ? { entityId: query.entityId } : {}),
       ...(query.outcome ? { outcome: query.outcome } : {}),
     };
-    return readPage(RUN_KEY, query, (after, take) =>
+    const page = await readPage(RUN_KEY, query, (after, take) =>
       this.prisma.automationRun.findMany({
         where: after ? { AND: [where, after] } : where,
         orderBy: orderByKey(RUN_KEY),
@@ -228,6 +236,14 @@ export class AutomationsService implements OnApplicationBootstrap {
         include: { rule: { select: { id: true, name: true } } },
       }),
     );
+    // Nome de cada registo (Fase 3c), lido de uma vez por tipo de registo para a página toda.
+    const labels = new Map<string, string>();
+    for (const type of new Set(page.items.map((r) => r.entityType))) {
+      if (!isAutomationEntityType(type)) continue;
+      const ids = page.items.filter((r) => r.entityType === type).map((r) => r.entityId);
+      for (const [id, label] of await automationEntity(type).labels(this.prisma, ids)) labels.set(`${type}:${id}`, label);
+    }
+    return { ...page, items: page.items.map((r) => ({ ...r, entityLabel: labels.get(`${r.entityType}:${r.entityId}`) ?? null })) };
   }
 
   /** Limpeza diária do histórico. */

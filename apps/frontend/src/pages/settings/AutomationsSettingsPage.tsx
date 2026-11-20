@@ -1,52 +1,37 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import type { AutomationRule } from "@opencrm/shared-types";
 import { listAutomationRules } from "@/lib/automations-api";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { AutomationRuleDialog } from "./AutomationRuleDialog";
+import { describeRule } from "./automation-text";
+import { useAutomationLookups } from "./useAutomationLookups";
 
-const TRIGGER_SUMMARY: Record<string, (rule: AutomationRule) => string> = {
-  IDLE_IN_STEP: (rule) => `Parado ${rule.triggerConfig.days ?? "?"} dias em "${rule.step?.name ?? "?"}"`,
-  ALL_TASKS_CLOSED: (rule) => `Tarefas concluídas em "${rule.step?.name ?? "?"}"`,
-  FIELD_CHANGED: (rule) =>
-    `Campo "${rule.triggerConfig.field ?? "?"}"${rule.conditions.map((c) => ` ${c.operator} ${c.value ?? ""}`).join(" e")}`,
-};
-
-const ACTION_SUMMARY: Record<string, (rule: AutomationRule) => string> = {
-  MOVE_TO_STEP: () => "Move para outra fase",
-  WEBHOOK: (rule) => `Dispara webhook "${rule.actionConfig.event ?? "?"}"`,
-  CREATE_WORK_ITEM: (rule) => `Cria a tarefa "${rule.actionConfig.title ?? "?"}"`,
-  ASSIGN: () => "Atribui a um utilizador",
-};
-
-/** Tipos de registo e gatilhos das regras que este editor ainda não desenha (3b; o editor genérico é o 3c). */
-const ENTITY_LABELS: Record<string, string> = { DEAL: "Negócio", WORK_ITEM: "Tarefa", LEAD: "Lead" };
-const GENERIC_TRIGGERS: Record<string, string> = { CREATED: "criado", ENTERED_STEP: "entrou no passo", CLOSED: "fechado", FIELD_CHANGED: "campo alterado" };
-
-function triggerSummary(rule: AutomationRule) {
-  if (rule.entityType === "DEAL" && TRIGGER_SUMMARY[rule.trigger]) return TRIGGER_SUMMARY[rule.trigger](rule);
-  const where = rule.step ? ` em "${rule.step.name}"` : "";
-  return `${ENTITY_LABELS[rule.entityType] ?? rule.entityType} ${GENERIC_TRIGGERS[rule.trigger] ?? rule.trigger}${where}${rule.conditions.length ? ` (${rule.conditions.length} condição/ões)` : ""}`;
-}
-
+/**
+ * Configurações > Automações (Fase 3c): cada regra resumida pela frase «Quando… então…», o editor genérico e o caminho
+ * para o histórico de execuções.
+ */
 export function AutomationsSettingsPage() {
   const [dialogState, setDialogState] = useState<{ rule: AutomationRule | null } | null>(null);
-
-  const { data: rules, isLoading } = useQuery({
-    queryKey: ["automation-rules"],
-    queryFn: listAutomationRules,
-  });
+  const { lookups } = useAutomationLookups();
+  const { data: rules, isLoading } = useQuery({ queryKey: ["automation-rules"], queryFn: listAutomationRules });
+  const entityLabel = (type: string) => lookups.catalog?.entities.find((e) => e.id === type)?.label ?? type;
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Automações</h1>
-        <Button onClick={() => setDialogState({ rule: null })}>Nova regra</Button>
+        <div className="flex gap-2">
+          <Button asChild variant="outline">
+            <Link to="/configuracoes/automacoes/historico">Histórico</Link>
+          </Button>
+          <Button onClick={() => setDialogState({ rule: null })}>Nova regra</Button>
+        </div>
       </div>
       <p className="text-sm text-muted-foreground">
-        Regras que movem negócios automaticamente entre fases/funis com base em eventos, ou disparam um webhook para
-        o n8n.
+        Regras «quando… então…» sobre negócios, tarefas e leads: mover, criar tarefas, atribuir ou enviar um webhook para o n8n.
       </p>
 
       <div className="overflow-hidden rounded-lg border border-border bg-background">
@@ -54,8 +39,8 @@ export function AutomationsSettingsPage() {
           <thead className="border-b border-border bg-muted/40 text-left text-muted-foreground">
             <tr>
               <th className="px-4 py-2 font-medium">Nome</th>
-              <th className="px-4 py-2 font-medium">Gatilho</th>
-              <th className="px-4 py-2 font-medium">Ação</th>
+              <th className="px-4 py-2 font-medium">Registo</th>
+              <th className="px-4 py-2 font-medium">Regra</th>
               <th className="px-4 py-2 font-medium">Estado</th>
             </tr>
           </thead>
@@ -75,18 +60,15 @@ export function AutomationsSettingsPage() {
               </tr>
             )}
             {rules?.map((rule) => (
-              <tr
-                key={rule.id}
-                className="cursor-pointer border-b border-border last:border-0 hover:bg-muted/30"
-                onClick={() => setDialogState({ rule })}
-              >
+              <tr key={rule.id} className="cursor-pointer border-b border-border last:border-0 hover:bg-muted/30" onClick={() => setDialogState({ rule })}>
                 <td className="px-4 py-2 font-medium">{rule.name}</td>
-                <td className="px-4 py-2 text-muted-foreground">{triggerSummary(rule)}</td>
-                <td className="px-4 py-2 text-muted-foreground">{ACTION_SUMMARY[rule.action]?.(rule)}</td>
+                <td className="px-4 py-2 text-muted-foreground">{entityLabel(rule.entityType)}</td>
+                <td className="px-4 py-2 text-muted-foreground">{describeRule(rule, lookups)}</td>
                 <td className="px-4 py-2">
-                  <Badge className={rule.active ? "bg-green-100 text-green-800 border-green-200" : ""}>
-                    {rule.active ? "Ativa" : "Inativa"}
-                  </Badge>
+                  <div className="flex flex-wrap gap-1">
+                    <Badge className={rule.active ? "border-green-200 bg-green-100 text-green-800" : ""}>{rule.active ? "Ativa" : "Inativa"}</Badge>
+                    {rule.systemKey && <Badge>Sistema</Badge>}
+                  </div>
                 </td>
               </tr>
             ))}
@@ -94,9 +76,7 @@ export function AutomationsSettingsPage() {
         </table>
       </div>
 
-      {dialogState && (
-        <AutomationRuleDialog open onClose={() => setDialogState(null)} rule={dialogState.rule} />
-      )}
+      {dialogState && <AutomationRuleDialog open onClose={() => setDialogState(null)} rule={dialogState.rule} />}
     </div>
   );
 }

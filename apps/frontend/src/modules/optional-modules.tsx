@@ -72,5 +72,8 @@ export const zadarmaModule: FrontendModule = {
 export const automationsModule: FrontendModule = {
   id: "automations",
   nav: [{ id: "automations:settings", label: "Automações", icon: Zap, to: "/configuracoes/automacoes", section: "settings", order: 30, roles: ADMIN_ONLY }],
-  routes: [{ path: "/configuracoes/automacoes", roles: ADMIN_ONLY, page: lazy(() => import("@/pages/settings/AutomationsSettingsPage").then((m) => ({ default: m.AutomationsSettingsPage }))) }],
+  routes: [
+    { path: "/configuracoes/automacoes", roles: ADMIN_ONLY, page: lazy(() => import("@/pages/settings/AutomationsSettingsPage").then((m) => ({ default: m.AutomationsSettingsPage }))) },
+    { path: "/configuracoes/automacoes/historico", roles: ADMIN_ONLY, page: lazy(() => import("@/pages/settings/AutomationRunsPage").then((m) => ({ default: m.AutomationRunsPage }))) },
+  ],
 };

@@ -272,6 +272,38 @@ calendário configurável), gatilhos de módulos que ainda não existem (cronóm
   variáveis e «atribuir»), editar uma existente (o editor carrega tudo o que foi gravado), a regra do sistema sem
   «Apagar», disparar uma regra e vê-la no histórico com o nome do registo, filtros do histórico.
 
+### Execução do 3c (2026-11-20)
+**Implementado como planeado**, com estes pormenores decididos na implementação:
+- **Ficheiros do editor:** `AutomationRuleDialog.tsx` (editor), `automation-text.ts` (a frase, usada na lista e na
+  pré-visualização) e `useAutomationLookups.ts` (catálogo, funis, tipos de tarefa e utilizadores, com os nomes por id).
+- **Âmbito e destino:** num negócio, o destino de «mover» pode ser de outro funil (escolhe-se o funil e depois a fase).
+  Numa tarefa, o destino é sempre um passo do tipo escolhido no âmbito.
+- **Erro encontrado no browser e corrigido:** ao escolher «criar tarefa», o responsável aparecia escolhido («o
+  responsável do registo») mas não ia no pedido, e o servidor recusava. Cada ação passou a começar com a configuração
+  que o editor mostra.
+- Os nomes das execuções no histórico são lidos por tipo de registo, uma vez para a página toda.
+- **Testes:**
+  - 2 e2e novos em `test/automation-engine.e2e-spec.ts` (tipo de tarefa como opção; nomes no histórico).
+  - Total: 284 unitários e 469 e2e.
+  - Numa volta da suite completa falhou um teste de passos das tarefas por tempo: a suite demorou 85 s em vez de cerca
+    de 20 s, com a máquina carregada. Passa sozinho; o limite por teste é 30 s.
+  - Uma volta anterior foi descartada: correu ao mesmo tempo que outra na mesma base de testes, por um comando lançado
+    mal.
+- **Prova por mutação:** 4 mutações nos acertos do servidor, todas apanhadas:
+  - sem opções nos tipos de tarefa;
+  - desativados de fora das opções;
+  - histórico sem nomes;
+  - nomes trocados entre tipos de registo.
+- **Browser** (base de testes):
+  - a lista resume as regras pela frase (incluindo a do sistema);
+  - criar pelo editor «leads de POS → atribuir à Rita» (condição com lista, atribuir com o seletor de utilizadores) e
+    «negócio entra em Em negociação → criar a tarefa "Ligar sobre {titulo}", chamada, prazo daqui a 2 dias úteis» (com o
+    botão da variável);
+  - reabrir: o editor carrega tudo o que foi gravado;
+  - a regra do sistema tem o aviso e não tem «Eliminar»;
+  - uma lead de POS criada pela interface disparou as duas regras de leads, com o nome da lead no histórico;
+  - filtros do histórico por regra e por resultado.
+
 ---
 
 ## Pacotes seguintes (esboço; cada um terá plano detalhado antes de começar)

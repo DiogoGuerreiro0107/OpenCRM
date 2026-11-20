@@ -157,6 +157,37 @@ describe("Motor de automações (e2e)", () => {
     });
   });
 
+  describe("interface (3c)", () => {
+    it("o tipo de tarefa nas condições é uma lista dos tipos que existem (também os desativados)", async () => {
+      await api().patch("/work-item-types/OUTRO").set("Authorization", admin).send({ active: false }).expect(200);
+      const catalog = (await api().get("/automation-rules/catalog").set("Authorization", admin).expect(200)).body;
+      const typeField = catalog.entities.find((e: { id: string }) => e.id === "WORK_ITEM").fields.find((f: { name: string }) => f.name === "typeId");
+      expect(typeField.kind).toBe("option");
+      expect(typeField.options).toEqual(expect.arrayContaining([{ value: "VISITA", label: "Visita" }, { value: "OUTRO", label: "Outro (desativado)" }]));
+      const body = { name: "Visitas", entityType: "WORK_ITEM", trigger: "CREATED", action: "WEBHOOK" };
+      await post({ ...body, conditions: [{ field: "typeId", operator: "eq", value: "NAO_EXISTE" }] }).expect(400);
+      await post({ ...body, conditions: [{ field: "typeId", operator: "eq", value: "VISITA" }] }).expect(201);
+    });
+
+    it("o histórico traz o nome de cada registo (e «nulo» se já foi apagado)", async () => {
+      await post({ ...valid(), action: "WEBHOOK", actionConfig: {} }).expect(201);
+      await post({ name: "Tarefas", entityType: "WORK_ITEM", trigger: "CREATED", action: "WEBHOOK" }).expect(201);
+      const deal = await createDeal();
+      await api().patch(`/deals/${deal.id}`).set("Authorization", comercial).send({ value: 5000 }).expect(200);
+      const task = (await api().post("/tasks").set("Authorization", comercial).send({ title: "Ligar ao cliente" }).expect(201)).body;
+      const lead = (await api().post("/leads").set("Authorization", comercial).send({ name: "Ana Lead" }).expect(201)).body; // regra do sistema
+      const gone = (await api().post("/tasks").set("Authorization", comercial).send({ title: "Vai ser apagada" }).expect(201)).body;
+      await api().delete(`/tasks/${gone.id}`).set("Authorization", comercial).expect(204);
+
+      const items: Array<{ entityId: string; entityLabel: string | null }> = await runs();
+      const label = (id: string) => items.find((r) => r.entityId === id)?.entityLabel;
+      expect(label(deal.id)).toBe("Negócio");
+      expect(label(task.id)).toBe("Ligar ao cliente");
+      expect(label(lead.id)).toBe("Ana Lead");
+      expect(label(gone.id)).toBeNull();
+    });
+  });
+
   describe("catálogo e módulos", () => {
     it("o catálogo descreve o que os registos oferecem", async () => {
       const catalog = (await api().get("/automation-rules/catalog").set("Authorization", admin).expect(200)).body;

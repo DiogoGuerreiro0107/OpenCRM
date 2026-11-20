@@ -604,3 +604,47 @@ export interface AgendaResponse {
   entries: AgendaEntry[];
   countsByDay: Record<string, number>;
 }
+
+/** Catálogo das automações (GET /automation-rules/catalog, Fase 3a/3c): o que os registos do servidor oferecem. */
+export interface AutomationCatalogField {
+  name: string;
+  label: string;
+  kind: "number" | "text" | "option" | "user";
+  options?: Array<{ value: string; label: string }>;
+}
+
+export interface AutomationCatalogEntity {
+  id: string;
+  label: string;
+  /** Tipo de fluxo (DEAL, WORK_ITEM) ou null (sem passos). */
+  workflowEntity: string | null;
+  fields: AutomationCatalogField[];
+  /** Campos cuja mudança o gatilho «campo alterado» pode acompanhar. */
+  changeTracked: string[];
+  /** Variáveis dos modelos de texto (nome → descrição). */
+  variables: Record<string, string>;
+  triggers: Array<{ id: AutomationTriggerType; label: string; step: "required" | "optional" }>;
+  actions: Array<{ id: AutomationActionType; label: string }>;
+}
+
+export interface AutomationCatalog {
+  entities: AutomationCatalogEntity[];
+  operators: Record<AutomationCondition["operator"], string>;
+  operatorsByKind: Record<AutomationCatalogField["kind"], Array<AutomationCondition["operator"]>>;
+}
+
+/** Execução de uma regra (histórico, GET /automation-runs). */
+export interface AutomationRun {
+  id: string;
+  ruleId: string;
+  rule: { id: string; name: string };
+  entityType: string;
+  entityId: string;
+  /** Nome do registo; null se já foi apagado. */
+  entityLabel: string | null;
+  trigger: string;
+  outcome: "SUCCEEDED" | "SKIPPED" | "FAILED";
+  message: string | null;
+  depth: number;
+  createdAt: string;
+}
