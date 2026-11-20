@@ -1,4 +1,7 @@
+import { useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import { useServiceCaseRoute } from "@/lib/useServiceCaseRoute";
 import { getTask } from "@/lib/tasks-api";
 import { getLead, getLeadSettings } from "@/lib/leads-api";
 import { TaskDialog } from "@/pages/tasks/TaskDialog";
@@ -10,10 +13,16 @@ export interface AgendaOpenerProps {
   onClose: () => void;
 }
 
-/** Tarefa: o diálogo da tarefa, com os dados atuais. */
+/** Tarefa: o diálogo da tarefa, com os dados atuais; uma assistência abre na ficha (Fase 4a). */
 export function TaskOpener({ id, onClose }: AgendaOpenerProps) {
   const { data: task } = useQuery({ queryKey: ["tasks", "one", id], queryFn: () => getTask(id) });
-  if (!task) return null;
+  const navigate = useNavigate();
+  const serviceCaseRoute = useServiceCaseRoute();
+  const route = task ? serviceCaseRoute(task) : null;
+  useEffect(() => {
+    if (route) navigate(route);
+  }, [route, navigate]);
+  if (!task || route) return null;
   return <TaskDialog open task={task} onClose={onClose} />;
 }
 

@@ -82,6 +82,44 @@ portal do cliente, faturação do tempo.
 - **Prova por mutação** nas regras; **browser** (base de testes): menu, lista, nova assistência, ficha, cartão na
   empresa, abrir pela agenda.
 
+### Execução do 4a (2026-11-20)
+**Implementado como planeado**, com estes pormenores decididos na implementação:
+- **Toda a tarefa do tipo «Assistência» tem os dados próprios**, venha de onde vier: a ficha nova, o diálogo da tarefa,
+  uma automação («criar tarefa») ou uma tarefa que passa a esse tipo. Sem dados, o serviço das tarefas cria-os com o
+  problema = descrição (ou título). É a mesma regra da migração para as que já existiam. Assim, abrir qualquer
+  assistência leva sempre a uma ficha.
+- **Uma assistência não muda de tipo** (400): os dados próprios só fazem sentido nesse tipo.
+- **Número sem buracos:** a primeira versão gravava com «ON CONFLICT DO NOTHING», que gasta um valor da sequência mesmo
+  quando não insere. A suite apanhou números saltados; passou a ver primeiro se existe.
+- Os passos por omissão são dados no arranque e antes de cada criação, só com o módulo ligado e o tipo sem passos.
+- **Interface:** contribuição do módulo (menu «Assistências», rotas `/assistencias` e `/assistencias/:id`, cartão nas
+  fichas de empresa e contacto). A lista tem pesquisa, responsável e estado (em aberto, fechadas, todas). O botão
+  «Quadro por passos» leva à página do tipo. Na ficha, a tarefa (passo, responsável, prazo) edita-se no diálogo da
+  tarefa. Na lista de tarefas (lista, quadro e calendário) e na agenda, uma assistência abre na ficha, com o módulo
+  ligado.
+- **Tempo real:** recurso `service-cases`. O formulário da ficha copia a assistência só ao abri-la ou ao gravar, para
+  uma atualização a meio não apagar o que se está a escrever (a mesma razão das fichas de empresa e contacto).
+- **Testes:** 9 e2e novos em `test/service-cases.e2e-spec.ts` e o módulo acrescentado em `test/modules.e2e-spec.ts`.
+  Total: 284 unitários e 478 e2e. Na suite completa, alguns testes de outras áreas falharam por tempo na limpeza da
+  base de testes (`TRUNCATE` acima de 30 s, com a suite a demorar 15 min em vez do habitual). Passam todos sozinhos e
+  nenhuma asserção falhou. A primeira volta apanhou o erro dos números saltados (acima).
+- **Prova por mutação:** 16 mutações, todas apanhadas: criar e mudar para o tipo sem dados próprios, problema sem a
+  descrição, sem ver se já existe (números saltados), assistência a mudar de tipo, pesquisa sem série e sem número,
+  fechadas = abertas, apagar o diagnóstico registado como atualizado, sem «campo alterado», marca sem limpar espaços,
+  problema vazio aceite, rota sem módulo e sem área de escrita, garantia fora das automações, filtro por empresa
+  ignorado. A prova mostrou um teste instável: as duas notas do mesmo pedido têm a mesma hora, e a ordem entre elas
+  deixou de contar no teste.
+- **Migração:** ensaiada numa cópia da base de desenvolvimento com duas assistências acrescentadas (uma com
+  descrição e outra sem): ganharam a linha (AS-0001 e AS-0002, problema = descrição ou título) e os restantes dados
+  ficaram iguais (mesma impressão digital). Sem desvio face ao esquema. A reversão repôs o esquema e os dados de
+  antes. A base de desenvolvimento foi migrada depois de uma cópia de segurança.
+- **Browser** (base de testes): menu «Assistências»; lista com pesquisa por série e por número; ficha (gravar o diagnóstico vai à
+  timeline e o formulário mantém o texto); mudar o passo no diálogo da tarefa (o cabeçalho atualiza); cartão na
+  empresa e «Nova assistência» a partir dele (com a empresa preenchida, abre a ficha nova); abrir uma assistência pela
+  lista de tarefas, pelo quadro do tipo e pela agenda leva à ficha, também a criada como tarefa comum. Acerto feito
+  no browser: o campo da garantia passou a «Em garantia» com opções curtas (Sim, Não, Por confirmar), porque o texto
+  não cabia.
+
 ---
 
 ## Pacotes seguintes (esboço; cada um terá plano detalhado antes de começar)

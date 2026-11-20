@@ -107,18 +107,29 @@ export const AUTOMATION_ENTITIES = {
         options: [{ value: "BAIXA", label: "Baixa" }, { value: "NORMAL", label: "Normal" }, { value: "ALTA", label: "Alta" }, { value: "URGENTE", label: "Urgente" }],
       },
       { name: "assigneeId", label: "Responsável", kind: "user" },
+      // Dados das assistências (módulo assistencias, Fase 4a): vazios nas tarefas que não são assistências.
+      { name: "underWarranty", label: "Em garantia (assistências)", kind: "option", options: [{ value: "YES", label: "Sim" }, { value: "NO", label: "Não" }, { value: "UNKNOWN", label: "Não se sabe" }] },
+      { name: "brand", label: "Marca (assistências)", kind: "text" },
     ],
-    changeTracked: ["typeId", "status", "priority", "assigneeId"],
+    changeTracked: ["typeId", "status", "priority", "assigneeId", "underWarranty", "brand"],
     ownerField: "assigneeId",
     variables: { titulo: "Título da tarefa", empresa: "Empresa", contacto: "Contacto" },
     load: async (prisma, id) => {
       const task = await prisma.workItem.findUnique({
         where: { id },
-        include: { type: { select: { workflowId: true } }, company: { select: { name: true } }, contact: { select: { name: true } } },
+        include: {
+          type: { select: { workflowId: true } },
+          company: { select: { name: true } },
+          contact: { select: { name: true } },
+          serviceCase: { select: { underWarranty: true, brand: true } },
+        },
       });
       if (!task) return null;
       return {
-        values: { typeId: task.typeId, status: task.status, priority: task.priority, assigneeId: task.assigneeId },
+        values: {
+          typeId: task.typeId, status: task.status, priority: task.priority, assigneeId: task.assigneeId,
+          underWarranty: task.serviceCase?.underWarranty ?? null, brand: task.serviceCase?.brand ?? null,
+        },
         workflowId: task.type.workflowId,
         stepId: task.stepId,
         ownerId: task.assigneeId,

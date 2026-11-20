@@ -31,6 +31,9 @@ export interface SystemWorkItemType {
   color: (typeof WORK_ITEM_COLORS)[number];
 }
 
+/** Tipo das assistências (Fase 4a): cada item deste tipo tem os dados próprios em `ServiceCase`. */
+export const SERVICE_CASE_TYPE = "ASSISTENCIA";
+
 export const SYSTEM_WORK_ITEM_TYPES: SystemWorkItemType[] = [
   { id: "TAREFA", name: "Tarefa", icon: "check-square", color: "slate" },
   { id: "CHAMADA", name: "Chamada", icon: "phone", color: "blue" },

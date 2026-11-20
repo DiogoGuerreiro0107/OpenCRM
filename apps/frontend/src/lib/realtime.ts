@@ -13,7 +13,9 @@ import { api, getAccessToken } from "./api";
 const KEYS_BY_RESOURCE: Record<string, string[]> = {
   deals: ["deals", "pipelines", "dashboard-summary", "automation-runs"],
   pipelines: ["pipelines", "deals", "dashboard-summary"],
-  tasks: ["tasks", "dashboard-summary", "work-item-types", "agenda", "automation-runs"],
+  tasks: ["tasks", "dashboard-summary", "work-item-types", "agenda", "automation-runs", "service-cases"],
+  // Assistências (Fase 4a): cada uma é uma tarefa; a ficha só recarrega o formulário quando muda de assistência.
+  "service-cases": ["service-cases", "tasks", "agenda", "dashboard-summary", "automation-runs", "timeline"],
   // Um administrador mudou os tipos de tarefa: formulários, filtros e listas atualizam-se.
   "work-item-types": ["work-item-types", "tasks", "custom-fields", "agenda", "automation-rules"],
   // Passos de um fluxo (tipos de tarefa ou funis) mudaram: tipos, tarefas, quadros e funis atualizam-se.
