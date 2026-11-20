@@ -8,6 +8,7 @@ import { errorMessage } from "@/lib/errors";
 import { useCanWrite } from "@/lib/useCanWrite";
 import { CustomFieldsSection } from "@/components/CustomFieldsSection";
 import { TimelineSection } from "@/components/TimelineSection";
+import { TimeSection } from "@/components/time/TimeSection";
 import { ReadOnlyFieldset } from "@/components/ReadOnly";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -32,7 +33,7 @@ function formOf(sc: ServiceCase | null) {
 
 /**
  * Ficha da assistência (Fase 4a): cabeçalho (número, cliente, passo, responsável), equipamento, problema, diagnóstico e
- * resolução, campos personalizados do tipo e timeline. A tarefa (passo, responsável, prazo) edita-se no diálogo da tarefa.
+ * resolução, campos personalizados do tipo, tempo (4b) e timeline. A tarefa (passo, responsável, prazo) edita-se no diálogo da tarefa.
  */
 export function ServiceCaseDetailPage() {
   const { id = "" } = useParams();
@@ -184,14 +185,24 @@ export function ServiceCaseDetailPage() {
             </CardContent>
           </Card>
         </div>
-        <Card>
-          <CardHeader>
-            <CardTitle>Atividade</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <TimelineSection entityType="TASK" entityId={sc.workItemId} />
-          </CardContent>
-        </Card>
+        <div className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Tempo</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <TimeSection workItemId={sc.workItemId} closed={w.status === "DONE" || w.status === "CANCELLED"} />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Atividade</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <TimelineSection entityType="TASK" entityId={sc.workItemId} />
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       {editingTask && task.data && (

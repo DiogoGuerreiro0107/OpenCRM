@@ -53,6 +53,8 @@ function triggerText(rule: RuleLike, lookups: AutomationLookups) {
       return `entra em ${step}`;
     case "IDLE_IN_STEP":
       return `está ${done("parado", "parada")} há ${rule.triggerConfig.days ?? "?"} dias em ${step}`;
+    case "TIMER_STOPPED":
+      return "tem um cronómetro parado";
     case "ALL_TASKS_CLOSED":
       return `tem todas as tarefas fechadas em ${step}`;
     case "FIELD_CHANGED": {

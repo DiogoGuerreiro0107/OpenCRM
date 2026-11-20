@@ -5,6 +5,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { CreateUserDto } from "./dto/create-user.dto";
 import { UpdateUserDto } from "./dto/update-user.dto";
 import { RealtimeService } from "../realtime/realtime.service";
+import { stopRunningTimers } from "../time-entries/time-entry-rules";
 import { hashToken } from "../common/secrets";
 
 /** Campos que podem sair para a API. NUNCA passwordHash, refreshToken nem resetTokenHash. */
@@ -106,6 +107,8 @@ export class UsersService {
 
     // Um utilizador desativado deixa de receber eventos em tempo real: fecha-lhe as ligações abertas.
     if (deactivating) this.realtime.disconnectUser(id);
+    // E o cronómetro dele para (Fase 4b): ninguém mais o pararia. Sem automações (não foi trabalho que acabou).
+    if (deactivating) await stopRunningTimers(this.prisma, { userId: id });
     return updated;
   }
 

@@ -200,6 +200,50 @@ fica no núcleo das tarefas, sem módulo próprio. A interface começa pela fich
   - registo manual;
   - editar com motivo e ver a timeline.
 
+### Execução do 4b (2026-11-20)
+**Implementado como planeado**, com estes pormenores decididos na implementação:
+- **Código:** serviço em `src/time-entries/`. As regras partilhadas (parar cronómetros, durações, textos) estão em
+  `time-entry-rules.ts` e são usadas pelo serviço das tarefas (fechar) e pelo dos utilizadores (desativar).
+- **Desativar um utilizador para o cronómetro dele.** Ninguém mais o pararia. Não dispara «cronómetro parado», porque
+  não foi trabalho que acabou.
+- **Sem sobreposições:** a regra está no serviço, não na base de dados (precisaria de uma extensão do Postgres).
+  Dois pedidos simultâneos da mesma pessoa podem, em teoria, passar os dois.
+- As horas dos textos da timeline vêm no fuso do browser (`tz`, Lisboa por omissão).
+- No ecrã, o contador usa a hora do servidor. O aviso de esquecido também aparece se as 8 h passarem com a página
+  aberta.
+- **Testes:**
+  - 10 e2e novos em `test/time-entries.e2e-spec.ts`, 4 unitários das regras e 1 dos utilizadores (desativar para o
+    cronómetro). Total: 289 unitários e 488 e2e.
+  - Na suite completa, só o tempo real falhou por tempo na limpeza da base de testes; passa sozinho.
+  - O primeiro ensaio dos testes apanhou um erro: com um registo a correr, a verificação de sobreposições usava uma
+    data «infinita» que a base de dados recusa. Passou a não ter limite superior.
+- **Prova por mutação:** 22 mutações, todas apanhadas:
+  - iniciar: sem parar o anterior, sem dizer qual parou, numa tarefa fechada, outro registo no mesmo item;
+  - fechar a tarefa não para;
+  - registo manual: fim igual ao início, no futuro, sem máximo de 24 h;
+  - sobreposições: o que corre não conta, editar sem verificar;
+  - motivos: horas sem motivo, acerto fora da timeline, apagar sem motivo;
+  - permissões: qualquer um altera os de outros, rota sem área de escrita;
+  - totais: faturável igual a tudo;
+  - esquecido só às 9 h; desativar não para;
+  - gatilho: em falta ao parar, ao mudar e ao fechar, e a disparar nos manuais.
+
+  Duas mutações não compilavam à primeira e foram refeitas com variantes que compilam.
+- **Migração:** ensaiada numa cópia da base de desenvolvimento:
+  - os dados ficaram iguais antes da migração, depois dela e depois da reversão (mesma impressão digital);
+  - sem desvio de esquema (as CHECK não confundem o Prisma);
+  - em SQL, a base de dados recusou um segundo cronómetro a correr, um a correr sem marca, um parado com marca e um
+    fim antes do início;
+  - a reversão repôs o esquema;
+  - a base de desenvolvimento foi migrada depois de uma cópia de segurança.
+- **Browser** (base de testes):
+  - iniciar na ficha: o indicador aparece na barra com o contador e AS-0001;
+  - iniciar noutra assistência: o aviso «Parou o cronómetro de AS-0001…» aparece e o indicador muda;
+  - parar no indicador;
+  - registo manual (com a duração no diálogo);
+  - editar o fim: o motivo passa a obrigatório; o registo mostra «Acertado por…» e a timeline mostra «Tempo acertado
+    … → …. Motivo: …» na hora local.
+
 ---
 
 ## Pacotes seguintes (esboço; cada um terá plano detalhado antes de começar)

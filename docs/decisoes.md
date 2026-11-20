@@ -603,3 +603,25 @@ Primeiro pacote da [Fase 4](plano-fase-4-assistencias.md).
 - **Validação:** 9 e2e novos (478 e2e e 284 unitários no total), 16 mutações todas apanhadas, migração ensaiada com
   assistências antigas e revertida, e verificação no browser com a base de testes. A suite apanhou números saltados
   (corrigido). Detalhes no plano, em «Execução do 4a».
+
+## Fase 4b: cronómetro e registo de tempo (2026-11-20)
+Segundo pacote da [Fase 4](plano-fase-4-assistencias.md).
+- **Registo de tempo em qualquer item de trabalho** (`TimeEntry`), no núcleo das tarefas, sem módulo próprio.
+  **O servidor é a fonte de verdade:** «iniciar» grava o início e «parar» o fim. O contador no ecrã é só apresentação.
+- **Um cronómetro a correr por pessoa, garantido pela base de dados:** coluna única preenchida só enquanto corre,
+  mais restrições CHECK. Iniciar noutro item para o anterior e o ecrã avisa qual parou.
+- **Fechar uma tarefa para os cronómetros dela**, e desativar um utilizador para o dele.
+- **Registos manuais:** no passado, até 24 h, e os registos de uma pessoa não se sobrepõem (o que corre conta até
+  agora).
+- **Mudar horas ou apagar exige motivo.** Fica no registo (último acerto), na timeline do item e na auditoria. Nota
+  e faturável mudam-se livremente. Cada pessoa altera os seus registos e o Administrador os de todos.
+- **Gatilho de automação «Cronómetro parado»** nas tarefas: parar, mudar de cronómetro e fechar contam; os registos
+  manuais não.
+- **Interface:** indicador global na barra lateral (contador, item, «Parar», aviso a partir de 8 h) e cartão «Tempo»
+  na ficha da assistência (iniciar ou parar, totais por pessoa, registos com editar e apagar, registo manual).
+  Ficam para mais tarde o cronómetro nas tarefas comuns e o relatório de tempo por técnico (vai com os indicadores
+  do 4c).
+- **Validação:** 10 e2e e 5 unitários novos (488 e2e e 289 unitários no total), 22 mutações todas apanhadas,
+  migração ensaiada (com as restrições testadas em SQL) e revertida, e verificação no browser com a base de testes.
+  Detalhes no plano, em «Execução do 4b».
+

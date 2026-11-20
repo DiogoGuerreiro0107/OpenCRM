@@ -7,6 +7,7 @@ import { OPEN_WORK_ITEM_STATUSES, isOpenStatus } from "./work-item-status";
 import { resolveWorkItemStep } from "./work-item-steps";
 import { Chain, newChain } from "../automations/registry/engine";
 import { DEFAULT_WORK_ITEM_TYPE, SERVICE_CASE_TYPE } from "../work-item-types/system-types";
+import { stopRunningTimers } from "../time-entries/time-entry-rules";
 import { CreateTaskDto } from "./dto/create-task.dto";
 import { UpdateTaskDto } from "./dto/update-task.dto";
 import { QueryTaskBoardDto, QueryTaskCalendarDto, QueryTasksDto, TaskFiltersDto } from "./dto/query-tasks.dto";
@@ -255,6 +256,7 @@ export class TasksService implements OnModuleInit {
 
     // Fechar (concluir ou cancelar) regista-se na timeline da tarefa e dos registos ligados.
     const closedAs = nextStatus !== existing.status && !isOpenStatus(nextStatus) ? nextStatus : null;
+    let timersStopped = false;
     if (closedAs) {
       const description = `Tarefa ${closedAs === "DONE" ? "concluída" : "cancelada"}: "${task.title}".`;
       const events: { entityType: "CONTACT" | "COMPANY" | "DEAL" | "LEAD" | "TASK"; entityId: string }[] = [
@@ -268,6 +270,8 @@ export class TasksService implements OnModuleInit {
       await this.prisma.timelineEvent.createMany({
         data: events.map((e) => ({ ...e, type: "SYSTEM", description, userId: actingUserId })),
       });
+      // Fechar o item para os cronómetros que corram nele, de quem for (Fase 4b).
+      timersStopped = (await stopRunningTimers(this.prisma, { workItemId: task.id })).length > 0;
 
       // A regra «tarefas do negócio concluídas» olha para as que ficam em aberto: cancelar a última também conta.
       if (task.dealId && isOpenStatus(existing.status)) {
@@ -280,6 +284,7 @@ export class TasksService implements OnModuleInit {
     const changedFields = TasksService.TRACKED.filter((field) => task[field] !== existing[field]);
     if (changedFields.length > 0) await this.automations.dispatch({ ...actor, trigger: "FIELD_CHANGED", changedFields: [...changedFields] }, chain);
     if (task.stepId && task.stepId !== existing.stepId) await this.automations.dispatch({ ...actor, trigger: "ENTERED_STEP" }, chain);
+    if (timersStopped) await this.automations.dispatch({ ...actor, trigger: "TIMER_STOPPED" }, chain);
     if (closedAs) await this.automations.dispatch({ ...actor, trigger: "CLOSED" }, chain);
 
     return task;
