@@ -69,8 +69,8 @@ export class LeadsController {
   }
 
   @Patch(":id")
-  update(@Param("id") id: string, @Body() dto: UpdateLeadDto) {
-    return this.leadsService.update(id, dto);
+  update(@Param("id") id: string, @Body() dto: UpdateLeadDto, @CurrentUser() user: { userId: string }) {
+    return this.leadsService.update(id, dto, user.userId);
   }
 
   @Delete(":id")

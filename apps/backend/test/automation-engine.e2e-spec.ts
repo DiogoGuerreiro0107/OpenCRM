@@ -62,7 +62,7 @@ describe("Motor de automações (e2e)", () => {
         ["dias inválidos", { trigger: "IDLE_IN_STEP", stepId: stage("Novo").id, triggerConfig: { days: 0 } }],
         ["dias não inteiros", { trigger: "IDLE_IN_STEP", stepId: stage("Novo").id, triggerConfig: { days: 1.5 } }],
         ["campo alterado sem campo", { triggerConfig: {} }],
-        ["campo que não se acompanha", { triggerConfig: { field: "ownerId" } }],
+        ["campo que não se acompanha", { triggerConfig: { field: "outcome" } }],
         ["condição com campo desconhecido", { conditions: [{ field: "x", operator: "eq", value: 1 }] }],
         ["condição com valor errado", { conditions: [{ field: "value", operator: "gt", value: "mil" }] }],
         ["condição com opção inexistente", { conditions: [{ field: "type", operator: "eq", value: "NAVE_ESPACIAL" }] }],
@@ -79,7 +79,7 @@ describe("Motor de automações (e2e)", () => {
       // Passo de outro funil que não o escolhido.
       const other = (await api().post("/pipelines").set("Authorization", admin).send({ name: "Outro" }).expect(201)).body;
       await post({ ...valid(), stepId: other.stages[0].id }).expect(400);
-      expect(await prisma().automationRule.count()).toBe(0);
+      expect(await prisma().automationRule.count({ where: { systemKey: null } })).toBe(0);
     });
 
     it("alterar valida a regra inteira (o que vem por cima do que existe)", async () => {
@@ -161,8 +161,9 @@ describe("Motor de automações (e2e)", () => {
     it("o catálogo descreve o que os registos oferecem", async () => {
       const catalog = (await api().get("/automation-rules/catalog").set("Authorization", admin).expect(200)).body;
       const deal = catalog.entities.find((e: { id: string }) => e.id === "DEAL");
-      expect(deal.triggers.map((t: { id: string }) => t.id)).toEqual(["IDLE_IN_STEP", "ALL_TASKS_CLOSED", "FIELD_CHANGED"]);
-      expect(deal.actions.map((a: { id: string }) => a.id)).toEqual(["MOVE_TO_STEP", "WEBHOOK"]);
+      expect(deal.triggers.map((t: { id: string }) => t.id)).toEqual(["IDLE_IN_STEP", "ALL_TASKS_CLOSED", "FIELD_CHANGED", "CREATED", "ENTERED_STEP", "CLOSED"]);
+      expect(deal.actions.map((a: { id: string }) => a.id)).toEqual(["MOVE_TO_STEP", "WEBHOOK", "CREATE_WORK_ITEM", "ASSIGN"]);
+      expect(catalog.entities.map((e: { id: string }) => e.id)).toEqual(["DEAL", "WORK_ITEM", "LEAD"]);
       expect(deal.fields.map((f: { name: string }) => f.name)).toContain("value");
       expect(catalog.operatorsByKind.number).toContain("gt");
       await api().get("/automation-rules/catalog").set("Authorization", comercial).expect(403);

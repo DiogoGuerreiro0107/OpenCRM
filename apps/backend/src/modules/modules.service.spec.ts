@@ -18,6 +18,17 @@ function build(saved: Array<{ moduleId: string; enabled: boolean }> = []) {
   return { service, prisma };
 }
 
+/** Desde a 3b nenhum módulo real depende de outro: estes testes declaram «automações → negócios» só durante o teste. */
+function withTestDependency() {
+  const automations = MODULE_MANIFESTS.find((m) => m.id === "automations")!;
+  beforeEach(() => {
+    automations.dependsOn = ["deals"];
+  });
+  afterEach(() => {
+    automations.dependsOn = [];
+  });
+}
+
 describe("ModulesService", () => {
   it("sem nenhuma definição guardada, todos os módulos estão ativos", async () => {
     const { service } = build();
@@ -46,6 +57,7 @@ describe("ModulesService", () => {
   });
 
   describe("setEnabled", () => {
+    withTestDependency();
     it("desliga e a cache reflete-se de imediato", async () => {
       const { service } = build();
       await service.reload();
@@ -95,12 +107,15 @@ describe("ModulesService", () => {
     });
   });
 
-  it("list() mostra as dependências e os dependentes ativos", async () => {
+  describe("list()", () => {
+    withTestDependency();
+    it("mostra as dependências e os dependentes ativos", async () => {
     const { service } = build();
     await service.reload();
     const view = service.list();
     expect(view.find((m) => m.id === "automations")?.dependsOn).toEqual(["deals"]);
     expect(view.find((m) => m.id === "deals")?.activeDependents).toEqual(["automations"]);
     expect(view.find((m) => m.id === "leads")?.activeDependents).toEqual([]);
+    });
   });
 });

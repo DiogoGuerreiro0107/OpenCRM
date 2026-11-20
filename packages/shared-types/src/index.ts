@@ -425,9 +425,9 @@ export interface EmailTemplate {
 }
 
 /** Gatilhos e ações das automações (Fase 3a): códigos dos registos do servidor (src/automations/registry/). */
-export type AutomationTriggerType = "IDLE_IN_STEP" | "ALL_TASKS_CLOSED" | "FIELD_CHANGED";
+export type AutomationTriggerType = "IDLE_IN_STEP" | "ALL_TASKS_CLOSED" | "FIELD_CHANGED" | "CREATED" | "ENTERED_STEP" | "CLOSED";
 
-export type AutomationActionType = "MOVE_TO_STEP" | "WEBHOOK";
+export type AutomationActionType = "MOVE_TO_STEP" | "WEBHOOK" | "CREATE_WORK_ITEM" | "ASSIGN";
 
 export interface AutomationCondition {
   field: string;
@@ -439,6 +439,8 @@ export interface AutomationRule {
   id: string;
   name: string;
   active: boolean;
+  /** Regra do sistema (ex.: primeiro contacto da lead): desativa-se, mas não se apaga. */
+  systemKey: string | null;
   entityType: string;
   workflowId: string | null;
   workflow: { id: string; name: string } | null;

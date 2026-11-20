@@ -54,25 +54,31 @@ describe("manifestProblems (deteta manifestos maus)", () => {
 
 describe("dependências", () => {
   const set = (...ids: string[]) => new Set(ids) as never;
+  // Desde a 3b nenhum módulo real tem dependências: o mecanismo testa-se com manifestos de teste.
+  const manifests = [m("deals"), m("leads"), m("automations", ["deals"])];
 
-  it("automações precisam de negócios", () => {
-    expect(missingDependencies("automations", set("leads", "email"))).toEqual(["deals"]);
-    expect(missingDependencies("automations", set("deals"))).toEqual([]);
+  it("um módulo com dependência desligada não se liga", () => {
+    expect(missingDependencies("automations", set("leads", "email"), manifests)).toEqual(["deals"]);
+    expect(missingDependencies("automations", set("deals"), manifests)).toEqual([]);
   });
 
   it("um módulo sem dependências nunca tem nada em falta", () => {
-    expect(missingDependencies("leads", set())).toEqual([]);
+    expect(missingDependencies("leads", set(), manifests)).toEqual([]);
   });
 
-  it("não se desliga negócios enquanto as automações estiverem ativas", () => {
-    expect(activeDependents("deals", set("deals", "automations"))).toEqual(["automations"]);
+  it("não se desliga uma dependência enquanto o dependente estiver ativo", () => {
+    expect(activeDependents("deals", set("deals", "automations"), manifests)).toEqual(["automations"]);
   });
 
-  it("depois de desligar as automações, já se pode desligar os negócios", () => {
-    expect(activeDependents("deals", set("deals"))).toEqual([]);
+  it("depois de desligar o dependente, já se pode desligar a dependência", () => {
+    expect(activeDependents("deals", set("deals"), manifests)).toEqual([]);
   });
 
   it("dependentes já desligados não contam", () => {
-    expect(activeDependents("deals", set("deals", "leads"))).toEqual([]);
+    expect(activeDependents("deals", set("deals", "leads"), manifests)).toEqual([]);
+  });
+
+  it("nenhum módulo real depende de outro (desde a 3b, as automações correm por tipo de registo)", () => {
+    expect(MODULE_MANIFESTS.filter((x) => x.dependsOn.length > 0).map((x) => x.id)).toEqual([]);
   });
 });

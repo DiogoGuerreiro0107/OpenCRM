@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, Logger, NotFoundException, OnApplicationBootstrap } from "@nestjs/common";
 import { Cron, CronExpression } from "@nestjs/schedule";
 import { AutomationRule, Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
@@ -10,8 +10,10 @@ import { CreateAutomationRuleDto, QueryAutomationRunsDto } from "./dto/create-au
 import { UpdateAutomationRuleDto } from "./dto/update-automation-rule.dto";
 import { AUTOMATION_ENTITIES, AUTOMATION_ENTITY_TYPES, AutomationEntityType, automationEntity, isAutomationEntityType } from "./registry/automation-entities";
 import { AUTOMATION_TRIGGERS, AUTOMATION_TRIGGER_IDS, AutomationEvent, automationTrigger, isAutomationTriggerId } from "./registry/automation-triggers";
-import { AUTOMATION_ACTIONS, AUTOMATION_ACTION_IDS, actionApplies, automationAction, isAutomationActionId } from "./registry/automation-actions";
-import { Condition, OPERATORS, OPERATORS_BY_KIND, normalizeConditions } from "./registry/conditions";
+import { AUTOMATION_ACTIONS, AUTOMATION_ACTION_IDS, TaskWriter, actionApplies, automationAction, isAutomationActionId } from "./registry/automation-actions";
+import { AutomationField, Condition, OPERATORS, OPERATORS_BY_KIND, normalizeConditions } from "./registry/conditions";
+import { customAutomationFields, customAutomationValues } from "./registry/helpers";
+import { ensureSystemAutomationRules } from "./registry/system-rules";
 import { Chain, EngineDeps, EngineEvent, EngineRule, newChain, runEvent, runRule } from "./registry/engine";
 
 const RULE_INCLUDE = {
@@ -40,7 +42,7 @@ const toEngineRule = (rule: AutomationRule): EngineRule => ({
  * gatilhos, ações e campos (src/automations/registry/), e um único ponto de entrada para os eventos (`dispatch`).
  */
 @Injectable()
-export class AutomationsService {
+export class AutomationsService implements OnApplicationBootstrap {
   private readonly logger = new Logger(AutomationsService.name);
 
   constructor(
@@ -49,6 +51,27 @@ export class AutomationsService {
     private readonly realtime: RealtimeService,
     private readonly modules: ModulesService,
   ) {}
+
+  /**
+   * Escritas em tarefas feitas pelas ações (criar tarefa, mover tarefa). O serviço das tarefas regista-se aqui ao
+   * arrancar (depende deste para os eventos; ao contrário, criava uma dependência circular entre os dois).
+   */
+  private taskWriterFor: ((chain: Chain) => TaskWriter) | null = null;
+
+  registerTaskWriter(factory: (chain: Chain) => TaskWriter) {
+    this.taskWriterFor = factory;
+  }
+
+  /** Regras do sistema (ex.: primeiro contacto da lead): o arranque cria as que faltem, sem mexer nas existentes. */
+  async onApplicationBootstrap() {
+    await ensureSystemAutomationRules(this.prisma);
+  }
+
+  /** Campos das condições de um tipo de registo: os do registo e os personalizados «disponíveis em automações». */
+  private async fieldsOf(entityType: AutomationEntityType): Promise<AutomationField[]> {
+    const entity = automationEntity(entityType);
+    return [...entity.fields, ...(await customAutomationFields(this.prisma, entity.customFieldEntity))];
+  }
 
   /** As regras de um tipo de registo só correm com o módulo de automações E o do tipo de registo ativos. */
   private active(entityType: AutomationEntityType) {
@@ -96,8 +119,10 @@ export class AutomationsService {
   }
 
   async remove(id: string) {
-    const exists = await this.prisma.automationRule.findUnique({ where: { id }, select: { id: true } });
-    if (!exists) throw new NotFoundException("Regra de automação não encontrada");
+    const rule = await this.prisma.automationRule.findUnique({ where: { id }, select: { id: true, systemKey: true, name: true } });
+    if (!rule) throw new NotFoundException("Regra de automação não encontrada");
+    // Uma regra do sistema voltava no arranque seguinte: desativa-se em vez de se apagar.
+    if (rule.systemKey) throw new BadRequestException(`«${rule.name}» é uma regra do sistema: podes desativá-la ou alterá-la, mas não apagá-la`);
     await this.prisma.automationRule.delete({ where: { id } });
   }
 
@@ -146,8 +171,8 @@ export class AutomationsService {
     let actionConfig: Record<string, unknown> = {};
     try {
       triggerConfig = trigger.config(input.triggerConfig ?? {}, entity);
-      conditions = normalizeConditions(entity.fields, input.conditions ?? []);
-      actionConfig = await action.config(this.prisma, input.actionConfig ?? {}, { entityType });
+      conditions = normalizeConditions(await this.fieldsOf(entityType), input.conditions ?? []);
+      actionConfig = await action.config(this.prisma, input.actionConfig ?? {}, { entityType, workflowId });
     } catch (err) {
       fail((err as Error).message);
     }
@@ -164,14 +189,18 @@ export class AutomationsService {
   }
 
   /** O que os registos oferecem (só tipos de registo com o módulo ativo), para a interface montar o editor. */
-  catalog() {
-    const entities = AUTOMATION_ENTITY_TYPES.filter((type) => this.active(type)).map((type) => {
-      const entity = AUTOMATION_ENTITIES[type];
+  async catalog() {
+    const types = AUTOMATION_ENTITY_TYPES.filter((type) => this.active(type));
+    const fields = await Promise.all(types.map((type) => this.fieldsOf(type)));
+    const entities = types.map((type, i) => {
+      const entity: (typeof AUTOMATION_ENTITIES)[AutomationEntityType] = AUTOMATION_ENTITIES[type];
       return {
         id: type,
         label: entity.label,
         workflowEntity: entity.workflowEntity,
-        fields: entity.fields,
+        fields: fields[i],
+        changeTracked: entity.changeTracked,
+        variables: entity.variables,
         triggers: AUTOMATION_TRIGGER_IDS.filter((id) => automationTrigger(id).entities.includes(type)).map((id) => ({
           id,
           label: AUTOMATION_TRIGGERS[id].label,
@@ -210,21 +239,45 @@ export class AutomationsService {
 
   // ------------------------------------------------------------------------------------------------------------ motor
 
+  private taskWriter(chain: Chain): TaskWriter {
+    if (!this.taskWriterFor) throw new Error("O serviço das tarefas não está disponível");
+    return this.taskWriterFor(chain);
+  }
+
   private engine(): EngineDeps {
     return {
       rulesFor: async (entityType, trigger) =>
         (await this.prisma.automationRule.findMany({ where: { active: true, entityType, trigger }, orderBy: { createdAt: "asc" } })).map(toEngineRule),
-      load: (entityType, id) => (isAutomationEntityType(entityType) ? automationEntity(entityType).load(this.prisma, id) : Promise.resolve(null)),
-      fields: (entityType) => (isAutomationEntityType(entityType) ? automationEntity(entityType).fields : []),
+      load: async (entityType, id) => {
+        if (!isAutomationEntityType(entityType)) return null;
+        const entity = automationEntity(entityType);
+        const record = await entity.load(this.prisma, id);
+        if (!record) return null;
+        return { ...record, values: { ...record.values, ...(await customAutomationValues(this.prisma, entity.customFieldEntity, id)) } };
+      },
+      fields: async (entityType) => (isAutomationEntityType(entityType) ? this.fieldsOf(entityType) : []),
       matches: async (rule, event) => {
         if (!isAutomationTriggerId(rule.trigger)) return false;
         const matches = automationTrigger(rule.trigger).matches;
         return matches ? matches(this.prisma, event as AutomationEvent, rule.triggerConfig) : true;
       },
-      execute: async (rule, event) => {
+      execute: async (rule, event, chain, record) => {
         if (!isAutomationActionId(rule.action)) throw new Error(`Ação desconhecida: ${rule.action}`);
+        // Os eventos causados por esta ação ficam na mesma cadeia, um nível abaixo (proteção contra ciclos).
+        const child: Chain = { depth: chain.depth + 1, seen: chain.seen };
         return automationAction(rule.action).execute(
-          { prisma: this.prisma, webhooks: this.webhooks, realtime: this.realtime, rule, entityType: event.entityType as AutomationEntityType, entityId: event.entityId },
+          {
+            prisma: this.prisma,
+            webhooks: this.webhooks,
+            realtime: this.realtime,
+            rule,
+            entityType: event.entityType as AutomationEntityType,
+            entityId: event.entityId,
+            actorId: event.actorId ?? null,
+            record,
+            dispatch: (next) => this.dispatch(next, child),
+            tasks: this.taskWriter(child),
+          },
           rule.actionConfig,
         );
       },

@@ -14,6 +14,8 @@ export interface AutomationEvent {
   trigger: AutomationTriggerId;
   /** Campos que mudaram (gatilho «campo alterado»). */
   changedFields?: string[];
+  /** Quem causou o evento (uma pessoa; nos agendados e na API pública pode não haver). */
+  actorId?: string | null;
 }
 
 export interface AutomationTrigger {
@@ -68,7 +70,7 @@ export const AUTOMATION_TRIGGERS = {
   /** Um campo do registo mudou (as condições dizem para que valores). */
   FIELD_CHANGED: {
     label: "Campo alterado",
-    entities: ["DEAL"],
+    entities: ["DEAL", "WORK_ITEM", "LEAD"],
     step: "optional",
     scheduled: false,
     config: (raw, entity) => {
@@ -77,6 +79,30 @@ export const AUTOMATION_TRIGGERS = {
       return { field: field.name };
     },
     matches: async (_prisma, event, config) => !!event.changedFields?.includes(config.field as string),
+  },
+  /** Criado (por uma pessoa, pela API pública ou por outra automação). Fase 3b. */
+  CREATED: {
+    label: "Criado",
+    entities: ["DEAL", "WORK_ITEM", "LEAD"],
+    step: "optional",
+    scheduled: false,
+    config: () => ({}),
+  },
+  /** Mudou para o passo da regra (criar já num passo não conta: usa «criado» com o passo). Fase 3b. */
+  ENTERED_STEP: {
+    label: "Entrou no passo",
+    entities: ["DEAL", "WORK_ITEM"],
+    step: "required",
+    scheduled: false,
+    config: () => ({}),
+  },
+  /** Fechado: negócio ganho ou perdido, tarefa concluída ou cancelada, lead convertida ou perdida. Fase 3b. */
+  CLOSED: {
+    label: "Fechado",
+    entities: ["DEAL", "WORK_ITEM", "LEAD"],
+    step: "optional",
+    scheduled: false,
+    config: () => ({}),
   },
 } satisfies Record<string, AutomationTrigger>;
 

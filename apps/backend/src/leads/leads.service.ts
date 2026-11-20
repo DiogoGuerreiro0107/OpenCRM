@@ -1,8 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { Company, Contact, Lead, Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
-import { resolveWorkItemStep } from "../tasks/work-item-steps";
-import { DEFAULT_WORK_ITEM_TYPE } from "../work-item-types/system-types";
+import { AutomationsService } from "../automations/automations.service";
 import { WebhooksService } from "../webhooks/webhooks.service";
 import { ModulesService } from "../modules/modules.service";
 import { CreateLeadDto } from "./dto/create-lead.dto";
@@ -33,11 +32,15 @@ const PAGE_SIZE = 50;
 const COMPANY_OUTCOME_LABEL: Record<ConversionOutcome, string> = { LINKED: "já ligada à lead", MATCHED: "já existia, mesmo NIF", CREATED: "nova" };
 const CONTACT_OUTCOME_LABEL: Record<ConversionOutcome, string> = { LINKED: "já ligado à lead", MATCHED: "já existia, mesmo email ou telefone", CREATED: "novo" };
 
+/** Lead fechada: convertida ou perdida (as outras ainda estão em aberto). */
+const isClosedLead = (status: string) => status === "CONVERTIDO" || status === "PERDIDO";
+
 @Injectable()
 export class LeadsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly webhooks: WebhooksService,
+    private readonly automations: AutomationsService,
     private readonly modules: ModulesService,
   ) {}
 
@@ -133,20 +136,9 @@ export class LeadsService {
     const created = await this.prisma.lead.create({ data: { ...dto, ...links, kind, id: options.id }, include: LEAD_INCLUDE });
     const lead = withoutInternal(created);
 
-    const dueDate = new Date();
-    dueDate.setDate(dueDate.getDate() + 1);
-    // Tipo por omissão («Tarefa»); se o administrador lhe deu passos, entra no primeiro passo «por fazer».
-    const step = await resolveWorkItemStep(this.prisma, { typeId: DEFAULT_WORK_ITEM_TYPE, status: "PENDING" });
-    await this.prisma.workItem.create({
-      data: {
-        title: `Contactar lead: ${lead.name}`,
-        status: "PENDING",
-        stepId: step.stepId,
-        dueDate,
-        assigneeId: lead.responsavelId ?? creatorId,
-        leadId: lead.id,
-      },
-    });
+    // A tarefa de primeiro contacto passou a regra de automação do sistema «Primeiro contacto da lead» (Fase 3b,
+    // src/automations/registry/system-rules.ts): mesmo efeito, mas desativável e editável.
+    await this.automations.dispatch({ entityType: "LEAD", entityId: lead.id, trigger: "CREATED", actorId: creatorId });
 
     this.webhooks.trigger("lead.created", {
       leadId: lead.id,
@@ -161,13 +153,19 @@ export class LeadsService {
     return lead;
   }
 
-  async update(id: string, dto: UpdateLeadDto) {
-    const existing = await this.prisma.lead.findUnique({ where: { id }, select: { kind: true } });
+  async update(id: string, dto: UpdateLeadDto, actorId?: string) {
+    const existing = await this.prisma.lead.findUnique({ where: { id }, select: { kind: true, status: true, interest: true, responsavelId: true } });
     if (!existing) throw new NotFoundException("Lead não encontrado");
     // Mudar o tipo de uma lead tem de respeitar o modo; manter o tipo que já tinha é sempre permitido.
     if (dto.kind && dto.kind !== existing.kind) assertKindAllowed(this.mode(), dto.kind);
     const links = await this.resolveLinks(dto);
-    return withoutInternal(await this.prisma.lead.update({ where: { id }, data: { ...dto, ...links }, include: LEAD_INCLUDE }));
+    const lead = withoutInternal(await this.prisma.lead.update({ where: { id }, data: { ...dto, ...links }, include: LEAD_INCLUDE }));
+
+    // Automações das leads (Fase 3b): campo alterado e, ao passar a convertida ou perdida, fechada.
+    const changedFields = (["status", "interest", "responsavelId"] as const).filter((field) => lead[field] !== existing[field]);
+    if (changedFields.length > 0) await this.automations.dispatch({ entityType: "LEAD", entityId: id, trigger: "FIELD_CHANGED", changedFields: [...changedFields], actorId });
+    if (isClosedLead(lead.status) && !isClosedLead(existing.status)) await this.automations.dispatch({ entityType: "LEAD", entityId: id, trigger: "CLOSED", actorId });
+    return lead;
   }
 
   async remove(id: string) {
@@ -202,7 +200,7 @@ export class LeadsService {
 
     // Tudo ou nada: sem transação, uma falha a meio deixava empresa/contacto órfãos e o lead por converter
     // (e uma nova tentativa duplicava os registos).
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const { company, outcome: companyOutcome } = await this.resolveCompany(tx, lead);
       const { contact, outcome: contactOutcome } = await this.resolveContact(tx, lead, company?.id ?? null);
 
@@ -252,6 +250,11 @@ export class LeadsService {
         outcome: { company: company ? companyOutcome : null, contact: contact ? contactOutcome : null },
       };
     });
+
+    // Automações (Fase 3b), depois de gravado: a lead fechou (convertida) e, se houve, nasceu um negócio.
+    await this.automations.dispatch({ entityType: "LEAD", entityId: id, trigger: "CLOSED", actorId: actingUserId });
+    if (result.deal) await this.automations.dispatch({ entityType: "DEAL", entityId: result.deal.id, trigger: "CREATED", actorId: actingUserId });
+    return result;
   }
 
   /** Empresa da conversão: a ligada; senão uma com o mesmo NIF; senão cria (se a lead tiver empresa). */
