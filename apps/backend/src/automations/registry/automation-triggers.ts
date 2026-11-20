@@ -104,6 +104,14 @@ export const AUTOMATION_TRIGGERS = {
     scheduled: false,
     config: () => ({}),
   },
+  /** Parou um cronómetro do item (parar, mudar de cronómetro ou fechar o item; os registos manuais não). Fase 4b. */
+  TIMER_STOPPED: {
+    label: "Cronómetro parado",
+    entities: ["WORK_ITEM"],
+    step: "optional",
+    scheduled: false,
+    config: () => ({}),
+  },
 } satisfies Record<string, AutomationTrigger>;
 
 export type AutomationTriggerId = keyof typeof AUTOMATION_TRIGGERS;

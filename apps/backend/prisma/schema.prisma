@@ -41,6 +41,8 @@ model User {
   auditEvents          AuditEvent[]
   apiKeys              ApiKey[]
   webhookSubscriptions WebhookSubscription[]
+  timeEntries          TimeEntry[]           @relation("TimeEntryUser")
+  editedTimeEntries    TimeEntry[]           @relation("TimeEntryEditor")
 }
 
 enum TimelineEventType {
@@ -320,14 +322,14 @@ enum WorkItemPriority {
 // Configurável pelo Administrador. O id é o código estável (não muda depois de criado). Os tipos de sistema estão
 // também em código (src/work-item-types/system-types.ts) e o arranque repõe os que faltem.
 model WorkItemType {
-  id        String     @id
-  name      String
+  id         String     @id
+  name       String
   /// Nome de um ícone da lista fechada do frontend (nunca SVG vindo da base de dados).
-  icon      String
+  icon       String
   /// Nome de uma cor da paleta fechada.
-  color     String
-  isSystem  Boolean    @default(false)
-  active    Boolean    @default(true)
+  color      String
+  isSystem   Boolean    @default(false)
+  active     Boolean    @default(true)
   sortOrder  Int        @default(0)
   /// Tem item próprio no menu principal, com a página do tipo (Fase 2c).
   showInMenu Boolean    @default(false)
@@ -341,42 +343,43 @@ model WorkItemType {
 
 // Item de trabalho (era a «tarefa», Task): o que a agenda e as listas veem. A API continua em /tasks.
 model WorkItem {
-  id          String           @id @default(uuid())
-  title       String
-  description String?
-  status      WorkItemStatus   @default(PENDING)
-  typeId      String           @default("TAREFA")
-  type        WorkItemType     @relation(fields: [typeId], references: [id], onDelete: Restrict)
+  id             String           @id @default(uuid())
+  title          String
+  description    String?
+  status         WorkItemStatus   @default(PENDING)
+  typeId         String           @default("TAREFA")
+  type           WorkItemType     @relation(fields: [typeId], references: [id], onDelete: Restrict)
   /// Passo do fluxo do tipo (só em tipos com passos). O estado deriva da categoria do passo (trigger confirma).
-  stepId      String?
-  step        WorkflowStep?    @relation(fields: [stepId], references: [id], onDelete: Restrict)
-  priority    WorkItemPriority @default(NORMAL)
-  result      String?
-  dueDate     DateTime?
+  stepId         String?
+  step           WorkflowStep?    @relation(fields: [stepId], references: [id], onDelete: Restrict)
+  priority       WorkItemPriority @default(NORMAL)
+  result         String?
+  dueDate        DateTime?
   /// Horário marcado (Fase 2d), opcional e além do prazo. O fim exige início e não é antes dele (CHECK).
   scheduledStart DateTime?
   scheduledEnd   DateTime?
   /// Coluna interna (trigger): início marcado, senão o prazo. É o momento na agenda.
-  agendaAt    DateTime?
-  assigneeId  String
-  assignee    User             @relation(fields: [assigneeId], references: [id])
-  contactId   String?
-  contact     Contact?         @relation(fields: [contactId], references: [id], onDelete: SetNull)
-  companyId   String?
-  company     Company?         @relation(fields: [companyId], references: [id], onDelete: SetNull)
-  dealId      String?
-  deal        Deal?            @relation(fields: [dealId], references: [id], onDelete: SetNull)
-  leadId      String?
-  lead        Lead?            @relation(fields: [leadId], references: [id], onDelete: SetNull)
-  reminders   Reminder[]
+  agendaAt       DateTime?
+  assigneeId     String
+  assignee       User             @relation(fields: [assigneeId], references: [id])
+  contactId      String?
+  contact        Contact?         @relation(fields: [contactId], references: [id], onDelete: SetNull)
+  companyId      String?
+  company        Company?         @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  dealId         String?
+  deal           Deal?            @relation(fields: [dealId], references: [id], onDelete: SetNull)
+  leadId         String?
+  lead           Lead?            @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  reminders      Reminder[]
   /// Dados próprios quando o item é uma assistência (módulo assistencias, Fase 4a).
-  serviceCase ServiceCase?
+  serviceCase    ServiceCase?
+  timeEntries    TimeEntry[]
   /// Coluna interna mantida por trigger (prazo, ou 9999-12-31 sem prazo).
-  dueSort     DateTime         @default(dbgenerated("'9999-12-31 00:00:00'::timestamp without time zone"))
+  dueSort        DateTime         @default(dbgenerated("'9999-12-31 00:00:00'::timestamp without time zone"))
   /// Coluna interna de pesquisa (título e descrição sem acentos), mantida por trigger.
-  searchText  String           @default("")
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
+  searchText     String           @default("")
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
 
   @@index([assigneeId])
   @@index([dueDate])
@@ -818,4 +821,31 @@ model ServiceCase {
   updatedAt       DateTime        @updatedAt
 
   @@index([serialNumber])
+}
+
+/// Registo de tempo num item de trabalho (Fase 4b, docs/plano-fase-4-assistencias.md). Sem fim = a correr.
+/// Um só a correr por pessoa: `runningUserId` (única) só está preenchida enquanto corre; uma CHECK na migração liga-a ao
+/// fim vazio e ao utilizador do registo, e outra impede o fim antes do início.
+model TimeEntry {
+  id            String    @id @default(uuid())
+  workItemId    String
+  workItem      WorkItem  @relation(fields: [workItemId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User      @relation("TimeEntryUser", fields: [userId], references: [id])
+  startedAt     DateTime
+  endedAt       DateTime?
+  runningUserId String?   @unique
+  note          String?
+  billable      Boolean   @default(true)
+  manual        Boolean   @default(false)
+  /// Última mudança de horas: motivo, quando e por quem.
+  editReason    String?
+  editedAt      DateTime?
+  editedById    String?
+  editedBy      User?     @relation("TimeEntryEditor", fields: [editedById], references: [id], onDelete: SetNull)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([workItemId, startedAt])
+  @@index([userId, startedAt])
 }

@@ -425,7 +425,7 @@ export interface EmailTemplate {
 }
 
 /** Gatilhos e ações das automações (Fase 3a): códigos dos registos do servidor (src/automations/registry/). */
-export type AutomationTriggerType = "IDLE_IN_STEP" | "ALL_TASKS_CLOSED" | "FIELD_CHANGED" | "CREATED" | "ENTERED_STEP" | "CLOSED";
+export type AutomationTriggerType = "IDLE_IN_STEP" | "ALL_TASKS_CLOSED" | "FIELD_CHANGED" | "CREATED" | "ENTERED_STEP" | "CLOSED" | "TIMER_STOPPED";
 
 export type AutomationActionType = "MOVE_TO_STEP" | "WEBHOOK" | "CREATE_WORK_ITEM" | "ASSIGN";
 
@@ -682,4 +682,49 @@ export interface ServiceCase {
     company: { id: string; name: string } | null;
     contact: { id: string; name: string } | null;
   };
+}
+
+/** Registo de tempo num item de trabalho (Fase 4b). Sem fim = a correr. */
+export interface TimeEntry {
+  id: string;
+  workItemId: string;
+  user: { id: string; name: string };
+  startedAt: string;
+  endedAt: string | null;
+  running: boolean;
+  durationSeconds: number;
+  note: string | null;
+  billable: boolean;
+  manual: boolean;
+  editReason: string | null;
+  editedAt: string | null;
+  editedBy: { id: string; name: string } | null;
+  createdAt: string;
+}
+
+/** O item de um cronómetro (com o número, se for uma assistência). */
+export interface TimeEntryWorkItem {
+  id: string;
+  title: string;
+  typeId: string;
+  status: TaskStatus;
+  serviceCaseCode: string | null;
+}
+
+/** O meu cronómetro a correr (ou nenhum), com a hora do servidor para o contador do ecrã. */
+export interface ActiveTimer {
+  entry: (TimeEntry & { workItem: TimeEntryWorkItem; forgotten: boolean }) | null;
+  serverNow: string;
+}
+
+export interface StartTimerResult {
+  entry: TimeEntry;
+  /** O cronómetro que estava a correr noutro item e parou. */
+  stopped: (TimeEntry & { workItem: TimeEntryWorkItem }) | null;
+}
+
+export interface TimeSummary {
+  totalSeconds: number;
+  billableSeconds: number;
+  byUser: Array<{ user: { id: string; name: string }; totalSeconds: number; billableSeconds: number }>;
 }
