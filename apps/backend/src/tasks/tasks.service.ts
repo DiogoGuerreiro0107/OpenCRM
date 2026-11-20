@@ -6,7 +6,7 @@ import { WorkItemTypesService } from "../work-item-types/work-item-types.service
 import { OPEN_WORK_ITEM_STATUSES, isOpenStatus } from "./work-item-status";
 import { resolveWorkItemStep } from "./work-item-steps";
 import { Chain, newChain } from "../automations/registry/engine";
-import { DEFAULT_WORK_ITEM_TYPE } from "../work-item-types/system-types";
+import { DEFAULT_WORK_ITEM_TYPE, SERVICE_CASE_TYPE } from "../work-item-types/system-types";
 import { CreateTaskDto } from "./dto/create-task.dto";
 import { UpdateTaskDto } from "./dto/update-task.dto";
 import { QueryTaskBoardDto, QueryTaskCalendarDto, QueryTasksDto, TaskFiltersDto } from "./dto/query-tasks.dto";
@@ -176,7 +176,13 @@ export class TasksService implements OnModuleInit {
    * `chain`: cadeia de automações quando a tarefa é criada por uma automação (proteção contra ciclos); sem ela, é uma
    * pessoa (ou a API) e começa uma cadeia nova.
    */
-  async create(dto: CreateTaskDto & { leadId?: string }, creatorId: string, chain?: Chain) {
+  async create(
+    dto: CreateTaskDto & { leadId?: string },
+    creatorId: string,
+    chain?: Chain,
+    /** Grava dados ligados (ex.: os da assistência) antes das automações, para o «criado» já os ver. */
+    beforeEvents?: (taskId: string) => Promise<void>,
+  ) {
     if (dto.typeId) await this.types.assertUsable(dto.typeId);
     const { reminders, scheduledStart, scheduledEnd, ...rest } = dto;
     const schedule = { scheduledStart: toDate(scheduledStart), scheduledEnd: toDate(scheduledEnd) };
@@ -197,6 +203,8 @@ export class TasksService implements OnModuleInit {
       },
       include: TASK_INCLUDE,
     });
+    if (beforeEvents) await beforeEvents(task.id);
+    await this.ensureServiceCase(task);
     await this.automations.dispatch({ entityType: "WORK_ITEM", entityId: task.id, trigger: "CREATED", actorId: creatorId }, chain ?? newChain());
     return task;
   }
@@ -205,6 +213,10 @@ export class TasksService implements OnModuleInit {
     const existing = await this.prisma.workItem.findUnique({ where: { id } });
     if (!existing) throw new NotFoundException("Tarefa não encontrada");
     if (dto.typeId) await this.types.assertUsable(dto.typeId, existing.typeId);
+    // Uma assistência (Fase 4a) tem dados próprios que só fazem sentido nesse tipo: não muda de tipo.
+    if (dto.typeId && dto.typeId !== existing.typeId && (await this.prisma.serviceCase.count({ where: { workItemId: id } })) > 0) {
+      throw new BadRequestException("Uma assistência não pode mudar de tipo");
+    }
     const { reminders, scheduledStart, scheduledEnd, ...rest } = dto;
     const schedule = { scheduledStart: toDate(scheduledStart), scheduledEnd: toDate(scheduledEnd) };
     // Valida o horário que fica (o que vem no pedido por cima do que já existe).
@@ -239,6 +251,8 @@ export class TasksService implements OnModuleInit {
       include: TASK_INCLUDE,
     });
 
+    if (task.typeId !== existing.typeId) await this.ensureServiceCase(task);
+
     // Fechar (concluir ou cancelar) regista-se na timeline da tarefa e dos registos ligados.
     const closedAs = nextStatus !== existing.status && !isOpenStatus(nextStatus) ? nextStatus : null;
     if (closedAs) {
@@ -269,6 +283,21 @@ export class TasksService implements OnModuleInit {
     if (closedAs) await this.automations.dispatch({ ...actor, trigger: "CLOSED" }, chain);
 
     return task;
+  }
+
+  /**
+   * Todo o item do tipo «Assistência» tem os dados próprios (Fase 4a), venha de onde vier (diálogo da tarefa, automação,
+   * mudança de tipo): sem eles, cria-os com o problema = descrição (ou título). Se já existem, não mexe.
+   */
+  private async ensureServiceCase(task: { id: string; typeId: string; title: string; description: string | null }) {
+    if (task.typeId !== SERVICE_CASE_TYPE) return;
+    // Ver primeiro em vez de «ON CONFLICT DO NOTHING»: esse gasta um valor da sequência do número e deixava buracos.
+    if (await this.prisma.serviceCase.findUnique({ where: { workItemId: task.id }, select: { workItemId: true } })) return;
+    await this.prisma.serviceCase
+      .create({ data: { workItemId: task.id, reportedProblem: task.description?.trim() || task.title } })
+      .catch((err: unknown) => {
+        if (!(err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002")) throw err; // criada entretanto
+      });
   }
 
   async remove(id: string) {

@@ -5,7 +5,7 @@
  * Este ficheiro é a fonte de verdade de QUE módulos existem; a base de dados (`ModuleSetting`) só guarda SE estão
  * ativos. Módulo sem linha na base = `defaultEnabled`. Ver docs/plano-fase-0-fundacoes.md.
  */
-export type ModuleId = "leads" | "deals" | "email" | "zadarma" | "automations";
+export type ModuleId = "leads" | "deals" | "email" | "zadarma" | "automations" | "assistencias";
 
 export interface ModuleManifest {
   id: ModuleId;
@@ -51,6 +51,14 @@ export const MODULE_MANIFESTS: ModuleManifest[] = [
     label: "Automações",
     description:
       "Regras «quando… então…» sobre negócios, tarefas e leads: mover, criar tarefas, atribuir, webhooks. Inclui a tarefa de primeiro contacto das leads novas: desligar o módulo desliga-a também.",
+    dependsOn: [],
+    defaultEnabled: true,
+  },
+  {
+    id: "assistencias",
+    label: "Assistências",
+    description:
+      "Pedidos de reparação e suporte técnico: equipamento, problema, diagnóstico e resolução, sobre as tarefas do tipo «Assistência» (passos, agenda e automações).",
     dependsOn: [],
     defaultEnabled: true,
   },

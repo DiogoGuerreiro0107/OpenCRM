@@ -582,3 +582,24 @@ Segundo pacote da [Fase 3](plano-fase-3-automacoes.md).
 - **Servidor:** o tipo de tarefa nas condições passou a lista de opções lida da base de dados (também os desativados), em vez de texto livre; o histórico devolve o nome de cada registo, lido de uma vez por tipo de registo para a página toda.
 - Tempo real: as regras, o histórico (que nasce das alterações a negócios, tarefas e leads) e o catálogo (que muda com os tipos de tarefa e os campos personalizados) atualizam-se sozinhos.
 - **Validação:** 2 e2e novos (469 e2e e 284 unitários no total), 4 mutações nos acertos do servidor todas apanhadas, e verificação no browser com a base de testes (encontrou e corrigiu-se um erro do editor: o responsável por omissão de «criar tarefa» não ia no pedido). Detalhes no plano, em «Execução do 3c». **A Fase 3 fica concluída.**
+
+## Fase 4a: módulo e ficha das assistências (2026-11-20)
+Primeiro pacote da [Fase 4](plano-fase-4-assistencias.md).
+- **Módulo opcional «Assistências»** (`assistencias`, ligado por omissão). Uma assistência é uma tarefa do tipo
+  «Assistência» com **dados próprios 1:1** (`ServiceCase`): número legível (`AS-0001`, sequencial), marca, modelo,
+  número de série, em garantia (sim, não, por confirmar), problema reportado (obrigatório), diagnóstico e resolução.
+  Passo, responsável, prazo, cliente e campos personalizados continuam na tarefa.
+- **Toda a tarefa desse tipo tem os dados próprios**, venha de onde vier (ficha nova, diálogo da tarefa, automação,
+  mudança de tipo). A migração faz o mesmo às que já existiam. **Uma assistência não muda de tipo.**
+- **Passos por omissão** (Recebida → Diagnóstico → À espera de peças → Em reparação → Resolvida / Sem reparação),
+  dados ao tipo só se ainda não tiver passos. Os do administrador nunca se pisam.
+- Diagnóstico e resolução registam-se na timeline da assistência. **Em garantia** e **Marca** passam a campos das
+  automações de tarefas (vazios nas que não são assistências), avisados no «campo alterado».
+- **Interface:** menu «Assistências» (lista com pesquisa e filtros; o quadro é o da página do tipo), ficha
+  `/assistencias/:id` e cartão nas fichas de empresa e contacto. Abrir uma assistência na lista de tarefas, no quadro
+  ou na agenda leva à ficha.
+- A ficha copia os dados para o formulário só ao abrir ou ao gravar: o tempo real atualiza o resto sem apagar o que se
+  está a escrever.
+- **Validação:** 9 e2e novos (478 e2e e 284 unitários no total), 16 mutações todas apanhadas, migração ensaiada com
+  assistências antigas e revertida, e verificação no browser com a base de testes. A suite apanhou números saltados
+  (corrigido). Detalhes no plano, em «Execução do 4a».

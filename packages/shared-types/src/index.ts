@@ -648,3 +648,38 @@ export interface AutomationRun {
   depth: number;
   createdAt: string;
 }
+
+/** Garantia do equipamento de uma assistência (Fase 4a). */
+export type ServiceWarranty = "YES" | "NO" | "UNKNOWN";
+
+/** Assistência: dados próprios de uma tarefa do tipo «Assistência» (módulo assistencias, Fase 4a). */
+export interface ServiceCase {
+  workItemId: string;
+  /** Número sequencial; `code` = AS-0001. */
+  number: number;
+  code: string;
+  brand: string | null;
+  model: string | null;
+  serialNumber: string | null;
+  underWarranty: ServiceWarranty;
+  reportedProblem: string;
+  diagnosis: string | null;
+  resolution: string | null;
+  createdAt: string;
+  updatedAt: string;
+  workItem: {
+    id: string;
+    title: string;
+    status: TaskStatus;
+    priority: TaskPriority;
+    dueDate: string | null;
+    scheduledStart: string | null;
+    scheduledEnd: string | null;
+    typeId: string;
+    stepId: string | null;
+    step: { id: string; name: string; category: WorkflowStepCategory } | null;
+    assignee: { id: string; name: string };
+    company: { id: string; name: string } | null;
+    contact: { id: string; name: string } | null;
+  };
+}

@@ -97,12 +97,12 @@ export class WorkItemTypesService implements OnApplicationBootstrap {
    * (nenhum estado muda). Tudo numa transação; quem criar ou mudar um item deste tipo ao mesmo tempo espera por ela
    * (o trigger lê o tipo com FOR SHARE).
    */
-  async addWorkflow(id: string) {
+  async addWorkflow(id: string, steps: Array<{ name: string; category: WorkflowStepCategory }> = DEFAULT_WORK_ITEM_STEPS) {
     const type = await this.findOrThrow(id);
     if (type.workflowId) throw new ConflictException(`«${type.name}» já tem passos`);
     await this.prisma.$transaction(async (tx) => {
       const workflow = await tx.workflow.create({
-        data: { entityType: "WORK_ITEM", name: type.name, steps: { create: DEFAULT_WORK_ITEM_STEPS.map((s, order) => ({ ...s, order })) } },
+        data: { entityType: "WORK_ITEM", name: type.name, steps: { create: steps.map((s, order) => ({ ...s, order })) } },
         include: { steps: true },
       });
       // Condicional: se outro pedido deu passos entretanto, nenhuma linha muda e a transação desfaz-se.

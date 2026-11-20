@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import type { Task, TaskPriority, TaskStatus, WorkItemType } from "@opencrm/shared-types";
 import { listCalendarTasks, listTasks, type TaskFilters } from "@/lib/tasks-api";
@@ -15,6 +15,7 @@ import { Select } from "@/components/ui/select";
 import { WorkItemTypeBadge } from "@/components/WorkItemTypeBadge";
 import { listWorkItemTypes } from "@/lib/work-item-types-api";
 import { TaskDialog } from "./TaskDialog";
+import { useServiceCaseRoute } from "@/lib/useServiceCaseRoute";
 import { WorkItemBoard } from "./WorkItemBoard";
 import { TASK_STATUS_LABELS } from "./task-labels";
 
@@ -67,6 +68,14 @@ export function TasksListPage({ fixedType }: { fixedType?: WorkItemType } = {}) 
   const [view, setView] = useState<"list" | "calendar" | "board">(hasBoard ? "board" : "list");
   const [month, setMonth] = useState(() => new Date());
   const [dialogState, setDialogState] = useState<{ task: Task | null; defaultDueDate?: string; defaultStepId?: string } | null>(null);
+  const navigate = useNavigate();
+  const serviceCaseRoute = useServiceCaseRoute();
+  /** As assistências abrem na ficha própria (Fase 4a); as outras tarefas, no diálogo. */
+  const openTask = (task: Task) => {
+    const route = serviceCaseRoute(task);
+    if (route) navigate(route);
+    else setDialogState({ task });
+  };
 
   const [search, setSearch] = useState("");
   const term = useDebounced(search.trim());
@@ -180,7 +189,7 @@ export function TasksListPage({ fixedType }: { fixedType?: WorkItemType } = {}) 
         <WorkItemBoard
           type={fixedType}
           filters={{ search: term || undefined, assigneeId: assigneeId || undefined }}
-          onTaskClick={(task) => setDialogState({ task })}
+          onTaskClick={(task) => openTask(task)}
           onAdd={(stepId) => setDialogState({ task: null, defaultStepId: stepId })}
           readOnly={!canCreate}
         />
@@ -193,7 +202,7 @@ export function TasksListPage({ fixedType }: { fixedType?: WorkItemType } = {}) 
           onDayClick={(dayKey) => {
             if (canCreate) setDialogState({ task: null, defaultDueDate: dayKey });
           }}
-          onTaskClick={(task) => setDialogState({ task })}
+          onTaskClick={(task) => openTask(task)}
         />
       ) : (
         <div className="overflow-hidden rounded-lg border border-border bg-background">
@@ -228,7 +237,7 @@ export function TasksListPage({ fixedType }: { fixedType?: WorkItemType } = {}) 
                 <tr
                   key={task.id}
                   className="cursor-pointer border-b border-border last:border-0 hover:bg-muted/30"
-                  onClick={() => setDialogState({ task })}
+                  onClick={() => openTask(task)}
                 >
                   <td className="px-4 py-2 font-medium">{task.title}</td>
                   <td className="px-4 py-2">

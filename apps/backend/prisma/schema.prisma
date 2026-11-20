@@ -369,6 +369,8 @@ model WorkItem {
   leadId      String?
   lead        Lead?            @relation(fields: [leadId], references: [id], onDelete: SetNull)
   reminders   Reminder[]
+  /// Dados próprios quando o item é uma assistência (módulo assistencias, Fase 4a).
+  serviceCase ServiceCase?
   /// Coluna interna mantida por trigger (prazo, ou 9999-12-31 sem prazo).
   dueSort     DateTime         @default(dbgenerated("'9999-12-31 00:00:00'::timestamp without time zone"))
   /// Coluna interna de pesquisa (título e descrição sem acentos), mantida por trigger.
@@ -789,4 +791,31 @@ model PermissionSetting {
   area      String   @id
   roles     Role[]
   updatedAt DateTime @updatedAt
+}
+
+/// Garantia do equipamento de uma assistência: muitas vezes não se sabe ao receber.
+enum ServiceWarranty {
+  YES
+  NO
+  UNKNOWN
+}
+
+/// Assistência (módulo assistencias, Fase 4a, docs/plano-fase-4-assistencias.md): dados próprios de um item de trabalho
+/// do tipo «Assistência», 1:1 (apagar a tarefa apaga-os). O passo, o estado, o responsável e o prazo são os da tarefa.
+model ServiceCase {
+  workItemId      String          @id
+  workItem        WorkItem        @relation(fields: [workItemId], references: [id], onDelete: Cascade)
+  /// Número legível (AS-0001), sequencial e sem repetições (sequência da base de dados).
+  number          Int             @unique @default(autoincrement())
+  brand           String?
+  model           String?
+  serialNumber    String?
+  underWarranty   ServiceWarranty @default(UNKNOWN)
+  reportedProblem String
+  diagnosis       String?
+  resolution      String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+
+  @@index([serialNumber])
 }

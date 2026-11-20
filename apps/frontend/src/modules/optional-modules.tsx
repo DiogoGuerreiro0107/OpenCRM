@@ -1,5 +1,5 @@
 import { lazy } from "react";
-import { FileText, KanbanSquare, Mail, Phone, UserPlus, Zap } from "lucide-react";
+import { FileText, KanbanSquare, Mail, Phone, UserPlus, Wrench, Zap } from "lucide-react";
 import { ADMIN_ONLY } from "@/lib/permissions";
 import type { FrontendModule, RecordPanelProps } from "./types";
 
@@ -75,5 +75,23 @@ export const automationsModule: FrontendModule = {
   routes: [
     { path: "/configuracoes/automacoes", roles: ADMIN_ONLY, page: lazy(() => import("@/pages/settings/AutomationsSettingsPage").then((m) => ({ default: m.AutomationsSettingsPage }))) },
     { path: "/configuracoes/automacoes/historico", roles: ADMIN_ONLY, page: lazy(() => import("@/pages/settings/AutomationRunsPage").then((m) => ({ default: m.AutomationRunsPage }))) },
+  ],
+};
+
+export const servicesModule: FrontendModule = {
+  id: "assistencias",
+  nav: [{ id: "assistencias:list", label: "Assistências", icon: Wrench, to: "/assistencias", section: "main", order: 35 }],
+  routes: [
+    { path: "/assistencias", page: lazy(() => import("@/pages/service-cases/ServiceCasesListPage").then((m) => ({ default: m.ServiceCasesListPage }))) },
+    { path: "/assistencias/:id", page: lazy(() => import("@/pages/service-cases/ServiceCaseDetailPage").then((m) => ({ default: m.ServiceCaseDetailPage }))) },
+  ],
+  recordPanels: [
+    {
+      id: "assistencias:cases",
+      title: "Assistências",
+      entities: ["company", "contact"],
+      order: 15,
+      component: lazy(() => import("@/pages/service-cases/ServiceCasesPanel").then((m) => ({ default: m.ServiceCasesPanel }))),
+    },
   ],
 };

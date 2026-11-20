@@ -8,5 +8,7 @@ import { WorkItemTypesModule } from "../work-item-types/work-item-types.module";
   imports: [AutomationsModule, WorkItemTypesModule],
   controllers: [TasksController],
   providers: [TasksService],
+  // As assistências (Fase 4a) criam as suas tarefas por este serviço.
+  exports: [TasksService],
 })
 export class TasksModule {}
