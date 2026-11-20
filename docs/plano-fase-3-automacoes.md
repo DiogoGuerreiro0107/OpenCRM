@@ -232,16 +232,55 @@ calendário configurável), gatilhos de módulos que ainda não existem (cronóm
 
 ---
 
+## Pacote 3c — Interface (plano, 2026-11-20)
+
+### Editor de regras genérico (Configurações > Automações)
+- Substitui o editor atual (que só desenhava as três regras de negócios) por um que **lê o catálogo do servidor**
+  (`GET /automation-rules/catalog`): o que aparece em cada lista vem dos registos, por isso um módulo novo aparece sem
+  mudar o editor.
+- **Quando:** tipo de registo → gatilho → âmbito (negócios: funil e fase; tarefas: tipo de tarefa com passos e passo;
+  leads: sem âmbito), com o passo obrigatório quando o gatilho o pede; a configuração do gatilho (dias parado; campo
+  que muda, só entre os acompanhados).
+- **E se:** condições em linhas (campo, operador, valor). O valor é sempre escolhido de uma lista quando há opções
+  (opções, utilizadores, tipos de tarefa) e é um número nos campos numéricos; os operadores dependem do tipo de campo.
+- **Então:** a ação e a sua configuração — mover (passo de destino), webhook (nome do evento), criar tarefa (tipo,
+  título com botões para inserir as variáveis do tipo de registo, responsável, prazo, prioridade) e atribuir
+  (utilizador).
+- **Frase de pré-visualização** («Quando uma lead é criada e Interesse é igual a POS, então atribuir a Rui») e os erros
+  do servidor mostrados como vêm (a validação continua no servidor).
+- As regras do sistema editam-se como as outras, mas não têm «Apagar».
+- A lista de regras passa a resumir cada uma pela mesma frase, com o tipo de registo.
+
+### Histórico de automações
+- Página **Configurações > Automações > Histórico** (botão na página das automações, rota do módulo «Automações»):
+  data, regra, registo, gatilho, resultado (sucesso, ignorada, falha) e a mensagem; filtros por regra e resultado;
+  paginada («Mostrar mais»).
+- O servidor passa a devolver também o **nome do registo** de cada execução (título do negócio, da tarefa, nome da
+  lead), lido de uma vez para a página toda; um registo que já não exista aparece como «(apagado)».
+
+### Servidor (pequenos acertos)
+- **Tipo de tarefa nas condições passa a lista de opções** (os tipos que existem, lidos da base de dados), em vez de
+  texto livre: o editor mostra uma lista e o servidor recusa um tipo que não existe.
+- Os funis, as fases e os tipos de tarefa com os seus passos vêm das rotas que já existem (`/pipelines`,
+  `/work-item-types`); o catálogo não os repete.
+
+### Validação prevista
+- **e2e:** tipo de tarefa como opção (recusa um tipo inexistente; o catálogo traz os tipos); nomes dos registos no
+  histórico (negócio, tarefa, lead, apagado). Os testes de automações atuais continuam a passar.
+- **Prova por mutação** nos dois acertos do servidor.
+- **Browser** (base de testes): criar pelo editor uma regra de cada tipo de registo (incluindo «criar tarefa» com
+  variáveis e «atribuir»), editar uma existente (o editor carrega tudo o que foi gravado), a regra do sistema sem
+  «Apagar», disparar uma regra e vê-la no histórico com o nome do registo, filtros do histórico.
+
+---
+
 ## Pacotes seguintes (esboço; cada um terá plano detalhado antes de começar)
 
 ### 3b — Gatilhos e ações novos
 Plano detalhado acima («Pacote 3b»).
 
 ### 3c — Interface
-- Editor de regras genérico: escolher o tipo de registo, o gatilho (e o passo, quando se aplica), as condições
-  (campo, operador, valor — listas, sem texto livre onde há opções) e a ação com a sua configuração; pré-visualização
-  da frase «Quando … e … então …».
-- Página **Histórico de automações** (Configurações): o que correu, o que foi ignorado e porquê, falhas.
+Plano detalhado acima («Pacote 3c»).
 
 ## Decisões assumidas (a rever)
 - Uma regra = uma ação.
