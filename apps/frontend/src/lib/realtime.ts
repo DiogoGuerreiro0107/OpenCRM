@@ -13,7 +13,10 @@ import { api, getAccessToken } from "./api";
 const KEYS_BY_RESOURCE: Record<string, string[]> = {
   deals: ["deals", "pipelines", "dashboard-summary", "automation-runs"],
   pipelines: ["pipelines", "deals", "dashboard-summary"],
-  tasks: ["tasks", "dashboard-summary", "work-item-types", "agenda", "automation-runs", "service-cases"],
+  // Fechar uma tarefa para os cronómetros que corram nela (Fase 4b).
+  tasks: ["tasks", "dashboard-summary", "work-item-types", "agenda", "automation-runs", "service-cases", "time-entries"],
+  // Registo de tempo (Fase 4b): cronómetro, registos, totais; acertar e apagar escrevem na timeline.
+  "time-entries": ["time-entries", "timeline", "automation-runs", "tasks"],
   // Assistências (Fase 4a): cada uma é uma tarefa; a ficha só recarrega o formulário quando muda de assistência.
   "service-cases": ["service-cases", "tasks", "agenda", "dashboard-summary", "automation-runs", "timeline"],
   // Um administrador mudou os tipos de tarefa: formulários, filtros e listas atualizam-se.
@@ -31,7 +34,7 @@ const KEYS_BY_RESOURCE: Record<string, string[]> = {
   email: ["email-messages"],
   "custom-fields": ["custom-fields", "custom-field-values", "automation-rules"],
   zadarma: ["call-records"],
-  users: ["users"],
+  users: ["users", "time-entries"],
   // Um administrador ligou/desligou um módulo: menu, rotas e dashboard de todas as sessões atualizam-se.
   modules: ["modules", "dashboard-summary", "agenda"],
   "api-keys": ["api-keys"],

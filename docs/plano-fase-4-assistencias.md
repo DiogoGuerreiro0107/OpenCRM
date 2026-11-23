@@ -122,18 +122,131 @@ portal do cliente, faturação do tempo.
 
 ---
 
-## Pacotes seguintes (esboço; cada um terá plano detalhado antes de começar)
+## Pacote 4b — Cronómetro e registo de tempo
+Detalhado depois do 4a (2026-11-20). Serve **qualquer item de trabalho** (não é exclusivo das assistências), por isso
+fica no núcleo das tarefas, sem módulo próprio. A interface começa pela ficha da assistência e por um indicador global.
 
-### 4b — Cronómetro e registo de tempo
-- `TimeEntry` (item de trabalho, utilizador, início, fim, nota, faturável, manual, motivo da última edição).
-  **O servidor é a fonte de verdade:** «iniciar» grava o início, «parar» grava o fim; o contador no ecrã é só
-  apresentação (sobrevive a fechar o browser ou mudar de computador).
-- **Um cronómetro ativo por utilizador**, garantido pela base de dados; iniciar outro para o primeiro (com aviso).
-- Entrada manual; edição de um registo com motivo (auditoria); totais por assistência e por técnico; aviso de
-  cronómetro esquecido (aberto há mais de X horas) no ecrã.
-- Gatilho de automação «cronómetro parado».
-- Serve qualquer item de trabalho (o cronómetro não é exclusivo das assistências), mas a interface começa pela ficha da
-  assistência e um indicador global do cronómetro ativo na barra.
+### Modelo
+- `TimeEntry`: item de trabalho (apagar o item apaga os registos), utilizador, **início**, **fim** (vazio = a correr),
+  nota, faturável (sim por omissão), manual (sim/não), e a última edição (motivo, quando, por quem).
+- **O servidor é a fonte de verdade:** «iniciar» grava o início e «parar» grava o fim. O contador no ecrã é só
+  apresentação, por isso sobrevive a fechar o browser ou a mudar de computador.
+- **Um cronómetro a correr por pessoa, garantido pela base de dados:** a coluna `runningUserId` (única) só está
+  preenchida enquanto o registo corre, e uma restrição CHECK liga-a ao fim vazio e ao utilizador do registo. O
+  Prisma consegue descrever uma coluna única, ao contrário de um índice parcial, por isso não há desvio de esquema.
+  Outra CHECK obriga o fim a não ser anterior ao início.
+
+### Regras
+- **Iniciar** num item em aberto (concluído ou cancelado → 400). Se já corre no mesmo item, devolve-o sem mudar
+  nada. Se corre noutro item, **para esse** (fim = agora) e começa o novo, na mesma transação; a resposta diz qual
+  parou, para o ecrã avisar. Dois «iniciar» ao mesmo tempo: um ganha e o outro dá 409.
+- **Parar** o meu cronómetro (com nota opcional). Sem cronómetro a correr → 404.
+- **Fechar o item** (concluir ou cancelar) para os cronómetros que estejam a correr nele, de quem for.
+- **Registo manual** (esqueci-me de ligar): início e fim no passado, fim depois do início, no máximo 24 h por registo.
+- **Sem sobreposições:** os registos de uma pessoa não se sobrepõem (contando o que está a correr até agora); um
+  registo manual ou uma edição que sobreponha dá 409. Assim o tempo por técnico nunca conta a dobrar.
+- **Editar** nota e faturável é livre. **Mudar o início ou o fim exige um motivo**: fica no registo (último motivo,
+  quando, por quem), na timeline do item («Tempo acertado: 10:00–11:30 → 10:00–11:00. Motivo: …») e na auditoria.
+  Um registo a correr pode acertar o início, mas para-se com «parar».
+- **Apagar** exige motivo; fica na timeline do item e na auditoria.
+- **Quem:** registar tempo usa a área «trabalho do dia-a-dia» (Leitura apenas não regista). Cada pessoa edita e apaga
+  os seus registos; o Administrador edita e apaga os de todos. Ler é para todos.
+- **Cronómetro esquecido:** a correr há mais de 8 h aparece como aviso no indicador global. Não para sozinho, porque
+  o servidor não sabe a que horas a pessoa parou.
+
+### Automações
+- Gatilho novo **«Cronómetro parado»** nas tarefas: parar, mudar de cronómetro e fechar o item contam; os registos
+  manuais não. As condições são as das tarefas (ex.: tipo = Assistência e Em garantia = não → criar a tarefa de
+  faturação).
+
+### API
+- `POST /time-entries/start` `{ workItemId, note? }` → `{ entry, stopped? }`.
+- `POST /time-entries/stop` `{ note? }`.
+- `GET /time-entries/active`: o meu cronómetro a correr (com o item e se está esquecido), ou `null`.
+- `GET /time-entries?workItemId&userId&from&to`: lista paginada, mais recentes primeiro, com a duração.
+- `GET /time-entries/summary?workItemId`: total, faturável e total por pessoa.
+- `POST /time-entries` (manual); `PATCH /time-entries/:id`; `DELETE /time-entries/:id` (com motivo).
+- Tempo real: `time-entries`; fechar uma tarefa também atualiza os cronómetros.
+
+### Interface
+- **Indicador global** na barra lateral, só quando há cronómetro a correr: contador, item (abre a ficha da
+  assistência, ou a tarefa) e «Parar». Mais de 8 h → aviso «Cronómetro a correr há mais de 8 h — confirma».
+- **Cartão «Tempo» na ficha da assistência:**
+  - «Iniciar» ou «Parar»; iniciar com outro a correr avisa qual parou;
+  - total, faturável e total por técnico;
+  - lista dos registos (paginada), com editar e apagar (pedem o motivo quando mudam horas);
+  - «Adicionar tempo» (manual).
+- Fica para mais tarde: cronómetro no diálogo das tarefas comuns e relatório de tempo por técnico entre datas (vai
+  com os indicadores do 4c).
+
+### Validação prevista
+- **e2e:**
+  - iniciar, parar e mudar de item (para o anterior);
+  - um só a correr (base de dados e pedidos simultâneos);
+  - item fechado: não inicia, e fechar para;
+  - manual: limites e sobreposições;
+  - editar com e sem motivo, e timeline;
+  - apagar;
+  - permissões (o próprio, o Administrador, Leitura apenas);
+  - totais por pessoa;
+  - esquecido;
+  - gatilho «cronómetro parado».
+- Prova por mutação nas regras.
+- Migração ensaiada numa cópia da base de desenvolvimento, com reversão e sem desvio de esquema.
+- **Browser** (base de testes):
+  - iniciar na ficha e ver o indicador;
+  - mudar para outra assistência (aviso);
+  - parar no indicador;
+  - registo manual;
+  - editar com motivo e ver a timeline.
+
+### Execução do 4b (2026-11-20)
+**Implementado como planeado**, com estes pormenores decididos na implementação:
+- **Código:** serviço em `src/time-entries/`. As regras partilhadas (parar cronómetros, durações, textos) estão em
+  `time-entry-rules.ts` e são usadas pelo serviço das tarefas (fechar) e pelo dos utilizadores (desativar).
+- **Desativar um utilizador para o cronómetro dele.** Ninguém mais o pararia. Não dispara «cronómetro parado», porque
+  não foi trabalho que acabou.
+- **Sem sobreposições:** a regra está no serviço, não na base de dados (precisaria de uma extensão do Postgres).
+  Dois pedidos simultâneos da mesma pessoa podem, em teoria, passar os dois.
+- As horas dos textos da timeline vêm no fuso do browser (`tz`, Lisboa por omissão).
+- No ecrã, o contador usa a hora do servidor. O aviso de esquecido também aparece se as 8 h passarem com a página
+  aberta.
+- **Testes:**
+  - 10 e2e novos em `test/time-entries.e2e-spec.ts`, 4 unitários das regras e 1 dos utilizadores (desativar para o
+    cronómetro). Total: 289 unitários e 488 e2e.
+  - Na suite completa, só o tempo real falhou por tempo na limpeza da base de testes; passa sozinho.
+  - O primeiro ensaio dos testes apanhou um erro: com um registo a correr, a verificação de sobreposições usava uma
+    data «infinita» que a base de dados recusa. Passou a não ter limite superior.
+- **Prova por mutação:** 22 mutações, todas apanhadas:
+  - iniciar: sem parar o anterior, sem dizer qual parou, numa tarefa fechada, outro registo no mesmo item;
+  - fechar a tarefa não para;
+  - registo manual: fim igual ao início, no futuro, sem máximo de 24 h;
+  - sobreposições: o que corre não conta, editar sem verificar;
+  - motivos: horas sem motivo, acerto fora da timeline, apagar sem motivo;
+  - permissões: qualquer um altera os de outros, rota sem área de escrita;
+  - totais: faturável igual a tudo;
+  - esquecido só às 9 h; desativar não para;
+  - gatilho: em falta ao parar, ao mudar e ao fechar, e a disparar nos manuais.
+
+  Duas mutações não compilavam à primeira e foram refeitas com variantes que compilam.
+- **Migração:** ensaiada numa cópia da base de desenvolvimento:
+  - os dados ficaram iguais antes da migração, depois dela e depois da reversão (mesma impressão digital);
+  - sem desvio de esquema (as CHECK não confundem o Prisma);
+  - em SQL, a base de dados recusou um segundo cronómetro a correr, um a correr sem marca, um parado com marca e um
+    fim antes do início;
+  - a reversão repôs o esquema;
+  - a base de desenvolvimento foi migrada depois de uma cópia de segurança.
+- **Browser** (base de testes):
+  - iniciar na ficha: o indicador aparece na barra com o contador e AS-0001;
+  - iniciar noutra assistência: o aviso «Parou o cronómetro de AS-0001…» aparece e o indicador muda;
+  - parar no indicador;
+  - registo manual (com a duração no diálogo);
+  - editar o fim: o motivo passa a obrigatório; o registo mostra «Acertado por…» e a timeline mostra «Tempo acertado
+    … → …. Motivo: …» na hora local.
+
+---
+
+## Pacotes seguintes (esboço; cada um terá plano detalhado antes de começar)
 
 ### 4c — Peças e indicadores
 - Peças usadas (descrição, referência opcional, quantidade), com a ligação a produtos preparada para a Fase 5 (stock).
@@ -143,4 +256,4 @@ portal do cliente, faturação do tempo.
 - Os dados do equipamento vivem na assistência até haver equipamentos como registo próprio (Fase 9).
 - «Em garantia» tem três valores (sim, não, não sei), porque muitas vezes não se sabe ao receber.
 - As peças são texto até existirem produtos (Fase 5).
-- O cronómetro serve qualquer item de trabalho.
+- O cronómetro serve qualquer item de trabalho e fica no núcleo das tarefas (sem módulo próprio).

@@ -21,6 +21,7 @@ const TRIGGERS: Record<string, string> = {
   FIELD_CHANGED: "campo alterado",
   IDLE_IN_STEP: "parado no passo",
   ALL_TASKS_CLOSED: "tarefas fechadas",
+  TIMER_STOPPED: "cronómetro parado",
 };
 
 /**

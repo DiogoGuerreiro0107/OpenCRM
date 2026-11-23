@@ -156,6 +156,7 @@ Estado atual: **todas as fases do roadmap consolidado e a revisão final conclu�
   - [x] Automações em tarefas e leads: gatilhos «criado», «entrou no passo» e «fechado», ações «criar tarefa» (prazo em dias úteis) e «atribuir», condições sobre campos personalizados; a tarefa da lead nova passa a regra do sistema (Fase 3b)
   - [x] Editor de regras de automação genérico (lê o catálogo do servidor, frase «Quando… então…») e histórico de execuções em Configurações > Automações (Fase 3c)
   - [x] Módulo «Assistências»: equipamento, problema, diagnóstico e resolução numa ficha própria (AS-0001), passos por omissão, cartão nas fichas de empresa e contacto, e garantia e marca nas automações (Fase 4a) — ver [docs/plano-fase-4-assistencias.md](docs/plano-fase-4-assistencias.md)
+  - [x] Cronómetro e registo de tempo nos itens de trabalho: um cronómetro por pessoa, indicador global, registos manuais, acertos com motivo (timeline e auditoria), totais por técnico e gatilho «cronómetro parado» (Fase 4b)
 
 ### Por fazer (backlog)
 

@@ -23,6 +23,8 @@ const CORE_CONTROLLERS = [
   "ContactsController",
   "TimelineController",
   "TasksController",
+  // Registo de tempo (4b): serve qualquer item de trabalho, por isso é do núcleo das tarefas.
+  "TimeEntriesController",
   "WorkItemTypesController",
   "CustomFieldsController",
   // Rotas genéricas de fluxos (2b): o módulo de cada fluxo é verificado no serviço (registo de fluxos).

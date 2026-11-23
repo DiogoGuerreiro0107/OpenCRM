@@ -13,6 +13,7 @@ function build(target: UserRow | null, otherActiveAdmins = 1) {
       create: jest.fn().mockImplementation(async ({ data }) => ({ id: "novo", ...data })),
       update: jest.fn().mockImplementation(async ({ data }) => ({ id: "x", ...data })),
     },
+    timeEntry: { findMany: jest.fn().mockResolvedValue([]), updateMany: jest.fn() },
   };
   const realtime = { disconnectUser: jest.fn() };
   return { service: new UsersService(prisma as never, realtime as never), prisma, realtime };
@@ -105,6 +106,16 @@ describe("UsersService.updateUser — proteções", () => {
     const on = build({ id: "alvo", role: "COMERCIAL", active: false });
     await on.service.updateUser("admin", "alvo", { active: true });
     expect(on.realtime.disconnectUser).not.toHaveBeenCalled();
+  });
+
+  it("desativar para o cronómetro do utilizador (Fase 4b); reativar não mexe nos registos", async () => {
+    const off = build({ id: "alvo", role: "COMERCIAL", active: true });
+    await off.service.updateUser("admin", "alvo", { active: false });
+    expect(off.prisma.timeEntry.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { userId: "alvo", endedAt: null } }));
+
+    const on = build({ id: "alvo", role: "COMERCIAL", active: false });
+    await on.service.updateUser("admin", "alvo", { active: true });
+    expect(on.prisma.timeEntry.findMany).not.toHaveBeenCalled();
   });
 
   it("um pedido recusado não fecha ligação nenhuma", async () => {

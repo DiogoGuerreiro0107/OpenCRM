@@ -6,6 +6,7 @@ import { PasswordDialog } from "@/components/PasswordDialog";
 import { changeOwnPassword } from "@/lib/users-api";
 import { cn } from "@/lib/utils";
 import { useMainMenu, useSettingsMenu } from "@/modules/hooks";
+import { TimerIndicator } from "@/components/TimerIndicator";
 
 const linkClass = ({ isActive }: { isActive: boolean }) =>
   cn(
@@ -54,6 +55,7 @@ export function AppShell() {
             </NavLink>
           ))}
         </nav>
+        <TimerIndicator />
         <div className="border-t border-border p-4">
           <p className="truncate text-sm font-medium">{user?.name}</p>
           <p className="truncate text-xs text-muted-foreground">{user?.role}</p>
