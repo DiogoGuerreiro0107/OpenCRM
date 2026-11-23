@@ -103,32 +103,35 @@ enum PreferredChannel {
 }
 
 model Company {
-  id          String         @id @default(uuid())
-  name        String
-  legalName   String?
-  taxId       String?
-  website     String?
-  phone       String?
-  email       String?
-  address     String?
-  postalCode  String?
-  city        String?
-  country     String?
-  status      CompanyStatus  @default(POTENCIAL)
-  source      CompanySource?
-  ownerId     String?
-  owner       User?          @relation(fields: [ownerId], references: [id], onDelete: SetNull)
-  notes       String?
+  id               String            @id @default(uuid())
+  name             String
+  legalName        String?
+  taxId            String?
+  website          String?
+  phone            String?
+  email            String?
+  address          String?
+  postalCode       String?
+  city             String?
+  country          String?
+  status           CompanyStatus     @default(POTENCIAL)
+  source           CompanySource?
+  ownerId          String?
+  owner            User?             @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  notes            String?
   /// Nome, nome fiscal, NIF, telefone e email, em minúsculas e sem acentos (unaccent), para a pesquisa com pg_trgm (mantido por um trigger; não sai na API).
-  searchText  String         @default("")
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
-  contacts    Contact[]
-  deals       Deal[]
-  workItems   WorkItem[]
-  emails      EmailMessage[]
-  callRecords CallRecord[]
-  leads       Lead[]
+  /// Também fornecedor (Fase 5a): aparece nos fornecedores dos produtos.
+  isSupplier       Boolean           @default(false)
+  suppliedProducts ProductSupplier[]
+  searchText       String            @default("")
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  contacts         Contact[]
+  deals            Deal[]
+  workItems        WorkItem[]
+  emails           EmailMessage[]
+  callRecords      CallRecord[]
+  leads            Lead[]
 
   @@index([ownerId])
   @@index([name, id])
@@ -869,4 +872,72 @@ model TimeEntry {
 
   @@index([workItemId, startedAt])
   @@index([userId, startedAt])
+}
+
+/// Unidades de venda dos produtos (Fase 5a).
+enum ProductUnit {
+  UN
+  CX
+  PACK
+  KG
+  M
+  L
+  H
+}
+
+/// Produto do catálogo (Fase 5a, docs/plano-fase-5-produtos-stock.md). Referência em maiúsculas e única; preço sem
+/// IVA (vazio = sob consulta). `searchText` é mantido por trigger (pesquisa sem acentos), como nas empresas.
+model Product {
+  id          String            @id @default(uuid())
+  sku         String            @unique
+  barcode     String?           @unique
+  name        String
+  description String?
+  unit        ProductUnit       @default(UN)
+  salePrice   Decimal?          @db.Decimal(12, 2)
+  vatRate     Decimal           @default(23) @db.Decimal(5, 2)
+  categoryId  String?
+  category    ProductCategory?  @relation(fields: [categoryId], references: [id])
+  active      Boolean           @default(true)
+  /// Controla stock (D6): não para serviços e revenda direta.
+  tracksStock Boolean           @default(true)
+  /// Stock mínimo para o alerta (Fase 5b).
+  minStock    Decimal?          @db.Decimal(12, 2)
+  searchText  String            @default("")
+  suppliers   ProductSupplier[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@index([categoryId])
+  @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin)
+}
+
+/// Categoria de produtos (lista simples). `nameKey` = nome sem maiúsculas nem espaços nas pontas, para ser único.
+model ProductCategory {
+  id        String    @id @default(uuid())
+  name      String
+  nameKey   String    @unique
+  sortOrder Int       @default(0)
+  active    Boolean   @default(true)
+  products  Product[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+/// Fornecedor de um produto: a referência e o custo do fornecedor. No máximo um preferido por produto, garantido pela
+/// base de dados: `preferredFor` (única) só está preenchida no preferido, com o id do produto (CHECK na migração).
+model ProductSupplier {
+  id           String   @id @default(uuid())
+  productId    String
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  companyId    String
+  company      Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  supplierSku  String?
+  costPrice    Decimal? @db.Decimal(12, 4)
+  preferredFor String?  @unique
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([productId, companyId])
+  @@index([companyId])
 }

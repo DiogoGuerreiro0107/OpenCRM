@@ -175,6 +175,8 @@ describe("predefinições das permissões (Fase 0d)", () => {
       sendEmail: ["ADMINISTRADOR", "BACKOFFICE", "COMERCIAL"],
       makeCall: ["ADMINISTRADOR", "BACKOFFICE", "COMERCIAL", "TECNICO"],
       emailTemplates: ["ADMINISTRADOR", "BACKOFFICE"],
+      // Área nova (Fase 5a): não muda quem escrevia antes, porque o catálogo não existia.
+      catalog: ["ADMINISTRADOR", "BACKOFFICE", "FINANCEIRO"],
     });
   });
 });

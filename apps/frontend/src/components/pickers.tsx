@@ -30,14 +30,15 @@ interface PickerBase<T> {
 type CompanyOption = Pick<CompanySummary, "id" | "name" | "taxId">;
 type ContactOption = Pick<ContactSummary, "id" | "name" | "email" | "phone" | "mobilePhone" | "jobTitle" | "companyId" | "company">;
 
-export function CompanyPicker({ emptyLabel = "Nenhuma", ...props }: PickerBase<CompanyOption>) {
+/** `suppliersOnly`: só empresas marcadas como fornecedor (Fase 5a). */
+export function CompanyPicker({ emptyLabel = "Nenhuma", suppliersOnly, ...props }: PickerBase<CompanyOption> & { suppliersOnly?: boolean }) {
   return (
     <RecordPicker<CompanyOption>
       {...props}
       emptyLabel={emptyLabel}
       placeholder="Nome, NIF ou email..."
-      queryKey={["companies"]}
-      search={(search) => listCompanies({ search: search || undefined, limit: PAGE }).then((page) => page.items)}
+      queryKey={["companies", suppliersOnly ? "suppliers" : "all"]}
+      search={(search) => listCompanies({ search: search || undefined, limit: PAGE, supplier: suppliersOnly ? "true" : undefined }).then((page) => page.items)}
       resolve={getCompany}
       getId={(c) => c.id}
       getLabel={(c) => c.name}

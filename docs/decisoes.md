@@ -646,3 +646,12 @@ Segundo pacote da [Fase 4](plano-fase-4-assistencias.md).
   trigger (2 apanhadas, 1 equivalente). Migração ensaiada com tarefas fechadas e reabertas, e revertida. Verificação
   no browser com a base de testes. Detalhes no plano, em «Execução do 4c». **A Fase 4 fica concluída.**
 
+## Fase 5a: catálogo de produtos e fornecedores (2026-11-23)
+Primeiro pacote da [Fase 5](plano-fase-5-produtos-stock.md).
+- **Módulo opcional «Produtos»**: referência única em maiúsculas, código de barras único, nome, preço sem IVA (vazio = sob consulta), IVA, unidade, categoria, ativo, controla stock (D6) e stock mínimo (para a 5b). Pesquisa sem acentos, por trigger.
+- **Fornecedores são empresas** marcadas como fornecedor; cada produto tem os seus fornecedores (referência e custo) e **um só preferido**, garantido pela base de dados.
+- **Área de escrita nova «Catálogo de produtos»** (Administrador, Backoffice, Financeiro). **Custos e margem só para quem a tem**: o servidor não os envia aos outros.
+- Preços e custos na auditoria; campos personalizados do tipo «Produto»; categorias simples (em uso, desativam-se).
+- Ficam para depois: reservas (Fase 6), armazéns, lotes e séries, preços por cliente, importação do catálogo.
+- **Validação:** 8 e2e novos (502 e2e e 289 unitários), 20 mutações todas apanhadas, migração ensaiada e revertida, verificação no browser. Detalhes no plano, em «Execução do 5a».
+

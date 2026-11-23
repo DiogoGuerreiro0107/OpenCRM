@@ -1,6 +1,6 @@
 import { api } from "./api";
 
-export type ModuleId = "leads" | "deals" | "email" | "zadarma" | "automations" | "assistencias";
+export type ModuleId = "leads" | "deals" | "email" | "zadarma" | "automations" | "assistencias" | "produtos";
 
 export interface ModuleView {
   id: ModuleId;

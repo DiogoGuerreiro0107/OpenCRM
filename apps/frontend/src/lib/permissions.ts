@@ -17,6 +17,7 @@ export const WRITE_AREA_NAMES = [
   "sendEmail",
   "makeCall",
   "emailTemplates",
+  "catalog",
 ] as const;
 
 export type WriteArea = (typeof WRITE_AREA_NAMES)[number];

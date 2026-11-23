@@ -1,5 +1,5 @@
 import { CompanySource, CompanyStatus } from "@prisma/client";
-import { IsEmail, IsEnum, IsOptional, IsString, MinLength } from "class-validator";
+import { IsBoolean, IsEmail, IsEnum, IsOptional, IsString, MinLength } from "class-validator";
 
 export class CreateCompanyDto {
   @IsString()
@@ -57,4 +57,9 @@ export class CreateCompanyDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  /** Também fornecedor (Fase 5a). */
+  @IsOptional()
+  @IsBoolean()
+  isSupplier?: boolean;
 }

@@ -73,6 +73,7 @@ export function RecordPanels({ entity, ...props }: { entity: RecordEntity } & Re
     <>
       {recordPanelsFor(entity)
         .filter(canSee)
+        .filter((p) => !p.when || p.when(props))
         .map(({ id, title, component: Panel }) => (
           <Card key={id}>
             <CardHeader>

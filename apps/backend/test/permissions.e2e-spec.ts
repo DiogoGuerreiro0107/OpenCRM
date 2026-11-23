@@ -32,11 +32,12 @@ describe("Permissões configuráveis (e2e)", () => {
   describe("sem configuração tudo fica como antes", () => {
     it("GET /me/permissions devolve a predefinição de cada papel", async () => {
       const expected: Record<string, string[]> = {
-        ADMINISTRADOR: ["companies", "contacts", "leads", "deals", "dailyWork", "sendEmail", "makeCall", "emailTemplates"],
+        // `catalog` (Fase 5a): área nova, só para quem gere preços.
+        ADMINISTRADOR: ["companies", "contacts", "leads", "deals", "dailyWork", "sendEmail", "makeCall", "emailTemplates", "catalog"],
         COMERCIAL: ["companies", "contacts", "leads", "deals", "dailyWork", "sendEmail", "makeCall"],
         TECNICO: ["dailyWork", "makeCall"],
-        BACKOFFICE: ["companies", "contacts", "leads", "deals", "dailyWork", "sendEmail", "makeCall", "emailTemplates"],
-        FINANCEIRO: ["companies", "dailyWork"],
+        BACKOFFICE: ["companies", "contacts", "leads", "deals", "dailyWork", "sendEmail", "makeCall", "emailTemplates", "catalog"],
+        FINANCEIRO: ["companies", "dailyWork", "catalog"],
         LEITURA_APENAS: [],
       };
       for (const [role, areas] of Object.entries(expected)) {
