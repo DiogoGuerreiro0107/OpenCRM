@@ -18,6 +18,7 @@ import { CallButton } from "@/components/CallButton";
 import { RecordPanels } from "@/modules/hooks";
 import { CompanyContactsSection } from "@/components/CompanyContactsSection";
 import { useCanWrite } from "@/lib/useCanWrite";
+import { useModuleEnabled } from "@/lib/useModules";
 import { ReadOnlyFieldset } from "@/components/ReadOnly";
 
 const STATUS_LABELS: Record<CompanyStatus, string> = {
@@ -50,6 +51,7 @@ export function CompanyDetailPage() {
     enabled: !!id,
   });
 
+  const productsOn = useModuleEnabled("produtos");
   const [form, setForm] = useState({
     name: "",
     legalName: "",
@@ -65,6 +67,7 @@ export function CompanyDetailPage() {
     source: "" as CompanySource | "",
     ownerId: "",
     notes: "",
+    isSupplier: false,
   });
 
   useEffect(() => {
@@ -84,6 +87,7 @@ export function CompanyDetailPage() {
         source: company.source ?? "",
         ownerId: company.ownerId ?? "",
         notes: company.notes ?? "",
+        isSupplier: company.isSupplier,
       });
     }
   }, [company]);
@@ -210,6 +214,12 @@ export function CompanyDetailPage() {
                 <Label htmlFor="notes">Notas</Label>
                 <Textarea id="notes" value={form.notes} onChange={handleChange("notes")} />
               </div>
+              {productsOn && (
+                <label className="flex items-center gap-2 text-sm">
+                  <input type="checkbox" checked={form.isSupplier} onChange={(e) => setForm((prev) => ({ ...prev, isSupplier: e.target.checked }))} />
+                  Fornecedor (aparece nos fornecedores dos produtos)
+                </label>
+              )}
               {updateMutation.isError && (
                 <p className="text-sm text-red-600">{errorMessage(updateMutation.error, "Não foi possível guardar a empresa.")}</p>
               )}
@@ -267,7 +277,7 @@ export function CompanyDetailPage() {
         </Card>
 
         {/* Cartões dos módulos (Email, Chamadas...), pelo registo de contribuições (Fase 2c). */}
-        <RecordPanels entity="company" companyId={company.id} />
+        <RecordPanels entity="company" companyId={company.id} isSupplier={company.isSupplier} />
       </div>
     </div>
   );

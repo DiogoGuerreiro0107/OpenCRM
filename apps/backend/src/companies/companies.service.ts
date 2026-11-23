@@ -26,6 +26,7 @@ export class CompaniesService {
     if (query.status) where.status = query.status;
     if (query.source) where.source = query.source;
     if (query.ownerId) where.ownerId = query.ownerId;
+    if (query.supplier) where.isSupplier = query.supplier === "true";
 
     const page = await readPage(NAME_KEY, query, (after, take) =>
       this.prisma.company.findMany({ where: after ? { AND: [where, after] } : where, orderBy: orderByKey(NAME_KEY), take }),

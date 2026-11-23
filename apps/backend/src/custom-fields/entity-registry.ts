@@ -66,6 +66,13 @@ export const CUSTOM_FIELD_ENTITIES = {
       of: async (prisma, entityId) => (await prisma.workItem.findUnique({ where: { id: entityId }, select: { typeId: true } }))?.typeId ?? null,
     },
   },
+  /** Produtos do catálogo (Fase 5a). */
+  PRODUCT: {
+    label: "Produtos",
+    module: "produtos",
+    writeArea: "catalog",
+    exists: async (prisma, id) => (await prisma.product.count({ where: { id } })) > 0,
+  },
 } satisfies Record<string, CustomFieldEntity>;
 
 export type CustomFieldEntityType = keyof typeof CUSTOM_FIELD_ENTITIES;

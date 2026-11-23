@@ -28,7 +28,8 @@ const KEYS_BY_RESOURCE: Record<string, string[]> = {
   // Regras de automação; o catálogo («automation-rules», "catalog") muda também com os tipos de tarefa e os campos.
   "automation-rules": ["automation-rules"],
   leads: ["leads", "dashboard-summary", "agenda", "automation-runs"],
-  companies: ["dashboard-summary"],
+  // Fornecedor marcado ou não: os seletores de fornecedores e os produtos (Fase 5a).
+  companies: ["dashboard-summary", "products"],
   contacts: ["dashboard-summary"],
   timeline: ["timeline"],
   email: ["email-messages"],
@@ -40,7 +41,10 @@ const KEYS_BY_RESOURCE: Record<string, string[]> = {
   "api-keys": ["api-keys"],
   webhooks: ["webhooks"],
   // Um administrador mudou permissões: os botões de todas as sessões ajustam-se sem recarregar.
-  permissions: ["permissions"],
+  permissions: ["permissions", "products"],
+  // Catálogo de produtos (Fase 5a).
+  products: ["products"],
+  "product-categories": ["product-categories", "products"],
 };
 
 /** Junta rajadas de eventos (ex.: uma automação + o pedido que a causou) num só refrescamento. */

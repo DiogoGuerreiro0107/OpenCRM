@@ -1,9 +1,9 @@
 import { coreModule } from "./core";
-import { automationsModule, dealsModule, emailModule, leadsModule, servicesModule, zadarmaModule } from "./optional-modules";
+import { automationsModule, dealsModule, emailModule, leadsModule, productsModule, servicesModule, zadarmaModule } from "./optional-modules";
 import type { AgendaSourceContribution, FrontendModule, NavContribution, RecordEntity, RecordPanelContribution, RouteContribution } from "./types";
 
 /** Todos os módulos do frontend. Um módulo novo junta-se aqui. */
-export const FRONTEND_MODULES: FrontendModule[] = [coreModule, leadsModule, dealsModule, emailModule, servicesModule, zadarmaModule, automationsModule];
+export const FRONTEND_MODULES: FrontendModule[] = [coreModule, leadsModule, dealsModule, emailModule, servicesModule, productsModule, zadarmaModule, automationsModule];
 
 /** As contribuições herdam o módulo que as declara (o núcleo não tem), salvo se indicarem outro. */
 function withModule<T extends { module?: FrontendModule["id"] }>(mod: FrontendModule, items: T[] | undefined) {

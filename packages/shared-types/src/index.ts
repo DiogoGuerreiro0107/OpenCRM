@@ -44,6 +44,8 @@ export interface Company {
   source: CompanySource | null;
   ownerId: string | null;
   notes: string | null;
+  /** Também fornecedor (Fase 5a). */
+  isSupplier: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -349,7 +351,7 @@ export interface LeadConversionResult {
   outcome: { company: ConversionOutcome | null; contact: ConversionOutcome | null };
 }
 
-export type CustomFieldEntityType = "COMPANY" | "CONTACT" | "LEAD" | "DEAL" | "WORK_ITEM";
+export type CustomFieldEntityType = "COMPANY" | "CONTACT" | "LEAD" | "DEAL" | "WORK_ITEM" | "PRODUCT";
 
 export type CustomFieldType =
   | "TEXT"
@@ -754,4 +756,48 @@ export interface ServiceIndicators {
   resolution: { averageHours: number | null; medianHours: number | null };
   timeByTechnician: Array<{ user: { id: string; name: string }; totalSeconds: number; billableSeconds: number }>;
   topParts: Array<{ description: string; reference: string | null; quantity: number; cases: number }>;
+}
+
+/** Catálogo de produtos (Fase 5a). */
+export type ProductUnit = "UN" | "CX" | "PACK" | "KG" | "M" | "L" | "H";
+
+export interface ProductCategory {
+  id: string;
+  name: string;
+  sortOrder: number;
+  active: boolean;
+  productCount: number;
+}
+
+/** Fornecedor de um produto. `costPrice` só vem a quem pode escrever no catálogo. */
+export interface ProductSupplier {
+  id: string;
+  company: { id: string; name: string };
+  supplierSku: string | null;
+  preferred: boolean;
+  costPrice?: number | null;
+}
+
+export interface Product {
+  id: string;
+  sku: string;
+  barcode: string | null;
+  name: string;
+  description: string | null;
+  unit: ProductUnit;
+  /** Sem IVA; `null` = sob consulta. */
+  salePrice: number | null;
+  vatRate: number;
+  salePriceWithVat: number | null;
+  categoryId: string | null;
+  category: { id: string; name: string } | null;
+  active: boolean;
+  tracksStock: boolean;
+  minStock: number | null;
+  suppliers: ProductSupplier[];
+  preferredSupplier: { id: string; name: string } | null;
+  /** % sobre o preço de venda, com o custo do preferido. Só vem a quem pode escrever no catálogo. */
+  margin?: number | null;
+  createdAt: string;
+  updatedAt: string;
 }

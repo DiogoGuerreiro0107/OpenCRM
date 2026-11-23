@@ -94,6 +94,33 @@ preços por cliente ou por quantidade, leitura de produtos pela API pública (Fa
 - **Browser** (base de testes): criar produto, fornecedor com custo e margem, categorias, pesquisa e filtros, vista
   sem permissão (sem custos).
 
+### Execução do 5a (2026-11-23)
+**Implementado como planeado**, com estes pormenores decididos na implementação:
+- **Um só preferido, garantido pela base de dados:** com o padrão do cronómetro (coluna única `preferredFor` + CHECK),
+  em vez de um índice parcial que o Prisma não descreve. O primeiro fornecedor ligado fica preferido; tornar outro
+  preferido tira o anterior. Retirar o preferido deixa o produto sem preferido.
+- **Apagar uma empresa** tira-a dos fornecedores dos produtos.
+- **Categorias:** sem acentos nem maiúsculas no nome único (`nameKey`). Uma categoria desativada continua nos produtos
+  que a têm, mas não se escolhe em produtos novos ou alterados.
+- **Interface:**
+  - o cartão «Produtos fornecidos» só aparece nas empresas marcadas como fornecedor. Para isso, as contribuições de
+    cartões ganharam uma condição (`when`);
+  - a opção «Fornecedor» na empresa e o separador «Produtos» nos campos personalizados só aparecem com o módulo
+    ligado;
+  - ligar um fornecedor aceita qualquer empresa e marca-a como fornecedor; o filtro de fornecedor da lista de produtos
+    usa só fornecedores.
+- **Permissões:** área nova «Catálogo de produtos» (Administrador, Backoffice, Financeiro). Os testes estruturais da
+  matriz e das áreas do frontend foram atualizados de propósito.
+- **Testes:** 8 e2e novos em `test/products.e2e-spec.ts`; atualizados os testes de módulos, permissões e campos personalizados. Total: 502 e2e e 289 unitários. Na suite completa, alguns testes falharam por tempo na limpeza da base de testes (e um em cadeia, por o utilizador da limpeza falhada ter ficado); passam sozinhos.
+- **Prova por mutação:** 20 mutações, todas apanhadas (referência, custos à vista, margem, preferido, marca de fornecedor, categorias, filtros, pesquisa, código de barras, preço com IVA, auditoria, área de escrita, módulo, filtro de fornecedores nas empresas). A M5 foi confirmada isoladamente, porque na primeira volta coincidiu com um tempo esgotado noutro teste.
+- **Migração:** ensaiada numa cópia da base de desenvolvimento:
+  - em SQL, o trigger de pesquisa tirou os acentos («Tôner» → «toner») e a base de dados recusou IVA de 150%, preço
+    negativo, referência repetida e um «preferido» de outro produto;
+  - sem desvio de esquema;
+  - a reversão repôs o esquema e os dados (as mesmas linhas);
+  - a base de desenvolvimento foi migrada depois de uma cópia de segurança.
+- **Browser** (base de testes): lista e menus; produto novo com referência em minúsculas (fica em maiúsculas) e preço «12,5»; fornecedor ligado com custo «7,9» (preferido, margem 36,8%); cartão «Produtos fornecidos» só no fornecedor; como Técnico, ficha só de leitura, sem custos nem margem. Acerto: as colunas da ficha ficaram iguais, para a referência do fornecedor caber.
+
 ---
 
 ## Pacotes seguintes (esboço; cada um terá plano detalhado antes de começar)

@@ -8,6 +8,7 @@ import { Select } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { useModuleEnabled } from "@/lib/useModules";
 import { CustomFieldDialog } from "./CustomFieldDialog";
 
 const ENTITY_TABS: { value: CustomFieldEntityType; label: string }[] = [
@@ -16,6 +17,7 @@ const ENTITY_TABS: { value: CustomFieldEntityType; label: string }[] = [
   { value: "LEAD", label: "Leads" },
   { value: "DEAL", label: "Oportunidades" },
   { value: "WORK_ITEM", label: "Tarefas" },
+  { value: "PRODUCT", label: "Produtos" },
 ];
 
 const isEntityTab = (value: string | null): value is CustomFieldEntityType => ENTITY_TABS.some((t) => t.value === value);
@@ -25,6 +27,8 @@ const isEntityTab = (value: string | null): value is CustomFieldEntityType => EN
  * (âmbito). `?entidade=WORK_ITEM&ambito=VISITA` abre diretamente os campos de um tipo (ligação nos tipos de tarefa).
  */
 export function CustomFieldsSettingsPage() {
+  // O separador dos produtos só aparece com o módulo ligado (Fase 5a).
+  const productsOn = useModuleEnabled("produtos");
   const [params, setParams] = useSearchParams();
   const requested = params.get("entidade");
   const entityType: CustomFieldEntityType = isEntityTab(requested) ? requested : "COMPANY";
@@ -54,7 +58,7 @@ export function CustomFieldsSettingsPage() {
       </div>
 
       <div className="flex gap-2 border-b border-border">
-        {ENTITY_TABS.map((tab) => (
+        {ENTITY_TABS.filter((tab) => tab.value !== "PRODUCT" || productsOn).map((tab) => (
           <button
             key={tab.value}
             onClick={() => setEntityType(tab.value)}

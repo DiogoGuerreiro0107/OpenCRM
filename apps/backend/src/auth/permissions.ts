@@ -67,6 +67,11 @@ export const WRITE_AREAS = {
     description: "Criar, alterar e eliminar modelos de email.",
     defaultRoles: [ADMIN, BACKOFFICE],
   },
+  catalog: {
+    label: "Catálogo de produtos",
+    description: "Criar e alterar produtos, preços, categorias e fornecedores dos produtos. Só quem tem esta área vê os preços de custo e as margens.",
+    defaultRoles: [ADMIN, BACKOFFICE, FINANCEIRO],
+  },
 } satisfies Record<string, WriteAreaDefinition>;
 
 export type WriteArea = keyof typeof WRITE_AREAS;

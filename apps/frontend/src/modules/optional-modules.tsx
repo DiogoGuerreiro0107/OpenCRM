@@ -1,5 +1,5 @@
 import { lazy } from "react";
-import { FileText, KanbanSquare, Mail, Phone, UserPlus, Wrench, Zap } from "lucide-react";
+import { FileText, KanbanSquare, Mail, Package, Phone, Tags, UserPlus, Wrench, Zap } from "lucide-react";
 import { ADMIN_ONLY } from "@/lib/permissions";
 import type { FrontendModule, RecordPanelProps } from "./types";
 
@@ -93,6 +93,29 @@ export const servicesModule: FrontendModule = {
       entities: ["company", "contact"],
       order: 15,
       component: lazy(() => import("@/pages/service-cases/ServiceCasesPanel").then((m) => ({ default: m.ServiceCasesPanel }))),
+    },
+  ],
+};
+
+export const productsModule: FrontendModule = {
+  id: "produtos",
+  nav: [
+    { id: "produtos:list", label: "Produtos", icon: Package, to: "/produtos", section: "main", order: 38 },
+    { id: "produtos:categories", label: "Categorias de produtos", icon: Tags, to: "/configuracoes/categorias-produtos", section: "settings", order: 25, writeArea: "catalog" },
+  ],
+  routes: [
+    { path: "/produtos", page: lazy(() => import("@/pages/products/ProductsListPage").then((m) => ({ default: m.ProductsListPage }))) },
+    { path: "/produtos/:id", page: lazy(() => import("@/pages/products/ProductDetailPage").then((m) => ({ default: m.ProductDetailPage }))) },
+    { path: "/configuracoes/categorias-produtos", writeArea: "catalog", page: lazy(() => import("@/pages/products/ProductCategoriesSettingsPage").then((m) => ({ default: m.ProductCategoriesSettingsPage }))) },
+  ],
+  recordPanels: [
+    {
+      id: "produtos:supplied",
+      title: "Produtos fornecidos",
+      entities: ["company"],
+      order: 30,
+      when: (props) => !!props.isSupplier,
+      component: lazy(() => import("@/pages/products/SupplierProductsPanel").then((m) => ({ default: m.SupplierProductsPanel }))),
     },
   ],
 };

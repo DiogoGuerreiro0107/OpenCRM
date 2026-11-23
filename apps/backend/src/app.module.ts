@@ -23,6 +23,7 @@ import { MenuSettingsModule } from "./menu-settings/menu-settings.module";
 import { AgendaModule } from "./agenda/agenda.module";
 import { ServiceCasesModule } from "./service-cases/service-cases.module";
 import { TimeEntriesModule } from "./time-entries/time-entries.module";
+import { ProductsModule } from "./products/products.module";
 import { EmailModule } from "./email/email.module";
 import { EmailTemplatesModule } from "./email-templates/email-templates.module";
 import { LeadsModule } from "./leads/leads.module";
@@ -63,6 +64,7 @@ import { RealtimeInterceptor } from "./realtime/realtime.interceptor";
     AgendaModule,
     ServiceCasesModule,
     TimeEntriesModule,
+    ProductsModule,
     EmailModule,
     EmailTemplatesModule,
     LeadsModule,

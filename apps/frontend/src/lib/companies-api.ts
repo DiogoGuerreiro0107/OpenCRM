@@ -18,6 +18,7 @@ export interface CompanyInput {
   source?: CompanySource;
   ownerId?: string;
   notes?: string;
+  isSupplier?: boolean;
 }
 
 export interface CompanyFilters {
@@ -25,6 +26,8 @@ export interface CompanyFilters {
   status?: CompanyStatus;
   source?: CompanySource;
   ownerId?: string;
+  /** Só fornecedores (Fase 5a). */
+  supplier?: "true";
 }
 
 /** Uma página da lista (por nome). Os seletores pedem só a primeira, com `limit` pequeno. */

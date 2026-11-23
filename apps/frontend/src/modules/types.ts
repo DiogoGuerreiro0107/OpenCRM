@@ -49,6 +49,8 @@ export interface RecordPanelProps {
   leadId?: string;
   /** Email do registo (para pré-preencher o destinatário). */
   email?: string | null;
+  /** A empresa é fornecedor (Fase 5a). */
+  isSupplier?: boolean;
 }
 
 export interface RecordPanelContribution extends Visibility {
@@ -59,6 +61,8 @@ export interface RecordPanelContribution extends Visibility {
   order: number;
   /** Componente carregado à parte (React.lazy). */
   component: ComponentType<RecordPanelProps>;
+  /** Só aparece quando isto é verdade (ex.: «Produtos fornecidos» só nos fornecedores). */
+  when?: (props: RecordPanelProps) => boolean;
 }
 
 /** Fonte da agenda (Fase 2d): o servidor dá as entradas; aqui fica o nome do filtro e como se abre uma entrada. */
