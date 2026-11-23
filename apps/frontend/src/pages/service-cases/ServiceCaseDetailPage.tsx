@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { TaskDialog } from "@/pages/tasks/TaskDialog";
+import { ServicePartsSection } from "./ServicePartsSection";
 
 function formOf(sc: ServiceCase | null) {
   return {
@@ -33,7 +34,7 @@ function formOf(sc: ServiceCase | null) {
 
 /**
  * Ficha da assistência (Fase 4a): cabeçalho (número, cliente, passo, responsável), equipamento, problema, diagnóstico e
- * resolução, campos personalizados do tipo, tempo (4b) e timeline. A tarefa (passo, responsável, prazo) edita-se no diálogo da tarefa.
+ * resolução, peças (4c), campos personalizados do tipo, tempo (4b) e timeline. A tarefa (passo, responsável, prazo) edita-se no diálogo da tarefa.
  */
 export function ServiceCaseDetailPage() {
   const { id = "" } = useParams();
@@ -174,6 +175,14 @@ export function ServiceCaseDetailPage() {
                   </Button>
                 )}
               </form>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle>Peças</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ServicePartsSection serviceCaseId={sc.workItemId} />
             </CardContent>
           </Card>
           <Card>

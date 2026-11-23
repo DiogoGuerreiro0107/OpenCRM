@@ -83,6 +83,7 @@ export const servicesModule: FrontendModule = {
   nav: [{ id: "assistencias:list", label: "Assistências", icon: Wrench, to: "/assistencias", section: "main", order: 35 }],
   routes: [
     { path: "/assistencias", page: lazy(() => import("@/pages/service-cases/ServiceCasesListPage").then((m) => ({ default: m.ServiceCasesListPage }))) },
+    { path: "/assistencias/indicadores", page: lazy(() => import("@/pages/service-cases/ServiceIndicatorsPage").then((m) => ({ default: m.ServiceIndicatorsPage }))) },
     { path: "/assistencias/:id", page: lazy(() => import("@/pages/service-cases/ServiceCaseDetailPage").then((m) => ({ default: m.ServiceCaseDetailPage }))) },
   ],
   recordPanels: [

@@ -43,6 +43,7 @@ model User {
   webhookSubscriptions WebhookSubscription[]
   timeEntries          TimeEntry[]           @relation("TimeEntryUser")
   editedTimeEntries    TimeEntry[]           @relation("TimeEntryEditor")
+  ServicePart          ServicePart[]
 }
 
 enum TimelineEventType {
@@ -360,6 +361,8 @@ model WorkItem {
   scheduledEnd   DateTime?
   /// Coluna interna (trigger): início marcado, senão o prazo. É o momento na agenda.
   agendaAt       DateTime?
+  /// Quando fechou (concluída ou cancelada); vazio se está em aberto. Mantido por trigger (Fase 4c).
+  closedAt       DateTime?
   assigneeId     String
   assignee       User             @relation(fields: [assigneeId], references: [id])
   contactId      String?
@@ -386,6 +389,7 @@ model WorkItem {
   @@index([typeId])
   @@index([stepId])
   @@index([agendaAt])
+  @@index([closedAt])
   @@index([dueSort, createdAt(sort: Desc), id(sort: Desc)])
   @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin)
 }
@@ -819,8 +823,25 @@ model ServiceCase {
   resolution      String?
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
+  parts           ServicePart[]
 
   @@index([serialNumber])
+}
+
+/// Peça usada numa assistência (Fase 4c). Texto até existirem produtos (Fase 5); quantidade > 0 (CHECK na migração).
+model ServicePart {
+  id            String      @id @default(uuid())
+  serviceCaseId String
+  serviceCase   ServiceCase @relation(fields: [serviceCaseId], references: [workItemId], onDelete: Cascade)
+  description   String
+  reference     String?
+  quantity      Decimal     @default(1) @db.Decimal(10, 2)
+  createdById   String?
+  createdBy     User?       @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@index([serviceCaseId, createdAt])
 }
 
 /// Registo de tempo num item de trabalho (Fase 4b, docs/plano-fase-4-assistencias.md). Sem fim = a correr.

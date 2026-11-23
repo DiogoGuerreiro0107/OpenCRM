@@ -232,6 +232,8 @@ export interface Task {
   dealId: string | null;
   deal: { id: string; title: string } | null;
   reminders: Reminder[];
+  /** Quando fechou (concluída ou cancelada); vazio em aberto. Fase 4c. */
+  closedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -727,4 +729,29 @@ export interface TimeSummary {
   totalSeconds: number;
   billableSeconds: number;
   byUser: Array<{ user: { id: string; name: string }; totalSeconds: number; billableSeconds: number }>;
+}
+
+/** Peça usada numa assistência (Fase 4c). Texto até existirem produtos. */
+export interface ServicePart {
+  id: string;
+  serviceCaseId: string;
+  description: string;
+  reference: string | null;
+  quantity: number;
+  createdBy: { id: string; name: string } | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Indicadores das assistências num período [from, to) (Fase 4c). */
+export interface ServiceIndicators {
+  period: { from: string; to: string };
+  openTotal: number;
+  openByStep: Array<{ stepId: string | null; name: string; count: number }>;
+  created: number;
+  resolved: number;
+  notRepaired: number;
+  resolution: { averageHours: number | null; medianHours: number | null };
+  timeByTechnician: Array<{ user: { id: string; name: string }; totalSeconds: number; billableSeconds: number }>;
+  topParts: Array<{ description: string; reference: string | null; quantity: number; cases: number }>;
 }

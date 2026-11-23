@@ -1,4 +1,4 @@
-import type { Page, ServiceCase, ServiceWarranty, TaskPriority } from "@opencrm/shared-types";
+import type { Page, ServiceCase, ServiceIndicators, ServicePart, ServiceWarranty, TaskPriority } from "@opencrm/shared-types";
 import type { PageParams } from "./pagination";
 import { api } from "./api";
 
@@ -55,3 +55,32 @@ export const WARRANTY_OPTIONS: Record<ServiceWarranty, string> = { YES: "Sim", N
 
 /** Tipo de tarefa das assistências. */
 export const SERVICE_TYPE = "ASSISTENCIA";
+
+/** Peças usadas (Fase 4c). */
+export async function listServiceParts(serviceCaseId: string) {
+  const { data } = await api.get<ServicePart[]>(`/service-cases/${serviceCaseId}/parts`);
+  return data;
+}
+
+export async function createServicePart(serviceCaseId: string, input: { description: string; reference?: string; quantity?: number }) {
+  const { data } = await api.post<ServicePart>(`/service-cases/${serviceCaseId}/parts`, input);
+  return data;
+}
+
+export async function updateServicePart(serviceCaseId: string, partId: string, input: { description?: string; reference?: string | null; quantity?: number }) {
+  const { data } = await api.patch<ServicePart>(`/service-cases/${serviceCaseId}/parts/${partId}`, input);
+  return data;
+}
+
+export async function deleteServicePart(serviceCaseId: string, partId: string) {
+  await api.delete(`/service-cases/${serviceCaseId}/parts/${partId}`);
+}
+
+/** Indicadores das assistências (Fase 4c): período [from, to) e, opcionalmente, uma pessoa. */
+export async function getServiceIndicators(params: { from: string; to: string; assigneeId?: string }) {
+  const { data } = await api.get<ServiceIndicators>("/service-cases/indicators", { params });
+  return data;
+}
+
+/** Quantidade à portuguesa (1,5). */
+export const formatQuantity = (q: number) => q.toLocaleString("pt-PT", { maximumFractionDigits: 2 });

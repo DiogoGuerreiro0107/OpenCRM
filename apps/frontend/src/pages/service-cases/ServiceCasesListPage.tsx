@@ -42,6 +42,9 @@ export function ServiceCasesListPage() {
         <h1 className="text-2xl font-semibold">Assistências</h1>
         <div className="flex gap-2">
           <Button asChild variant="outline">
+            <Link to="/assistencias/indicadores">Indicadores</Link>
+          </Button>
+          <Button asChild variant="outline">
             <Link to={`/tarefas/tipo/${SERVICE_TYPE}`}>Quadro por passos</Link>
           </Button>
           {canCreate && <Button onClick={() => setCreating(true)}>Nova assistência</Button>}

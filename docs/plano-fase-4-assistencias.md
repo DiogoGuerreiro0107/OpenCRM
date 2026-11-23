@@ -246,14 +246,107 @@ fica no núcleo das tarefas, sem módulo próprio. A interface começa pela fich
 
 ---
 
-## Pacotes seguintes (esboço; cada um terá plano detalhado antes de começar)
+## Pacote 4c — Peças e indicadores
+Detalhado depois do 4b (2026-11-23). Último pacote da Fase 4.
 
-### 4c — Peças e indicadores
-- Peças usadas (descrição, referência opcional, quantidade), com a ligação a produtos preparada para a Fase 5 (stock).
-- Indicadores do módulo: abertas por passo, tempo médio até resolver, tempo por técnico, resolvidas sem reparação.
+### Modelo
+- **Peças usadas** (`ServicePart`, da assistência; apagar a assistência apaga-as): descrição (obrigatória),
+  referência (opcional), quantidade (decimal positivo, por omissão 1), quem registou e quando. Ainda não há preços
+  nem ligação a produtos. Quando existirem produtos (Fase 5), a peça ganha a ligação ao produto e o texto fica para
+  as peças avulsas; a migração será só acrescentar a coluna.
+- **Quando fechou** (`WorkItem.closedAt`): serve o «tempo até resolver» e qualquer tipo de tarefa.
+  - Mantido por um trigger da base de dados, como o `agendaAt` da Fase 2d: o estado muda em vários sítios (serviço
+    das tarefas, passos movidos em bloco), e o trigger cobre todos.
+  - Passar a concluída ou cancelada grava a hora; reabrir limpa-a; mudar entre concluída e cancelada mantém a hora.
+  - A migração preenche as que já estão fechadas com a hora do registo «Tarefa concluída/cancelada» na timeline,
+    ou com a última alteração se não houver.
+
+### Regras
+- Peças: adicionar, editar e apagar com a área «trabalho do dia-a-dia» e o módulo ligado. Não há dono: qualquer
+  pessoa com escrita corrige. Cada mudança fica na timeline da assistência («Peça usada: 2 × Rolo de alimentação
+  (RM2-5452)», «Peça retirada: …», «Peça alterada: …»).
+- No máximo 100 peças por assistência. A lista é sempre curta, por isso vem inteira, sem paginação.
+- As peças editam-se também numa assistência fechada (correções).
+
+### Indicadores (`GET /service-cases/indicators?from&to&assigneeId`)
+Por período (por omissão, o mês corrente) e, opcionalmente, por responsável:
+- **em aberto por passo** (estado atual, sem período);
+- **entradas** (criadas no período), **resolvidas** (concluídas no período) e **sem reparação** (canceladas no
+  período);
+- **tempo médio até resolver** (da entrada à conclusão, só as concluídas no período) e mediana;
+- **tempo por técnico** (registos de tempo em assistências com início no período): total e faturável. É o
+  relatório que o 4b deixou para aqui;
+- **peças mais usadas** no período (as 10 primeiras, pela descrição e referência).
+
+### API
+- `GET /service-cases/:id/parts`, `POST /service-cases/:id/parts`, `PATCH /service-cases/:id/parts/:partId`,
+  `DELETE /service-cases/:id/parts/:partId`.
+- `GET /service-cases/indicators`.
+- Tempo real: recurso `service-cases` (já existe).
+
+### Interface
+- **Cartão «Peças»** na ficha da assistência: lista (quantidade, descrição, referência), adicionar numa linha,
+  editar e apagar.
+- **Página «Indicadores»** das assistências (`/assistencias/indicadores`, botão na lista): período (este mês,
+  mês passado, últimos 30 dias, este ano, ou datas à escolha) e responsável. Mostra:
+  - os números do período;
+  - em aberto por passo;
+  - tempo por técnico;
+  - peças mais usadas.
+
+### Validação prevista
+- **e2e:**
+  - peças: criar, editar e apagar, com timeline; validações; limite; permissões; módulo desligado;
+  - `closedAt`: concluir, cancelar, reabrir e passar entre fechados, também por passos e por passos movidos em
+    bloco;
+  - indicadores: períodos, responsável, médias e mediana, tempo por técnico (só assistências), peças mais usadas.
+- Prova por mutação nas regras.
+- Migração ensaiada numa cópia da base de desenvolvimento, com tarefas fechadas e reabertas: `closedAt` vem da
+  timeline. Também a reversão e a verificação de que não há desvio de esquema.
+- **Browser:** peças na ficha (adicionar, editar, apagar, timeline) e a página de indicadores com os filtros.
+
+### Execução do 4c (2026-11-23)
+**Implementado como planeado**, com estes pormenores decididos na implementação:
+- **Código:** peças em `src/service-cases/service-parts.service.ts` e indicadores em
+  `service-indicators.service.ts`, nas mesmas rotas do módulo (`/service-cases/:id/parts`,
+  `/service-cases/indicators`).
+- **Hora de fecho:** trigger próprio (`WorkItem_fechado_em`, só quando muda o estado), separado dos que já existiam.
+  A hora é gravada em UTC, como as restantes colunas.
+- **Peças mais usadas:** juntam a mesma descrição e referência sem distinguir maiúsculas nem espaços, e mostram a
+  escrita da primeira registada.
+- **No ecrã:** a página de indicadores usa números em destaque e tabelas com uma barra fina de uma só cor (sem
+  gráfico com legenda). Os períodos são dias inteiros na hora local.
+- Retirar uma peça pede confirmação na própria linha.
+- **Testes:** 6 e2e novos em `test/service-parts.e2e-spec.ts` (o teste que desliga o módulo obriga a recarregar a cache dos
+  módulos em cada teste). Total: 289 unitários e 494 e2e. Na suite completa, dois testes de outras áreas falharam por
+  tempo na limpeza da base de testes; passam sozinhos.
+- **Prova por mutação:** 18 mutações no código, todas apanhadas:
+  - peças: limite, espaços, timeline (usada, alterada sem mudanças, retirada), peça de outra assistência, lista
+    sem verificar a assistência, quantidade por omissão, quantidade como texto;
+  - indicadores: período invertido, em aberto com fechadas, entradas sem a pessoa, resolvidas com canceladas,
+    mediana igual à média, tempo de tarefas comuns, faturável igual a tudo, tempo sem a pessoa, peças a distinguir
+    maiúsculas.
+
+  Mais 3 mutações no trigger da hora de fecho, trocando a função na base de testes e repondo-a no fim. Duas foram
+  apanhadas (mudar entre fechados reescreve a hora; reabrir não limpa). A terceira (criar já fechada) é
+  equivalente: num INSERT o `OLD` é nulo e o ramo alternativo grava a mesma hora.
+- **Migração:** ensaiada numa cópia da base de desenvolvimento, com três tarefas acrescentadas: concluída com dois
+  registos na timeline, cancelada sem registo e reaberta.
+  - **Preenchimento:** a hora do registo mais recente, a da última alteração, e vazio, como planeado.
+  - **Trigger:** testado em SQL numa transação desfeita (fechar, mudar entre fechados, mexer noutra coluna,
+    reabrir).
+  - **Esquema:** sem desvio. A reversão repôs o esquema.
+  - **Dados:** os mesmos (a ordem física das linhas atualizadas muda, por isso compararam-se as linhas ordenadas).
+  - A base de desenvolvimento foi migrada depois de uma cópia de segurança.
+- **Browser** (base de testes): peças na ficha (adicionar com Enter, quantidade «1,5» com vírgula, editar a quantidade, retirar com
+  confirmação, tudo na timeline); indicadores com os números do seed (entradas, resolvida em 6 h, em aberto por
+  passo, tempo por técnico com faturável, peças mais usadas); «Mês passado» a zeros (em aberto mantém-se); filtro por
+  pessoa.
+
+---
 
 ## Decisões assumidas (a rever)
 - Os dados do equipamento vivem na assistência até haver equipamentos como registo próprio (Fase 9).
 - «Em garantia» tem três valores (sim, não, não sei), porque muitas vezes não se sabe ao receber.
-- As peças são texto até existirem produtos (Fase 5).
+- As peças são texto até existirem produtos (Fase 5), sem preços por agora.
 - O cronómetro serve qualquer item de trabalho e fica no núcleo das tarefas (sem módulo próprio).
