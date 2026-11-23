@@ -305,6 +305,46 @@ Por período (por omissão, o mês corrente) e, opcionalmente, por responsável:
   timeline. Também a reversão e a verificação de que não há desvio de esquema.
 - **Browser:** peças na ficha (adicionar, editar, apagar, timeline) e a página de indicadores com os filtros.
 
+### Execução do 4c (2026-11-23)
+**Implementado como planeado**, com estes pormenores decididos na implementação:
+- **Código:** peças em `src/service-cases/service-parts.service.ts` e indicadores em
+  `service-indicators.service.ts`, nas mesmas rotas do módulo (`/service-cases/:id/parts`,
+  `/service-cases/indicators`).
+- **Hora de fecho:** trigger próprio (`WorkItem_fechado_em`, só quando muda o estado), separado dos que já existiam.
+  A hora é gravada em UTC, como as restantes colunas.
+- **Peças mais usadas:** juntam a mesma descrição e referência sem distinguir maiúsculas nem espaços, e mostram a
+  escrita da primeira registada.
+- **No ecrã:** a página de indicadores usa números em destaque e tabelas com uma barra fina de uma só cor (sem
+  gráfico com legenda). Os períodos são dias inteiros na hora local.
+- Retirar uma peça pede confirmação na própria linha.
+- **Testes:** 6 e2e novos em `test/service-parts.e2e-spec.ts` (o teste que desliga o módulo obriga a recarregar a cache dos
+  módulos em cada teste). Total: 289 unitários e 494 e2e. Na suite completa, dois testes de outras áreas falharam por
+  tempo na limpeza da base de testes; passam sozinhos.
+- **Prova por mutação:** 18 mutações no código, todas apanhadas:
+  - peças: limite, espaços, timeline (usada, alterada sem mudanças, retirada), peça de outra assistência, lista
+    sem verificar a assistência, quantidade por omissão, quantidade como texto;
+  - indicadores: período invertido, em aberto com fechadas, entradas sem a pessoa, resolvidas com canceladas,
+    mediana igual à média, tempo de tarefas comuns, faturável igual a tudo, tempo sem a pessoa, peças a distinguir
+    maiúsculas.
+
+  Mais 3 mutações no trigger da hora de fecho, trocando a função na base de testes e repondo-a no fim. Duas foram
+  apanhadas (mudar entre fechados reescreve a hora; reabrir não limpa). A terceira (criar já fechada) é
+  equivalente: num INSERT o `OLD` é nulo e o ramo alternativo grava a mesma hora.
+- **Migração:** ensaiada numa cópia da base de desenvolvimento, com três tarefas acrescentadas: concluída com dois
+  registos na timeline, cancelada sem registo e reaberta.
+  - **Preenchimento:** a hora do registo mais recente, a da última alteração, e vazio, como planeado.
+  - **Trigger:** testado em SQL numa transação desfeita (fechar, mudar entre fechados, mexer noutra coluna,
+    reabrir).
+  - **Esquema:** sem desvio. A reversão repôs o esquema.
+  - **Dados:** os mesmos (a ordem física das linhas atualizadas muda, por isso compararam-se as linhas ordenadas).
+  - A base de desenvolvimento foi migrada depois de uma cópia de segurança.
+- **Browser** (base de testes): peças na ficha (adicionar com Enter, quantidade «1,5» com vírgula, editar a quantidade, retirar com
+  confirmação, tudo na timeline); indicadores com os números do seed (entradas, resolvida em 6 h, em aberto por
+  passo, tempo por técnico com faturável, peças mais usadas); «Mês passado» a zeros (em aberto mantém-se); filtro por
+  pessoa.
+
+---
+
 ## Decisões assumidas (a rever)
 - Os dados do equipamento vivem na assistência até haver equipamentos como registo próprio (Fase 9).
 - «Em garantia» tem três valores (sim, não, não sei), porque muitas vezes não se sabe ao receber.

@@ -157,6 +157,7 @@ Estado atual: **todas as fases do roadmap consolidado e a revisão final conclu�
   - [x] Editor de regras de automação genérico (lê o catálogo do servidor, frase «Quando… então…») e histórico de execuções em Configurações > Automações (Fase 3c)
   - [x] Módulo «Assistências»: equipamento, problema, diagnóstico e resolução numa ficha própria (AS-0001), passos por omissão, cartão nas fichas de empresa e contacto, e garantia e marca nas automações (Fase 4a) — ver [docs/plano-fase-4-assistencias.md](docs/plano-fase-4-assistencias.md)
   - [x] Cronómetro e registo de tempo nos itens de trabalho: um cronómetro por pessoa, indicador global, registos manuais, acertos com motivo (timeline e auditoria), totais por técnico e gatilho «cronómetro parado» (Fase 4b)
+  - [x] Peças usadas nas assistências e indicadores do módulo (entradas, resolvidas, tempo até resolver, em aberto por passo, tempo por técnico, peças mais usadas); hora de fecho em todas as tarefas (Fase 4c)
 
 ### Por fazer (backlog)
 

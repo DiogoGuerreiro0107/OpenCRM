@@ -625,3 +625,24 @@ Segundo pacote da [Fase 4](plano-fase-4-assistencias.md).
   migração ensaiada (com as restrições testadas em SQL) e revertida, e verificação no browser com a base de testes.
   Detalhes no plano, em «Execução do 4b».
 
+## Fase 4c: peças e indicadores das assistências (2026-11-23)
+Último pacote da [Fase 4](plano-fase-4-assistencias.md).
+- **Peças usadas** (`ServicePart`): descrição, referência opcional e quantidade decimal positiva (CHECK na base de
+  dados), no máximo 100 por assistência e sem paginação. Ainda não têm preços nem ligação a produtos; quando houver
+  produtos (Fase 5), basta acrescentar a coluna. Não há dono (quem tem escrita corrige) e cada mudança fica na
+  timeline da assistência.
+- **Hora de fecho dos itens de trabalho** (`WorkItem.closedAt`), mantida por um trigger da base de dados para cobrir
+  todos os caminhos que mudam o estado. Fechar grava a hora, reabrir limpa-a, mudar entre concluída e cancelada
+  mantém-na. As tarefas já fechadas foram preenchidas a partir da timeline. Serve qualquer tipo de tarefa.
+- **Indicadores** (`GET /service-cases/indicators` e página «Indicadores das assistências»), por período e pessoa:
+  - entradas, resolvidas, sem reparação;
+  - em aberto por passo (estado atual);
+  - tempo médio e mediana até resolver;
+  - tempo por técnico (só em assistências), com faturável;
+  - peças mais usadas.
+
+  O filtro de pessoa é o responsável das assistências e, no tempo, quem o registou.
+- **Validação:** 6 e2e novos (494 e2e e 289 unitários no total), 18 mutações no código todas apanhadas, e 3 no
+  trigger (2 apanhadas, 1 equivalente). Migração ensaiada com tarefas fechadas e reabertas, e revertida. Verificação
+  no browser com a base de testes. Detalhes no plano, em «Execução do 4c». **A Fase 4 fica concluída.**
+
