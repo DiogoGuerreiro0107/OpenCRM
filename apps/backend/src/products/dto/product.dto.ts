@@ -161,6 +161,11 @@ export class QueryProductsDto extends PageQueryDto {
   @IsOptional()
   @IsString()
   supplierId?: string;
+
+  /** Alertas de stock (Fase 5b): abaixo do mínimo ou negativo (só produtos que controlam stock). */
+  @IsOptional()
+  @IsIn(["below_min", "negative"])
+  stock?: "below_min" | "negative";
 }
 
 export class AddProductSupplierDto {

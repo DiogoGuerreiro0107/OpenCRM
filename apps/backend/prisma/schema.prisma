@@ -44,6 +44,7 @@ model User {
   timeEntries          TimeEntry[]           @relation("TimeEntryUser")
   editedTimeEntries    TimeEntry[]           @relation("TimeEntryEditor")
   ServicePart          ServicePart[]
+  StockMovement        StockMovement[]
 }
 
 enum TimelineEventType {
@@ -888,27 +889,34 @@ enum ProductUnit {
 /// Produto do catálogo (Fase 5a, docs/plano-fase-5-produtos-stock.md). Referência em maiúsculas e única; preço sem
 /// IVA (vazio = sob consulta). `searchText` é mantido por trigger (pesquisa sem acentos), como nas empresas.
 model Product {
-  id          String            @id @default(uuid())
-  sku         String            @unique
-  barcode     String?           @unique
-  name        String
-  description String?
-  unit        ProductUnit       @default(UN)
-  salePrice   Decimal?          @db.Decimal(12, 2)
-  vatRate     Decimal           @default(23) @db.Decimal(5, 2)
-  categoryId  String?
-  category    ProductCategory?  @relation(fields: [categoryId], references: [id])
-  active      Boolean           @default(true)
+  id             String            @id @default(uuid())
+  sku            String            @unique
+  barcode        String?           @unique
+  name           String
+  description    String?
+  unit           ProductUnit       @default(UN)
+  salePrice      Decimal?          @db.Decimal(12, 2)
+  vatRate        Decimal           @default(23) @db.Decimal(5, 2)
+  categoryId     String?
+  category       ProductCategory?  @relation(fields: [categoryId], references: [id])
+  active         Boolean           @default(true)
   /// Controla stock (D6): não para serviços e revenda direta.
-  tracksStock Boolean           @default(true)
+  tracksStock    Boolean           @default(true)
   /// Stock mínimo para o alerta (Fase 5b).
-  minStock    Decimal?          @db.Decimal(12, 2)
-  searchText  String            @default("")
-  suppliers   ProductSupplier[]
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  minStock       Decimal?          @db.Decimal(12, 2)
+  /// Stock atual = soma dos movimentos (Fase 5b), mantido por trigger a cada movimento novo.
+  stockOnHand    Decimal           @default(0) @db.Decimal(12, 2)
+  /// Abaixo do mínimo (mínimo definido e stock atual menor), mantido por trigger.
+  belowMin       Boolean           @default(false)
+  searchText     String            @default("")
+  suppliers      ProductSupplier[]
+  stockMovements StockMovement[]
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
 
   @@index([categoryId])
+  @@index([belowMin])
+  @@index([stockOnHand])
   @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin)
 }
 
@@ -940,4 +948,35 @@ model ProductSupplier {
 
   @@unique([productId, companyId])
   @@index([companyId])
+}
+
+/// Tipos de movimento de stock (Fase 5b). O sinal de cada um é garantido por CHECK na migração.
+enum StockMovementType {
+  INITIAL
+  PURCHASE_IN
+  SALE_OUT
+  RETURN
+  ADJUSTMENT
+  SERVICE_PART
+}
+
+/// Movimento de stock (Fase 5b, docs/plano-fase-5-produtos-stock.md): só se acrescenta (trigger recusa alterar e
+/// apagar). A quantidade tem sinal; o stock atual do produto é a soma (Product.stockOnHand, por trigger).
+model StockMovement {
+  id         String            @id @default(uuid())
+  productId  String
+  product    Product           @relation(fields: [productId], references: [id], onDelete: Restrict)
+  quantity   Decimal           @db.Decimal(12, 2)
+  type       StockMovementType
+  reason     String?
+  note       String?
+  /// Origem (ex.: SERVICE_CASE e o id da assistência, na 5c).
+  sourceType String?
+  sourceId   String?
+  userId     String
+  user       User              @relation(fields: [userId], references: [id], onDelete: Restrict)
+  createdAt  DateTime          @default(now())
+
+  @@index([productId, createdAt])
+  @@index([sourceType, sourceId])
 }

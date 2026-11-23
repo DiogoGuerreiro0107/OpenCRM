@@ -58,6 +58,7 @@ export class ProductsService {
       salePrice,
       vatRate,
       minStock: num(p.minStock),
+      stockOnHand: Number(p.stockOnHand),
       salePriceWithVat: salePrice === null ? null : round2(salePrice * (1 + vatRate / 100)),
       suppliers: supplierViews,
       preferredSupplier: preferred ? preferred.company : null,
@@ -79,6 +80,8 @@ export class ProductsService {
     if (query.categoryId) where.categoryId = query.categoryId;
     if (query.tracksStock) where.tracksStock = query.tracksStock === "true";
     if (query.supplierId) where.suppliers = { some: { companyId: query.supplierId } };
+    if (query.stock === "below_min") Object.assign(where, { tracksStock: true, belowMin: true });
+    if (query.stock === "negative") Object.assign(where, { tracksStock: true, stockOnHand: { lt: 0 } });
 
     const seesCosts = this.seesCosts(role);
     const page = await readPage(LIST_KEY, query, (after, take) =>
@@ -123,6 +126,10 @@ export class ProductsService {
   async update(id: string, dto: UpdateProductDto, role: Role | undefined) {
     const existing = await this.load(id);
     if (dto.categoryId && dto.categoryId !== existing.categoryId) await this.assertCategory(dto.categoryId);
+    // Deixar de controlar stock só com o stock a zero (Fase 5b): senão o stock que existe ficava escondido.
+    if (dto.tracksStock === false && existing.tracksStock && Number(existing.stockOnHand) !== 0) {
+      throw new ConflictException("Para deixar de controlar stock, acerta primeiro o stock para zero");
+    }
     const product = await this.write(() =>
       this.prisma.product.update({
         where: { id },
@@ -145,9 +152,12 @@ export class ProductsService {
     return this.view(product, this.seesCosts(role));
   }
 
-  /** Só enquanto nada usa o produto (a partir da 5c e da Fase 6, um produto usado desativa-se). */
+  /** Só enquanto nada usa o produto: com movimentos de stock (5b), peças (5c) ou encomendas (Fase 6), desativa-se. */
   async remove(id: string) {
     await this.load(id);
+    if ((await this.prisma.stockMovement.count({ where: { productId: id } })) > 0) {
+      throw new ConflictException("O produto tem movimentos de stock: desativa-o em vez de o apagar");
+    }
     await this.prisma.product.delete({ where: { id } });
   }
 

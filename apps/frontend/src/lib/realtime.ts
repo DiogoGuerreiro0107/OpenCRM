@@ -43,7 +43,9 @@ const KEYS_BY_RESOURCE: Record<string, string[]> = {
   // Um administrador mudou permissões: os botões de todas as sessões ajustam-se sem recarregar.
   permissions: ["permissions", "products"],
   // Catálogo de produtos (Fase 5a).
-  products: ["products"],
+  products: ["products", "stock"],
+  // Stock (Fase 5b): movimentos novos mudam o stock dos produtos e os alertas.
+  stock: ["stock", "products"],
   "product-categories": ["product-categories", "products"],
 };
 

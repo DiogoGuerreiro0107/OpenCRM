@@ -191,6 +191,34 @@ Detalhado depois do 5a (2026-11-23).
 - **Browser** (base de testes): stock inicial, entrada, saída, acerto com motivo, histórico, alerta e filtro na
   lista.
 
+### Execução do 5b (2026-11-23)
+**Implementado como planeado**, com estes pormenores decididos na implementação:
+- **Triggers:** stock atual somado a cada movimento novo (`StockMovement_soma_no_produto`); «abaixo do mínimo»
+  recalculado sempre que o produto muda (`Product_abaixo_do_minimo`); movimentos só de acrescentar
+  (`StockMovement_sem_update_delete`). A migração calcula o «abaixo do mínimo» dos produtos que já tinham mínimo.
+- **Movimentos simultâneos no mesmo produto:** a linha fica bloqueada e os pedidos esperam em fila. O primeiro ensaio
+  com 8 saídas simultâneas deu 500, porque o Prisma só espera 2 s por uma transação. Esta transação passou a esperar
+  até 15 s, e se mesmo assim não começar responde 409 («tenta de novo») em vez de 500.
+- **Primeira dependência real entre módulos:** `stock` → `produtos`. Desligar os produtos com o stock ligado é
+  recusado (400), por isso o teste dos produtos desliga primeiro o stock. Os testes estruturais (dependências, áreas,
+  matriz de permissões) foram atualizados de propósito.
+- **No ecrã:**
+  - antes do primeiro movimento, o cartão «Stock» oferece «Stock inicial»; depois, «Entrada», «Saída», «Devolução»
+    e «Acertar contagem», que mostra a diferença antes de lançar;
+  - na lista, a coluna «Stock» destaca os produtos abaixo do mínimo ou com stock negativo, e as contagens no topo
+    filtram a lista com um clique.
+- **Testes:** 7 e2e novos em `test/stock.e2e-spec.ts`; atualizados os testes de produtos (o módulo desliga-se depois do stock), módulos e permissões. Total: 509 e2e e 289 unitários. Na suite completa, alguns testes de outras áreas falharam por tempo na limpeza da base de testes; passam sozinhos.
+- **Prova por mutação:** 13 mutações, todas apanhadas: produtos sem stock, acerto sem motivo, acerto igual aceite, acerto a somar a contagem, stock inicial repetido, saída sem sinal, sem bloquear a linha (apanhada pelo teste das contagens simultâneas), alertas com desativados, filtro abaixo do mínimo, deixar de controlar com stock, apagar com movimentos, sem área de escrita, sem módulo.
+- **Migração:** ensaiada numa cópia da base de desenvolvimento, com dois produtos acrescentados (um com mínimo e outro
+  sem):
+  - o «abaixo do mínimo» foi calculado na migração;
+  - em SQL, numa transação desfeita, o stock somou (7, depois 4, abaixo do mínimo 5) e a base de dados recusou
+    alterar, apagar e lançar com o sinal errado;
+  - sem desvio de esquema;
+  - a reversão repôs o esquema e os dados;
+  - a base de desenvolvimento foi migrada depois de uma cópia de segurança.
+- **Browser** (base de testes): stock inicial 10, saída 8, mínimo 5 (aviso «Abaixo do mínimo»), acerto de contagem para 3 com motivo (o diálogo mostrou a diferença «+1»), histórico com sinais e motivo; na lista, a coluna «Stock» em destaque e a contagem «1 abaixo do mínimo», que filtra a lista com um clique.
+
 ---
 
 ## Pacotes seguintes (esboço; cada um terá plano detalhado antes de começar)

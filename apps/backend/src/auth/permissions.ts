@@ -72,6 +72,11 @@ export const WRITE_AREAS = {
     description: "Criar e alterar produtos, preços, categorias e fornecedores dos produtos. Só quem tem esta área vê os preços de custo e as margens.",
     defaultRoles: [ADMIN, BACKOFFICE, FINANCEIRO],
   },
+  stock: {
+    label: "Movimentos de stock",
+    description: "Lançar entradas, saídas, devoluções, stock inicial e acertos de contagem. Ver o stock é para todos.",
+    defaultRoles: [ADMIN, BACKOFFICE],
+  },
 } satisfies Record<string, WriteAreaDefinition>;
 
 export type WriteArea = keyof typeof WRITE_AREAS;

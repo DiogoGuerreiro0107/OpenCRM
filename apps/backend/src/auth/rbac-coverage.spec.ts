@@ -177,6 +177,8 @@ describe("predefinições das permissões (Fase 0d)", () => {
       emailTemplates: ["ADMINISTRADOR", "BACKOFFICE"],
       // Área nova (Fase 5a): não muda quem escrevia antes, porque o catálogo não existia.
       catalog: ["ADMINISTRADOR", "BACKOFFICE", "FINANCEIRO"],
+      // Área nova (Fase 5b).
+      stock: ["ADMINISTRADOR", "BACKOFFICE"],
     });
   });
 });

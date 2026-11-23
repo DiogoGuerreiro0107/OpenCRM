@@ -24,6 +24,8 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ProductFields, productFormOf, productInputOf } from "./ProductForm";
+import { ProductStockCard } from "./ProductStockCard";
+import { useModuleEnabled } from "@/lib/useModules";
 
 /** Linha de um fornecedor: referência e custo editáveis (custo só para quem o vê), preferido, retirar. */
 function SupplierRow({ product, supplier, canEdit }: { product: Product; supplier: ProductSupplier; canEdit: boolean }) {
@@ -128,6 +130,7 @@ export function ProductDetailPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const canEdit = useCanWrite("catalog");
+  const stockOn = useModuleEnabled("stock");
   const { data: product, isLoading, isError } = useQuery({ queryKey: ["products", "one", id], queryFn: () => getProduct(id) });
   const [form, setForm] = useState(() => productFormOf());
   const [loadedId, setLoadedId] = useState<string | null>(null);
@@ -234,6 +237,7 @@ export function ProductDetailPage() {
           </CardContent>
         </Card>
         <div className="space-y-4">
+          {stockOn && product.tracksStock && <ProductStockCard product={product} />}
           <Card>
             <CardHeader>
               <CardTitle>Fornecedores</CardTitle>

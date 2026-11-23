@@ -2,6 +2,8 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createProduct, formatMoney, listProductCategories, listProducts, type ProductFilters } from "@/lib/products-api";
+import { formatQty, getStockSummary } from "@/lib/stock-api";
+import { useModuleEnabled } from "@/lib/useModules";
 import { LoadMore, useDebounced, usePagedList } from "@/lib/pagination";
 import { useCanWrite } from "@/lib/useCanWrite";
 import { errorMessage } from "@/lib/errors";
@@ -68,12 +70,26 @@ export function ProductsListPage() {
   const term = useDebounced(search.trim());
   const [filters, setFilters] = useState<ProductFilters>({ active: "true" });
   const { data: categories = [] } = useQuery({ queryKey: ["product-categories"], queryFn: listProductCategories });
+  const stockOn = useModuleEnabled("stock");
+  const { data: alerts } = useQuery({ queryKey: ["stock", "summary"], queryFn: getStockSummary, enabled: stockOn });
   const list = usePagedList(["products", "list", term, filters], (cursor) => listProducts({ ...filters, search: term || undefined, cursor }));
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Produtos</h1>
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="text-2xl font-semibold">Produtos</h1>
+          {stockOn && alerts && alerts.belowMin > 0 && (
+            <button type="button" className="rounded-full border border-amber-200 bg-amber-100 px-2 py-0.5 text-xs text-amber-900" onClick={() => setFilters({ ...filters, stock: "below_min" })}>
+              {alerts.belowMin} abaixo do mínimo
+            </button>
+          )}
+          {stockOn && alerts && alerts.negative > 0 && (
+            <button type="button" className="rounded-full border border-red-200 bg-red-100 px-2 py-0.5 text-xs text-red-800" onClick={() => setFilters({ ...filters, stock: "negative" })}>
+              {alerts.negative} com stock negativo
+            </button>
+          )}
+        </div>
         <div className="flex gap-2">
           {canWrite && (
             <Button asChild variant="outline">
@@ -102,6 +118,13 @@ export function ProductsListPage() {
           <option value="true">Controla stock</option>
           <option value="false">Sem stock (serviços)</option>
         </Select>
+        {stockOn && (
+          <Select aria-label="Alertas de stock" value={filters.stock ?? ""} onChange={(e) => setFilters({ ...filters, stock: (e.target.value || undefined) as ProductFilters["stock"] })} className="w-44">
+            <option value="">Qualquer stock</option>
+            <option value="below_min">Abaixo do mínimo</option>
+            <option value="negative">Stock negativo</option>
+          </Select>
+        )}
         <CompanyPicker aria-label="Fornecedor" suppliersOnly value={filters.supplierId ?? ""} onChange={(id) => setFilters({ ...filters, supplierId: id || undefined })} emptyLabel="Todos os fornecedores" className="w-56" />
       </div>
 
@@ -115,17 +138,18 @@ export function ProductsListPage() {
               <th className="px-4 py-2 text-right font-medium">Sem IVA</th>
               <th className="px-4 py-2 text-right font-medium">Com IVA</th>
               <th className="px-4 py-2 font-medium">Fornecedor</th>
+              {stockOn && <th className="px-4 py-2 text-right font-medium">Stock</th>}
             </tr>
           </thead>
           <tbody>
             {list.isLoading && (
               <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">A carregar...</td>
+                <td colSpan={7} className="px-4 py-6 text-center text-muted-foreground">A carregar...</td>
               </tr>
             )}
             {!list.isLoading && list.items.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">Nenhum produto.</td>
+                <td colSpan={7} className="px-4 py-6 text-center text-muted-foreground">Nenhum produto.</td>
               </tr>
             )}
             {list.items.map((p) => (
@@ -140,6 +164,17 @@ export function ProductsListPage() {
                 <td className="whitespace-nowrap px-4 py-2 text-right tabular-nums">{p.salePrice === null ? "Sob consulta" : formatMoney(p.salePrice)}</td>
                 <td className="whitespace-nowrap px-4 py-2 text-right tabular-nums text-muted-foreground">{formatMoney(p.salePriceWithVat)}</td>
                 <td className="px-4 py-2 text-muted-foreground">{p.preferredSupplier?.name ?? "—"}</td>
+                {stockOn && (
+                  <td className="whitespace-nowrap px-4 py-2 text-right tabular-nums">
+                    {!p.tracksStock ? (
+                      <span className="text-muted-foreground">—</span>
+                    ) : (
+                      <span className={p.stockOnHand < 0 ? "font-medium text-red-700" : p.belowMin ? "font-medium text-amber-700" : ""} title={p.belowMin ? "Abaixo do mínimo" : undefined}>
+                        {formatQty(p.stockOnHand)}
+                      </span>
+                    )}
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>

@@ -794,6 +794,10 @@ export interface Product {
   active: boolean;
   tracksStock: boolean;
   minStock: number | null;
+  /** Stock atual = soma dos movimentos (Fase 5b). */
+  stockOnHand: number;
+  /** Abaixo do mínimo (Fase 5b). */
+  belowMin: boolean;
   suppliers: ProductSupplier[];
   preferredSupplier: { id: string; name: string } | null;
   /** % sobre o preço de venda, com o custo do preferido. Só vem a quem pode escrever no catálogo. */
@@ -801,3 +805,21 @@ export interface Product {
   createdAt: string;
   updatedAt: string;
 }
+
+/** Movimentos de stock (Fase 5b). Só se acrescentam; a quantidade tem sinal. */
+export type StockMovementType = "INITIAL" | "PURCHASE_IN" | "SALE_OUT" | "RETURN" | "ADJUSTMENT" | "SERVICE_PART";
+
+export interface StockMovement {
+  id: string;
+  productId: string;
+  product: { id: string; sku: string; name: string };
+  quantity: number;
+  type: StockMovementType;
+  reason: string | null;
+  note: string | null;
+  sourceType: string | null;
+  sourceId: string | null;
+  user: { id: string; name: string };
+  createdAt: string;
+}
+

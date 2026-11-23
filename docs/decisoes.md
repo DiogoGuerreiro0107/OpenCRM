@@ -655,3 +655,12 @@ Primeiro pacote da [Fase 5](plano-fase-5-produtos-stock.md).
 - Ficam para depois: reservas (Fase 6), armazéns, lotes e séries, preços por cliente, importação do catálogo.
 - **Validação:** 8 e2e novos (502 e2e e 289 unitários), 20 mutações todas apanhadas, migração ensaiada e revertida, verificação no browser. Detalhes no plano, em «Execução do 5a».
 
+## Fase 5b: stock como livro de movimentos (2026-11-23)
+Segundo pacote da [Fase 5](plano-fase-5-produtos-stock.md).
+- **Módulo opcional «Stock»**, que depende dos «Produtos» (a primeira dependência real entre módulos). Área de escrita nova **«Movimentos de stock»** (Administrador, Backoffice). Ver o stock é para todos.
+- **Movimentos só de acrescentar** (trigger): stock inicial (uma vez, antes de tudo), entrada, saída, devolução, acerto de contagem (o servidor lança a diferença, com motivo obrigatório) e, na 5c, o consumo em assistências. O sinal de cada tipo é garantido por CHECK. Corrigir é lançar outro movimento.
+- **Stock atual = soma**, guardado no produto por um trigger; «abaixo do mínimo» também por trigger, para filtrar e contar sem somar tudo. **Pode ficar negativo** (a faturação manda no stock, D3).
+- **Movimentos do mesmo produto em fila**, com a linha bloqueada. A espera do Prisma foi alargada, e se mesmo assim se esgotar responde 409 em vez de 500.
+- Um produto com movimentos não se apaga; deixar de controlar stock exige o stock a zero.
+- **Validação:** 7 e2e novos (509 e2e e 289 unitários), 13 mutações todas apanhadas, migração ensaiada (triggers testados em SQL) e revertida, verificação no browser. Detalhes no plano, em «Execução do 5b».
+

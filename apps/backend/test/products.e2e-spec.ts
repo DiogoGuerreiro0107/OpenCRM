@@ -190,11 +190,15 @@ describe("Catálogo de produtos (e2e)", () => {
     await api().post("/custom-fields/values").set("Authorization", admin).send({ entityType: "PRODUCT", entityId: p.id, values: [{ customFieldId: field.id, value: "Preto" }] }).expect(201);
     await api().post("/custom-fields/values").set("Authorization", await as("TECNICO")).send({ entityType: "PRODUCT", entityId: p.id, values: [{ customFieldId: field.id, value: "x" }] }).expect(403);
 
+    // O stock depende dos produtos (Fase 5b): sem o desligar primeiro, os produtos não se desligam.
+    await api().patch("/modules/produtos").set("Authorization", admin).send({ enabled: false }).expect(400);
+    await api().patch("/modules/stock").set("Authorization", admin).send({ enabled: false }).expect(200);
     await api().patch("/modules/produtos").set("Authorization", admin).send({ enabled: false }).expect(200);
     await api().get("/products").set("Authorization", admin).expect(404);
     await api().get("/product-categories").set("Authorization", admin).expect(404);
     await api().get("/custom-fields/values").query({ entityType: "PRODUCT", entityId: p.id }).set("Authorization", admin).expect(404);
     await api().patch("/modules/produtos").set("Authorization", admin).send({ enabled: true }).expect(200);
+    await api().patch("/modules/stock").set("Authorization", admin).send({ enabled: true }).expect(200);
     await api().get(`/products/${p.id}`).set("Authorization", admin).expect(200);
   });
 });

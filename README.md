@@ -159,6 +159,7 @@ Estado atual: **todas as fases do roadmap consolidado e a revisão final conclu�
   - [x] Cronómetro e registo de tempo nos itens de trabalho: um cronómetro por pessoa, indicador global, registos manuais, acertos com motivo (timeline e auditoria), totais por técnico e gatilho «cronómetro parado» (Fase 4b)
   - [x] Peças usadas nas assistências e indicadores do módulo (entradas, resolvidas, tempo até resolver, em aberto por passo, tempo por técnico, peças mais usadas); hora de fecho em todas as tarefas (Fase 4c)
   - [x] Catálogo de produtos: referência, preço e IVA, categorias, fornecedores com referência e custo (custos só para quem gere o catálogo) e campos personalizados (Fase 5a) — ver [docs/plano-fase-5-produtos-stock.md](docs/plano-fase-5-produtos-stock.md)
+  - [x] Stock como livro de movimentos (entradas, saídas, devoluções, acertos de contagem com motivo, stock inicial), stock mínimo com alertas e stock negativo permitido (Fase 5b)
 
 ### Por fazer (backlog)
 
