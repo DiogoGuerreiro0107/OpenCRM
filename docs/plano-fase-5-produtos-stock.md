@@ -123,16 +123,77 @@ preços por cliente ou por quantidade, leitura de produtos pela API pública (Fa
 
 ---
 
-## Pacotes seguintes (esboço; cada um terá plano detalhado antes de começar)
+## Pacote 5b — Stock
+Detalhado depois do 5a (2026-11-23).
 
-### 5b — Stock
-- `StockMovement` (produto, quantidade com sinal, tipo — stock inicial, entrada, saída, ajuste, devolução, consumo
-  em assistência —, motivo, origem, quem, quando). **Só se acrescenta:** a base de dados recusa alterar ou apagar,
-  como na auditoria. Corrigir é lançar o movimento contrário.
-- **Stock atual = soma dos movimentos**, só nos produtos que controlam stock. Pode ficar negativo, com aviso:
-  a faturação manda no stock e o CRM não bloqueia uma venda real.
-- Ajuste manual com motivo obrigatório; stock mínimo com alerta (lista «abaixo do mínimo» e indicador); histórico
-  por produto.
+### Modelo
+- Módulo opcional **`stock`**, que depende de `produtos`.
+- **`StockMovement`**:
+  - produto, quantidade com sinal (decimal, nunca zero) e tipo;
+  - motivo, nota, origem (tipo e id, ex.: a assistência na 5c), quem e quando;
+  - **só se acrescenta**: um trigger recusa alterar ou apagar, como na auditoria. Corrigir é lançar outro movimento.
+- **Tipos e sinal** (garantidos por CHECK):
+
+  | Tipo | Sinal | Notas |
+  |---|---|---|
+  | stock inicial | + | uma vez, antes de qualquer outro movimento do produto |
+  | entrada (compra) | + | |
+  | saída | − | |
+  | devolução | + | |
+  | acerto de contagem | + ou − | com motivo obrigatório |
+  | consumo em assistência | − ou + | 5c: lançado pelo sistema |
+
+- **Stock atual** = soma dos movimentos, guardado em `Product.stockOnHand` e mantido por um trigger em cada movimento
+  novo. É o que permite filtrar e ordenar sem somar tudo; um teste confirma que é igual à soma.
+
+### Regras
+- Só há movimentos em produtos que **controlam stock**.
+  - Deixar de controlar stock só com o stock a zero.
+  - Um produto com movimentos já não se apaga; desativa-se.
+- **Acerto de contagem:** indica-se a quantidade contada e o servidor lança a diferença, com a linha do produto
+  bloqueada para dois acertos ao mesmo tempo não se pisarem. Contagem igual ao atual → 400. Motivo obrigatório.
+- Nas entradas, saídas e devoluções indica-se a quantidade positiva; o servidor aplica o sinal.
+- **O stock pode ficar negativo**, com aviso, porque a faturação manda no stock (D3).
+- **Alertas:**
+  - «abaixo do mínimo»: o stock atual é menor do que o mínimo definido;
+  - «negativo»: o stock atual é menor do que zero.
+
+  Ambos são filtros na lista de produtos e contagens no topo da página.
+- **Quem:** área de escrita nova **«Movimentos de stock»**, por omissão Administrador e Backoffice. Ver o stock é para
+  todos. Os movimentos são o próprio registo (quem, quando, motivo), por isso não vão à auditoria.
+
+### API
+- `GET /stock/movements`: paginada, mais recentes primeiro; filtros por produto, tipo e período.
+- `POST /stock/movements`: tipos manuais (stock inicial, entrada, saída, devolução, acerto com `countedQuantity`).
+- `GET /stock/summary`: quantos produtos estão abaixo do mínimo e quantos estão negativos.
+- **Produtos:**
+  - `stockOnHand` vem em cada produto;
+  - filtro `?stock=below_min|negative`.
+- Tempo real: recurso `stock`.
+
+### Interface
+- **Cartão «Stock» na ficha do produto** (módulo ligado e produto que controla stock):
+  - stock atual com o mínimo e o aviso;
+  - botões «Entrada», «Saída», «Devolução», «Acertar contagem» e «Stock inicial» (só sem movimentos);
+  - histórico paginado.
+- **Lista de produtos:** coluna «Stock» (em destaque se estiver abaixo do mínimo ou negativo), filtro e contagens no
+  topo.
+
+### Validação prevista
+- **e2e:**
+  - tipos e sinais; stock inicial uma só vez; acerto pela contagem (também em simultâneo);
+  - só em produtos que controlam stock; não apagar nem deixar de controlar stock com stock;
+  - imutabilidade (a base de dados recusa alterar e apagar);
+  - `stockOnHand` igual à soma;
+  - filtros e contagens; permissões e área nova; módulo desligado (e a dependência de `produtos`).
+- Prova por mutação.
+- Migração ensaiada numa cópia da base de desenvolvimento, com reversão e sem desvio de esquema.
+- **Browser** (base de testes): stock inicial, entrada, saída, acerto com motivo, histórico, alerta e filtro na
+  lista.
+
+---
+
+## Pacotes seguintes (esboço; cada um terá plano detalhado antes de começar)
 
 ### 5c — Peças ligadas a produtos
 - A peça da assistência pode vir do catálogo (preenche descrição e referência; o texto livre continua para peças
