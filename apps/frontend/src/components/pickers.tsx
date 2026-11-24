@@ -1,7 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
-import type { CompanySummary, ContactSummary, UserSummary } from "@opencrm/shared-types";
+import type { CompanySummary, ContactSummary, Product, UserSummary } from "@opencrm/shared-types";
 import { getCompany, listCompanies } from "@/lib/companies-api";
 import { getContact, listContacts } from "@/lib/contacts-api";
+import { getProduct, listProducts } from "@/lib/products-api";
+import { formatQty } from "@/lib/stock-api";
 import { listUsers } from "@/lib/tasks-api";
 import { listManagedUsers } from "@/lib/users-api";
 import { ROLE_LABELS } from "@/lib/roles";
@@ -61,6 +63,27 @@ export function ContactPicker({ emptyLabel = "Nenhum", companyId, ...props }: Pi
       getId={(c) => c.id}
       getLabel={(c) => c.name}
       getDetail={(c) => [companyId ? null : c.company?.name, c.email ?? c.phone ?? c.mobilePhone].filter(Boolean).join(" · ") || null}
+      pageSize={PAGE}
+    />
+  );
+}
+
+/**
+ * Produtos ativos do catálogo (Fase 5c), pesquisa no servidor (referência, nome, código de barras). `showStock`: mostra
+ * o stock atual dos que o controlam.
+ */
+export function ProductPicker({ emptyLabel = "Nenhum", showStock, ...props }: PickerBase<Product> & { showStock?: boolean }) {
+  return (
+    <RecordPicker<Product>
+      {...props}
+      emptyLabel={emptyLabel}
+      placeholder="Referência ou nome..."
+      queryKey={["products", "picker"]}
+      search={(search) => listProducts({ search: search || undefined, active: "true", limit: PAGE }).then((page) => page.items)}
+      resolve={getProduct}
+      getId={(p) => p.id}
+      getLabel={(p) => p.name}
+      getDetail={(p) => [p.sku, showStock && p.tracksStock ? `stock ${formatQty(p.stockOnHand)}` : null].filter(Boolean).join(" · ")}
       pageSize={PAGE}
     />
   );

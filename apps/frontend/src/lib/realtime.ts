@@ -18,7 +18,8 @@ const KEYS_BY_RESOURCE: Record<string, string[]> = {
   // Registo de tempo (Fase 4b): cronómetro, registos, totais; acertar e apagar escrevem na timeline.
   "time-entries": ["time-entries", "timeline", "automation-runs", "tasks"],
   // Assistências (Fase 4a): cada uma é uma tarefa; a ficha só recarrega o formulário quando muda de assistência.
-  "service-cases": ["service-cases", "tasks", "agenda", "dashboard-summary", "automation-runs", "timeline"],
+  // As peças do catálogo gastam stock (Fase 5c).
+  "service-cases": ["service-cases", "tasks", "agenda", "dashboard-summary", "automation-runs", "timeline", "products", "stock"],
   // Um administrador mudou os tipos de tarefa: formulários, filtros e listas atualizam-se.
   "work-item-types": ["work-item-types", "tasks", "custom-fields", "agenda", "automation-rules"],
   // Passos de um fluxo (tipos de tarefa ou funis) mudaram: tipos, tarefas, quadros e funis atualizam-se.

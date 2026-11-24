@@ -283,6 +283,42 @@ Detalhado depois do 5b (2026-11-24).
 - **Browser** (base de testes): escolher do catálogo, ver o stock a sair, mudar a quantidade, retirar, histórico do
   produto com a ligação à assistência.
 
+### Execução do 5c (2026-11-24)
+**Implementado como planeado**, com estes pormenores decididos na implementação:
+- **Na base de dados:** uma CHECK (`ServicePart_stock_tirado`) garante que o que a peça tirou nunca é negativo e que só
+  uma peça do catálogo tira stock; a chave estrangeira para o produto é `Restrict`.
+- **Transação:** a peça, o movimento de stock e a nota na timeline ficam na mesma transação, com a linha do produto
+  bloqueada (a mesma fila dos movimentos manuais do 5b, com o 409 «tenta de novo»). A peça é relida e bloqueada dentro
+  dela; para as peças do catálogo é a linha do produto que põe as alterações em fila.
+- **Movimentos com o motivo legível:** «AS-0001: peça adicionada», «… quantidade da peça alterada», «… peça retirada»,
+  em nome de quem mexeu na peça. No histórico do produto, o consumo em assistência liga à assistência.
+- **Peças mais usadas:** as do catálogo aparecem com o nome e a referência atuais do produto (ligam à ficha); as
+  avulsas continuam como no 4c. A resposta ganhou `productId`.
+- **No ecrã:** por cima da linha «Adicionar», o seletor «Do catálogo…» (pesquisa no servidor, só produtos ativos, com a
+  referência e o stock); depois de escolher, diz se a peça «Sai do stock (atual N)» ou «Não mexe no stock». As peças
+  mostram «saiu do stock: N» e a referência liga ao produto.
+- **Testes:** 6 e2e novos em `test/service-parts-stock.e2e-spec.ts` e 4 unitários (`service-parts.spec.ts`);
+  atualizado o teste das peças mais usadas do 4c (o `productId`). Total: 515 e2e e 293 unitários. Na suite completa,
+  dois testes da paginação falharam por tempo na limpeza da base de testes (o mesmo problema dos pacotes anteriores);
+  sozinhos passam. Sem carga, essa limpeza demora cerca de 0,6 s, e não havia ligações presas a segurar bloqueios.
+- **Prova por mutação:** 15 mutações, todas apanhadas: adicionar sem tirar stock, ignorar o módulo de stock, ignorar se
+  o produto controla stock, devolver mais do que a peça tirou, sinal trocado ao mudar a quantidade, retirar sem
+  devolver, aceitar com os produtos desligados, aceitar produto inativo, descrição e referência que não vêm do produto,
+  movimento sem origem, apagar a tarefa com stock tirado, apagar o produto usado em peças, e as duas regras das peças
+  mais usadas (nome atual do produto e agrupar pelo produto).
+- **Migração:** ensaiada numa cópia da base de desenvolvimento, com uma assistência e duas peças avulsas
+  acrescentadas:
+  - as peças antigas ficaram sem produto e com 0 tirado;
+  - em SQL, numa transação desfeita, a base de dados recusou o tirado negativo, o tirado sem produto e apagar um
+    produto usado numa peça;
+  - sem desvio de esquema;
+  - a reversão repôs o esquema e os dados;
+  - a base de desenvolvimento foi migrada depois de uma cópia de segurança.
+- **Browser** (base de testes, como Técnico): na assistência AS-0001, «Do catálogo…» mostrou «TN-2420 · stock 10»;
+  escolher preencheu a descrição e a referência e disse «Sai do stock (atual 10)»; 2 unidades → «saiu do stock: 2»;
+  mudar para 3 → stock 7; na ficha do produto, o histórico mostrou os dois consumos com o motivo, o autor e a ligação
+  à assistência, sem botões de movimento para o Técnico; retirar a peça → «+3 … peça retirada» e o stock voltou a 10.
+
 ## Decisões assumidas (a rever)
 - **Reservas** passam para a Fase 6: só as encomendas reservam stock. As peças de assistência gastam diretamente.
 - **Um só armazém**, sem localizações, lotes nem números de série no stock.

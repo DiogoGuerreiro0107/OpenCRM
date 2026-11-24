@@ -160,6 +160,7 @@ Estado atual: **todas as fases do roadmap consolidado e a revisão final conclu�
   - [x] Peças usadas nas assistências e indicadores do módulo (entradas, resolvidas, tempo até resolver, em aberto por passo, tempo por técnico, peças mais usadas); hora de fecho em todas as tarefas (Fase 4c)
   - [x] Catálogo de produtos: referência, preço e IVA, categorias, fornecedores com referência e custo (custos só para quem gere o catálogo) e campos personalizados (Fase 5a) — ver [docs/plano-fase-5-produtos-stock.md](docs/plano-fase-5-produtos-stock.md)
   - [x] Stock como livro de movimentos (entradas, saídas, devoluções, acertos de contagem com motivo, stock inicial), stock mínimo com alertas e stock negativo permitido (Fase 5b)
+  - [x] Peças das assistências escolhidas do catálogo, a gastar stock (e a devolvê-lo ao retirar), com o histórico ligado à assistência; peças mais usadas agrupadas pelo produto (Fase 5c)
 
 ### Por fazer (backlog)
 

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Product } from "@opencrm/shared-types";
 import { createStockMovement, formatQty, listStockMovements, type ManualMovementType, MOVEMENT_LABELS } from "@/lib/stock-api";
@@ -120,7 +121,13 @@ export function ProductStockCard({ product }: { product: Product }) {
           {history.items.map((m) => (
             <li key={m.id} className="flex flex-wrap items-baseline gap-x-2 py-1.5">
               <span className={cn("w-16 shrink-0 text-right font-mono tabular-nums", m.quantity < 0 ? "text-red-700" : "text-green-700")}>{formatQty(m.quantity, true)}</span>
-              <span className="font-medium">{MOVEMENT_LABELS[m.type]}</span>
+              {m.sourceType === "SERVICE_CASE" && m.sourceId ? (
+                <Link to={`/assistencias/${m.sourceId}`} className="font-medium hover:underline" title="Abrir a assistência">
+                  {MOVEMENT_LABELS[m.type]}
+                </Link>
+              ) : (
+                <span className="font-medium">{MOVEMENT_LABELS[m.type]}</span>
+              )}
               <span className="text-xs text-muted-foreground">
                 {dateTime(m.createdAt)} · {m.user.name}
               </span>

@@ -664,3 +664,13 @@ Segundo pacote da [Fase 5](plano-fase-5-produtos-stock.md).
 - Um produto com movimentos não se apaga; deixar de controlar stock exige o stock a zero.
 - **Validação:** 7 e2e novos (509 e2e e 289 unitários), 13 mutações todas apanhadas, migração ensaiada (triggers testados em SQL) e revertida, verificação no browser. Detalhes no plano, em «Execução do 5b».
 
+## Fase 5c: peças das assistências ligadas a produtos (2026-11-24)
+Terceiro e último pacote da [Fase 5](plano-fase-5-produtos-stock.md).
+- **A peça pode vir do catálogo** (só ao adicionar, com os «Produtos» ligados e o produto ativo). A descrição e a referência vêm do produto, mas ficam como texto editável; as peças avulsas continuam. Trocar o produto é retirar e adicionar.
+- **Com o «Stock» ligado e o produto a controlar stock, a peça gasta stock:** adicionar tira, mudar a quantidade tira ou devolve a diferença, retirar devolve. Os movimentos são «consumo em assistência», com a origem na assistência.
+- **A peça guarda quanto tirou** (`stockTaken`) e nunca devolve mais do que isso. Assim, uma peça lançada com o stock desligado não devolve stock que nunca saiu. Com o stock desligado, as peças não mexem no stock; quem o religar acerta a contagem.
+- **Quem:** quem escreve nas peças («Trabalho diário»). Os movimentos são lançados pelo sistema em nome dessa pessoa, sem pedir a área «Movimentos de stock».
+- **Não se perde stock por apagar:** apagar a tarefa de uma assistência com peças que tiraram stock é recusado (409, «retira primeiro as peças»). Um produto usado em peças não se apaga (409 e chave estrangeira `Restrict`).
+- **Peças mais usadas** agrupadas pelo produto, com o nome atual.
+- **Validação:** 6 e2e e 4 unitários novos (515 e2e e 293 unitários), 15 mutações todas apanhadas, migração ensaiada e revertida, verificação no browser. Detalhes no plano, em «Execução do 5c».
+

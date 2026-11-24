@@ -6,15 +6,23 @@ import { IsDateString, IsNumber, IsOptional, IsString, Matches, Max, MaxLength, 
 const MAX_QUANTITY = 99_999_999;
 
 export class CreateServicePartDto {
+  /** Obrigatória sem produto; com produto, por omissão o nome dele (Fase 5c). */
+  @ValidateIf((o: CreateServicePartDto) => !o.productId || o.description !== undefined)
   @IsString()
   @Matches(/\S/, { message: "Descreve a peça" })
   @MaxLength(300)
-  description!: string;
+  description?: string;
 
+  /** Com produto, por omissão a referência dele. */
   @IsOptional()
   @IsString()
   @MaxLength(120)
   reference?: string;
+
+  /** Produto do catálogo (Fase 5c): só ao adicionar; trocar é retirar e adicionar outra. */
+  @IsOptional()
+  @IsString()
+  productId?: string;
 
   /** Por omissão 1; até duas casas decimais (ex.: metros de cabo). */
   @IsOptional()
