@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { ConflictException, Injectable, NotFoundException } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { CreateContactDto } from "./dto/create-contact.dto";
@@ -56,6 +56,10 @@ export class ContactsService {
 
   async remove(id: string) {
     await this.ensureExists(id);
+    // Encomendas (Fase 6a): o cliente não desaparece de uma encomenda.
+    if ((await this.prisma.salesOrder.count({ where: { contactId: id } })) > 0) {
+      throw new ConflictException("O contacto tem encomendas: não se pode eliminar");
+    }
     // Os valores dos campos personalizados não têm chave estrangeira (polimórficos): apagam-se juntamente.
     await this.prisma.$transaction([
       this.prisma.customFieldValue.deleteMany({ where: { entityType: "CONTACT", entityId: id } }),

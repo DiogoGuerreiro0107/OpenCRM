@@ -97,7 +97,7 @@ describe("validação dos valores por tipo de campo", () => {
 
 describe("registo de tipos de registo com campos personalizados", () => {
   it("tem os tipos atuais, com os MESMOS identificadores de antes (não muda nada para quem usa), mais as tarefas (2b) e os produtos (5a)", () => {
-    expect([...CUSTOM_FIELD_ENTITY_TYPES].sort()).toEqual(["COMPANY", "CONTACT", "DEAL", "LEAD", "PRODUCT", "WORK_ITEM"]);
+    expect([...CUSTOM_FIELD_ENTITY_TYPES].sort()).toEqual(["COMPANY", "CONTACT", "DEAL", "LEAD", "ORDER", "PRODUCT", "WORK_ITEM"]);
   });
 
   it("cada tipo tem rótulo, módulo existente (ou núcleo), permissões e verificação de existência", () => {
@@ -113,6 +113,7 @@ describe("registo de tipos de registo com campos personalizados", () => {
 
   it("isCustomFieldEntityType só aceita tipos registados (sem truques com o protótipo)", () => {
     expect(isCustomFieldEntityType("COMPANY")).toBe(true);
-    for (const bad of ["company", "ORDER", "", "toString", "__proto__", 1, null]) expect(isCustomFieldEntityType(bad)).toBe(false);
+    expect(isCustomFieldEntityType("ORDER")).toBe(true);
+    for (const bad of ["company", "PURCHASE_ORDER", "", "toString", "__proto__", 1, null]) expect(isCustomFieldEntityType(bad)).toBe(false);
   });
 });

@@ -14,6 +14,7 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
         deal: { searchText: true },
         emailMessage: { searchText: true },
         product: { searchText: true },
+        salesOrder: { searchText: true },
       },
     });
   }

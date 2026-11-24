@@ -23,6 +23,7 @@ const WRITE_AREA_BY_ENTITY: Record<CustomFieldEntityType, WriteArea> = {
   DEAL: "deals",
   WORK_ITEM: "dailyWork",
   PRODUCT: "catalog",
+  ORDER: "orders",
 };
 
 interface CustomFieldsSectionProps {

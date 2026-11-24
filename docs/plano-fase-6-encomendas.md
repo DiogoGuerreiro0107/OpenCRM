@@ -114,6 +114,64 @@ Detalhado com o plano da fase (2026-11-24).
 - **Browser** (base de testes): encomenda nova, linhas do catálogo e avulsa com desconto, totais, confirmar, enviar,
   entregar; cancelar outra com motivo; cartão na empresa; Técnico só a ver.
 
+### Execução do 6a (2026-11-24)
+**Implementado como planeado**, com estes pormenores decididos na implementação:
+- **Cálculo:**
+  - feito com decimais exatos (`Prisma.Decimal`), sem vírgula flutuante;
+  - cada linha é arredondada a cêntimos (meio cêntimo para cima), o IVA de cada linha também, e os totais são a soma;
+  - uma CHECK garante que total = sem IVA + IVA.
+- **Na base de dados:**
+  - CHECKs: cliente obrigatório; cancelada ⇔ motivo e data; totais; limites das linhas;
+  - o cliente e o produto têm chave estrangeira `Restrict`, e apagar uma empresa, um contacto ou um produto com
+    encomendas dá 409 com mensagem;
+  - pesquisa: número («EN-0007» ou «7»), referência do cliente e o texto de pesquisa da empresa e do contacto (nome,
+    NIF, email), que já existia.
+- **Encomenda bloqueada** em cada linha e mudança de estado (`SELECT … FOR UPDATE`): com 8 linhas acrescentadas em
+  simultâneo, os totais e as posições batem certo. A fila com espera alargada e o 409 «tenta de novo» passaram para
+  um utilitário comum (`common/locked-transaction.ts`), que o stock (5b) também usa.
+- **Linhas:** do catálogo copiam a referência, o nome, o preço e o IVA (o pedido prevalece); um produto sem preço
+  obriga a indicar o preço. A linha avulsa pede descrição, preço e IVA.
+- **Timeline e auditoria:**
+  - timeline nova para o tipo de registo «Encomenda» (`ORDER`), com cada linha («3 × Toner (TN-2420) a 45,90 € −10%»)
+    e cada estado;
+  - na auditoria: confirmar, cancelar (com o motivo) e apagar rascunhos.
+- **Primeiro módulo com dois dependentes nos produtos:** desligar os produtos exige desligar antes o stock e as
+  encomendas. Os testes estruturais (dependências, áreas, matriz de permissões, tipos de campos personalizados)
+  foram atualizados de propósito, e dois testes que usavam «ORDER» como exemplo de tipo desconhecido passaram a usar
+  outro.
+- **Erro apanhado no browser:** uma linha avulsa sem referência dava 500, porque a interface envia `sku: null` e o
+  servidor fazia `.trim()` sobre `null`. O servidor passou a aceitar `null` (sem referência) e o caso entrou nos e2e.
+- **Testes:**
+  - 7 e2e novos em `test/orders.e2e-spec.ts` e 7 unitários (`orders.spec.ts`); total: 522 e2e e 300 unitários;
+  - na suite completa, 4 testes de outras áreas falharam:
+    - um era real e foi corrigido (o exemplo «ORDER» dos campos personalizados);
+    - os outros 3 (auditoria e utilizadores) falharam por tempo, a mesma lentidão intermitente da base de testes, e
+      passam sozinhos.
+- **Prova por mutação:** 21 mutações, todas apanhadas:
+  - cálculo: desconto ignorado, sem arredondar, totais não recalculados;
+  - estados e edição: linhas fora de rascunho, confirmar sem linhas, transição sem verificar o estado, cancelar depois
+    de enviada, apagar fora de rascunho, cliente a mudar depois do rascunho, entregue ainda editável;
+  - validações: contacto de outra empresa, produto inativo, preço do produto ignorado;
+  - concorrência e pesquisa: sem bloquear a encomenda, pesquisa sem o cliente;
+  - acessos e auditoria: sem área, sem módulo, sem auditoria;
+  - apagar empresa, contacto ou produto com encomendas.
+- **Migração:** ensaiada numa cópia da base de desenvolvimento, com uma empresa e uma entrada antiga na timeline:
+  - em SQL, numa transação desfeita: o número e o texto de pesquisa por trigger («en-0001 po-acao 7»), a timeline
+    `ORDER`, as quatro CHECKs, o `Restrict` da empresa e as linhas apagadas em cascata;
+  - sem desvio de esquema;
+  - a reversão, com uma encomenda, uma entrada `ORDER` na timeline e um campo personalizado gravados, repôs os dados e
+    o esquema (o enum da timeline é recriado sem `ORDER`);
+  - a base de desenvolvimento foi migrada depois de uma cópia de segurança.
+- **Browser** (base de testes):
+  - como Comercial:
+    - «Nova encomenda» com a empresa e a referência abriu o rascunho EN-0001;
+    - «Do catálogo…» preencheu o toner (45,9 € e IVA de 23%);
+    - linha avulsa «Portes de envio» a 12,50 € com 10% de desconto = 11,25 €; totais 148,95 € + 34,26 € = 183,21 €;
+    - confirmar (as linhas e o cliente ficaram bloqueados), enviar e entregar, com as datas no cabeçalho;
+    - cancelar a EN-0002 com motivo;
+    - cartão «Encomendas» na ficha da empresa;
+  - como Técnico: a ficha só de leitura, sem botões de estado.
+
 ## Pacotes seguintes (esboço; cada um terá plano detalhado antes de começar)
 
 ### 6b — Reservas e saída de stock

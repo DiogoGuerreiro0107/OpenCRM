@@ -1,5 +1,5 @@
 import { lazy } from "react";
-import { FileText, KanbanSquare, Mail, Package, Phone, Tags, UserPlus, Wrench, Zap } from "lucide-react";
+import { FileText, KanbanSquare, Mail, Package, Phone, ShoppingCart, Tags, UserPlus, Wrench, Zap } from "lucide-react";
 import { ADMIN_ONLY } from "@/lib/permissions";
 import type { FrontendModule, RecordPanelProps } from "./types";
 
@@ -119,3 +119,23 @@ export const productsModule: FrontendModule = {
     },
   ],
 };
+
+/** Encomendas de cliente (Fase 6a): menu, lista, ficha e o cartão nas fichas de empresa e contacto. */
+export const ordersModule: FrontendModule = {
+  id: "encomendas",
+  nav: [{ id: "encomendas:list", label: "Encomendas", icon: ShoppingCart, to: "/encomendas", section: "main", order: 39 }],
+  routes: [
+    { path: "/encomendas", page: lazy(() => import("@/pages/orders/OrdersListPage").then((m) => ({ default: m.OrdersListPage }))) },
+    { path: "/encomendas/:id", page: lazy(() => import("@/pages/orders/OrderDetailPage").then((m) => ({ default: m.OrderDetailPage }))) },
+  ],
+  recordPanels: [
+    {
+      id: "encomendas:orders",
+      title: "Encomendas",
+      entities: ["company", "contact"],
+      order: 25,
+      component: lazy(() => import("@/pages/orders/OrdersPanel").then((m) => ({ default: m.OrdersPanel }))),
+    },
+  ],
+};
+

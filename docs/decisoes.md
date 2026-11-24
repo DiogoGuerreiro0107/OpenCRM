@@ -674,3 +674,14 @@ Terceiro e último pacote da [Fase 5](plano-fase-5-produtos-stock.md).
 - **Peças mais usadas** agrupadas pelo produto, com o nome atual.
 - **Validação:** 6 e2e e 4 unitários novos (515 e2e e 293 unitários), 15 mutações todas apanhadas, migração ensaiada e revertida, verificação no browser. Detalhes no plano, em «Execução do 5c».
 
+## Fase 6a: encomendas de cliente (2026-11-24)
+Primeiro pacote da [Fase 6](plano-fase-6-encomendas.md) (encomendas, compras e transporte).
+- **Módulo opcional «Encomendas»**, que depende dos «Produtos». Área de escrita nova **«Encomendas»** (Administrador, Comercial, Backoffice). Ver é para todos.
+- **Estados fixos em código** (rascunho → confirmada → enviada → entregue, ou cancelada com motivo), não passos configuráveis. É um desvio ao §3.7 da reorganização modular: a partir do 6b os estados mexem em stock, e essa lógica tem de ser código. O trabalho das pessoas continua nos itens de trabalho.
+- **Valores indicativos:** preço sem IVA, desconto e IVA por linha; cada linha é arredondada a cêntimos com decimais exatos e os totais são a soma. O CRM não emite faturas (D2); a nota está na ficha.
+- **Linhas só em rascunho**, com a encomenda bloqueada para os totais não se pisarem. O cliente só muda em rascunho; entregue ou cancelada já não se altera. Só se apagam rascunhos.
+- **Cliente = empresa e/ou contacto** (CHECK). Empresas, contactos e produtos com encomendas não se apagam (409).
+- **Timeline nova** para o tipo de registo «Encomenda»; na auditoria ficam confirmar, cancelar e apagar. Campos personalizados no tipo «Encomenda».
+- A fila de espera das transações com linha bloqueada (5b) passou a utilitário comum (`common/locked-transaction.ts`).
+- **Validação:** 7 e2e e 7 unitários novos (522 e2e e 300 unitários), 21 mutações todas apanhadas, migração ensaiada e revertida, verificação no browser, que apanhou um 500 numa linha sem referência, já corrigido e coberto. Detalhes no plano, em «Execução do 6a».
+

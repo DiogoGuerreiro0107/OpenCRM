@@ -9,7 +9,8 @@ export interface AuthUser {
 
 export type TimelineEventType = "NOTE" | "CALL" | "EMAIL" | "MEETING" | "FILE" | "SYSTEM";
 
-export type TimelineEntityType = "COMPANY" | "CONTACT" | "LEAD" | "DEAL" | "TASK";
+/** `ORDER`: encomendas de cliente (Fase 6a). */
+export type TimelineEntityType = "COMPANY" | "CONTACT" | "LEAD" | "DEAL" | "TASK" | "ORDER";
 
 export interface TimelineEvent {
   id: string;
@@ -351,7 +352,7 @@ export interface LeadConversionResult {
   outcome: { company: ConversionOutcome | null; contact: ConversionOutcome | null };
 }
 
-export type CustomFieldEntityType = "COMPANY" | "CONTACT" | "LEAD" | "DEAL" | "WORK_ITEM" | "PRODUCT";
+export type CustomFieldEntityType = "COMPANY" | "CONTACT" | "LEAD" | "DEAL" | "WORK_ITEM" | "PRODUCT" | "ORDER";
 
 export type CustomFieldType =
   | "TEXT"
@@ -827,5 +828,59 @@ export interface StockMovement {
   sourceId: string | null;
   user: { id: string; name: string };
   createdAt: string;
+}
+
+/** Encomendas de cliente (Fase 6a). Valores indicativos, sem IVA por linha; a fatura sai do programa de faturação. */
+export type SalesOrderStatus = "DRAFT" | "CONFIRMED" | "SHIPPED" | "DELIVERED" | "CANCELLED";
+
+export interface SalesOrderLine {
+  id: string;
+  position: number;
+  productId: string | null;
+  sku: string | null;
+  description: string;
+  quantity: number;
+  unitPrice: number;
+  discountPct: number;
+  vatRate: number;
+  /** Sem IVA, já com o desconto. */
+  lineTotal: number;
+  vatAmount: number;
+}
+
+interface SalesOrderBase {
+  id: string;
+  number: number;
+  code: string;
+  status: SalesOrderStatus;
+  companyId: string | null;
+  company: { id: string; name: string; taxId: string | null } | null;
+  contactId: string | null;
+  contact: { id: string; name: string; email: string | null } | null;
+  assigneeId: string | null;
+  assignee: { id: string; name: string } | null;
+  customerReference: string | null;
+  deliveryAddress: string | null;
+  notes: string | null;
+  subtotal: number;
+  vatTotal: number;
+  total: number;
+  confirmedAt: string | null;
+  shippedAt: string | null;
+  deliveredAt: string | null;
+  cancelledAt: string | null;
+  cancelReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Na lista: sem as linhas, com quantas são. */
+export interface SalesOrderSummary extends SalesOrderBase {
+  lineCount: number;
+}
+
+export interface SalesOrder extends SalesOrderBase {
+  createdBy: { id: string; name: string } | null;
+  lines: SalesOrderLine[];
 }
 

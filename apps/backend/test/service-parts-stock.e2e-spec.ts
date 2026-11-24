@@ -54,6 +54,7 @@ describe("Peças ligadas a produtos e ao stock (e2e)", () => {
     await api().post(parts(id)).set("Authorization", rui).send({ productId: off.id }).expect(400);
 
     await setModule("stock", false);
+    await setModule("encomendas", false);
     await setModule("produtos", false);
     await api().post(parts(id)).set("Authorization", rui).send({ productId: p.id }).expect(400);
     // As peças já ligadas continuam a ver-se e a editar-se.
