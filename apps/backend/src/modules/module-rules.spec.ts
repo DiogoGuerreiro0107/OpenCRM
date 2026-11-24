@@ -78,7 +78,10 @@ describe("dependências", () => {
     expect(activeDependents("deals", set("deals", "leads"), manifests)).toEqual([]);
   });
 
-  it("só o stock depende de outro módulo (dos produtos, Fase 5b); desde a 3b as automações correm por tipo de registo", () => {
-    expect(MODULE_MANIFESTS.filter((x) => x.dependsOn.length > 0).map((x) => [x.id, x.dependsOn])).toEqual([["stock", ["produtos"]]]);
+  it("o stock (5b) e as encomendas (6a) dependem dos produtos; desde a 3b as automações correm por tipo de registo", () => {
+    expect(MODULE_MANIFESTS.filter((x) => x.dependsOn.length > 0).map((x) => [x.id, x.dependsOn])).toEqual([
+      ["stock", ["produtos"]],
+      ["encomendas", ["produtos"]],
+    ]);
   });
 });

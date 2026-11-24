@@ -18,6 +18,7 @@ const ENTITY_TABS: { value: CustomFieldEntityType; label: string }[] = [
   { value: "DEAL", label: "Oportunidades" },
   { value: "WORK_ITEM", label: "Tarefas" },
   { value: "PRODUCT", label: "Produtos" },
+  { value: "ORDER", label: "Encomendas" },
 ];
 
 const isEntityTab = (value: string | null): value is CustomFieldEntityType => ENTITY_TABS.some((t) => t.value === value);
@@ -29,6 +30,8 @@ const isEntityTab = (value: string | null): value is CustomFieldEntityType => EN
 export function CustomFieldsSettingsPage() {
   // O separador dos produtos só aparece com o módulo ligado (Fase 5a).
   const productsOn = useModuleEnabled("produtos");
+  // E o das encomendas com o módulo delas (Fase 6a).
+  const ordersOn = useModuleEnabled("encomendas");
   const [params, setParams] = useSearchParams();
   const requested = params.get("entidade");
   const entityType: CustomFieldEntityType = isEntityTab(requested) ? requested : "COMPANY";
@@ -58,7 +61,7 @@ export function CustomFieldsSettingsPage() {
       </div>
 
       <div className="flex gap-2 border-b border-border">
-        {ENTITY_TABS.filter((tab) => tab.value !== "PRODUCT" || productsOn).map((tab) => (
+        {ENTITY_TABS.filter((tab) => (tab.value !== "PRODUCT" || productsOn) && (tab.value !== "ORDER" || ordersOn)).map((tab) => (
           <button
             key={tab.value}
             onClick={() => setEntityType(tab.value)}

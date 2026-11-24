@@ -73,6 +73,13 @@ export const CUSTOM_FIELD_ENTITIES = {
     writeArea: "catalog",
     exists: async (prisma, id) => (await prisma.product.count({ where: { id } })) > 0,
   },
+  /** Encomendas de cliente (Fase 6a). */
+  ORDER: {
+    label: "Encomendas",
+    module: "encomendas",
+    writeArea: "orders",
+    exists: async (prisma, id) => (await prisma.salesOrder.count({ where: { id } })) > 0,
+  },
 } satisfies Record<string, CustomFieldEntity>;
 
 export type CustomFieldEntityType = keyof typeof CUSTOM_FIELD_ENTITIES;

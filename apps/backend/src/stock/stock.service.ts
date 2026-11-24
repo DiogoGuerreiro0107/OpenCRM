@@ -2,6 +2,7 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { Prisma, StockMovementType } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { KeyField, orderByKey, readPage } from "../common/pagination";
+import { lockedTransaction } from "../common/locked-transaction";
 import { CreateStockMovementDto, QueryStockMovementsDto } from "./dto/stock.dto";
 
 const INCLUDE = {
@@ -94,15 +95,8 @@ export class StockService {
    * Transação com a linha do produto bloqueada. Pedidos simultâneos no mesmo produto esperam em fila; o tempo de
    * espera do Prisma (2 s por omissão) é alargado, e se mesmo assim se esgotar, responde 409 em vez de 500.
    */
-  async withLock<T>(fn: (tx: Tx) => Promise<T>): Promise<T> {
-    try {
-      return await this.prisma.$transaction(fn, { maxWait: 15_000, timeout: 15_000 });
-    } catch (err) {
-      if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2028") {
-        throw new ConflictException("Há muitos movimentos a ser lançados ao mesmo tempo: tenta de novo");
-      }
-      throw err;
-    }
+  withLock<T>(fn: (tx: Tx) => Promise<T>): Promise<T> {
+    return lockedTransaction(this.prisma, fn, "Há muitos movimentos a ser lançados ao mesmo tempo: tenta de novo");
   }
 
   async findPage(query: QueryStockMovementsDto) {

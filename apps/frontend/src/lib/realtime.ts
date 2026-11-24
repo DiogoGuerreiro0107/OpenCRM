@@ -48,6 +48,8 @@ const KEYS_BY_RESOURCE: Record<string, string[]> = {
   // Stock (Fase 5b): movimentos novos mudam o stock dos produtos e os alertas.
   stock: ["stock", "products"],
   "product-categories": ["product-categories", "products"],
+  // Encomendas (Fase 6a).
+  orders: ["orders", "timeline"],
 };
 
 /** Junta rajadas de eventos (ex.: uma automação + o pedido que a causou) num só refrescamento. */

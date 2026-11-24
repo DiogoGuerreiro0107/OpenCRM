@@ -19,6 +19,7 @@ export const WRITE_AREA_NAMES = [
   "emailTemplates",
   "catalog",
   "stock",
+  "orders",
 ] as const;
 
 export type WriteArea = (typeof WRITE_AREA_NAMES)[number];

@@ -77,6 +77,11 @@ export const WRITE_AREAS = {
     description: "Lançar entradas, saídas, devoluções, stock inicial e acertos de contagem. Ver o stock é para todos.",
     defaultRoles: [ADMIN, BACKOFFICE],
   },
+  orders: {
+    label: "Encomendas",
+    description: "Criar e alterar encomendas de clientes e as suas linhas, confirmar, marcar como enviadas ou entregues e cancelar. Ver as encomendas é para todos.",
+    defaultRoles: [ADMIN, COMERCIAL, BACKOFFICE],
+  },
 } satisfies Record<string, WriteAreaDefinition>;
 
 export type WriteArea = keyof typeof WRITE_AREAS;

@@ -39,7 +39,7 @@ describe("Módulos opcionais (e2e)", () => {
   describe("estado e permissões", () => {
     it("por omissão todos os módulos estão ativos", async () => {
       const res = await api().get("/modules").set(as(admin)).expect(200);
-      expect(res.body.enabled.sort()).toEqual(["assistencias", "automations", "deals", "email", "leads", "produtos", "stock", "zadarma"]);
+      expect(res.body.enabled.sort()).toEqual(["assistencias", "automations", "deals", "email", "encomendas", "leads", "produtos", "stock", "zadarma"]);
     });
 
     it("qualquer utilizador autenticado vê o que está ativo, mas só o Administrador vê o detalhe e altera", async () => {
@@ -150,7 +150,7 @@ describe("Módulos opcionais (e2e)", () => {
 
   describe("o núcleo nunca é afetado", () => {
     it("com todos os módulos opcionais desligados, empresas, contactos, tarefas, timeline e utilizadores funcionam", async () => {
-      for (const id of ["automations", "deals", "leads", "email", "zadarma", "assistencias", "stock", "produtos"]) await setModule(id, false);
+      for (const id of ["automations", "deals", "leads", "email", "zadarma", "assistencias", "stock", "encomendas", "produtos"]) await setModule(id, false);
 
       const company = (await api().post("/companies").set(as(admin)).send({ name: "Empresa sem módulos" }).expect(201)).body;
       await api().post("/contacts").set(as(admin)).send({ name: "Contacto sem módulos", companyId: company.id }).expect(201);

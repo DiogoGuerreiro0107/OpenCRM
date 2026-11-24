@@ -150,6 +150,7 @@ describe("Stock (e2e)", () => {
     await api().patch("/modules/stock").set("Authorization", admin).send({ enabled: true }).expect(200);
     // Sem produtos, o stock não se liga.
     await api().patch("/modules/stock").set("Authorization", admin).send({ enabled: false }).expect(200);
+    await api().patch("/modules/encomendas").set("Authorization", admin).send({ enabled: false }).expect(200);
     await api().patch("/modules/produtos").set("Authorization", admin).send({ enabled: false }).expect(200);
     await api().patch("/modules/stock").set("Authorization", admin).send({ enabled: true }).expect(400);
   });

@@ -161,6 +161,7 @@ Estado atual: **todas as fases do roadmap consolidado e a revisão final conclu�
   - [x] Catálogo de produtos: referência, preço e IVA, categorias, fornecedores com referência e custo (custos só para quem gere o catálogo) e campos personalizados (Fase 5a) — ver [docs/plano-fase-5-produtos-stock.md](docs/plano-fase-5-produtos-stock.md)
   - [x] Stock como livro de movimentos (entradas, saídas, devoluções, acertos de contagem com motivo, stock inicial), stock mínimo com alertas e stock negativo permitido (Fase 5b)
   - [x] Peças das assistências escolhidas do catálogo, a gastar stock (e a devolvê-lo ao retirar), com o histórico ligado à assistência; peças mais usadas agrupadas pelo produto (Fase 5c)
+  - [x] Encomendas de cliente: linhas do catálogo ou avulsas com desconto e IVA, totais indicativos, estados (rascunho, confirmada, enviada, entregue, cancelada com motivo), cartão nas fichas de empresa e contacto (Fase 6a) — ver [docs/plano-fase-6-encomendas.md](docs/plano-fase-6-encomendas.md)
 
 ### Por fazer (backlog)
 

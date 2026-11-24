@@ -179,6 +179,8 @@ describe("predefinições das permissões (Fase 0d)", () => {
       catalog: ["ADMINISTRADOR", "BACKOFFICE", "FINANCEIRO"],
       // Área nova (Fase 5b).
       stock: ["ADMINISTRADOR", "BACKOFFICE"],
+      // Área nova (Fase 6a).
+      orders: ["ADMINISTRADOR", "BACKOFFICE", "COMERCIAL"],
     });
   });
 });

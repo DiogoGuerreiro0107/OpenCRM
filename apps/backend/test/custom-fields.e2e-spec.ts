@@ -73,10 +73,10 @@ describe("Campos personalizados (e2e)", () => {
 
     it("tipo de registo desconhecido é recusado (400) em definições e valores", async () => {
       const { admin, company } = await setup();
-      await api().get("/custom-fields").query({ entityType: "ORDER" }).set("Authorization", admin).expect(400);
+      await api().get("/custom-fields").query({ entityType: "PURCHASE_ORDER" }).set("Authorization", admin).expect(400);
       await api().get("/custom-fields").query({ entityType: "company" }).set("Authorization", admin).expect(400);
-      await api().post("/custom-fields").set("Authorization", admin).send({ entityType: "ORDER", fieldLabel: "x", fieldType: "TEXT" }).expect(400);
-      await save(admin, "ORDER", company.id, []).expect(400);
+      await api().post("/custom-fields").set("Authorization", admin).send({ entityType: "PURCHASE_ORDER", fieldLabel: "x", fieldType: "TEXT" }).expect(400);
+      await save(admin, "PURCHASE_ORDER", company.id, []).expect(400);
     });
   });
 
