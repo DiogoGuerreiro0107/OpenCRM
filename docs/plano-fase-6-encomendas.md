@@ -269,16 +269,22 @@ Detalhado a 2026-11-24, depois do merge do 6a.
 - **Base de dados:**
   - trigger nas linhas que só toca no produto quando a reserva muda (os rascunhos não bloqueiam o produto);
   - CHECKs `0 ≤ reservado ≤ quantidade`, só linhas com produto, e `Product.reserved ≥ 0`.
+- **Ordem das notas:** várias notas da mesma ação (ex.: «Encomenda enviada» e «Saída de stock: …») caíam no mesmo
+  milissegundo e o desempate pelo id (uuid) baralhava-as; no CI, mais rápido, isso fez falhar um teste. As notas das
+  encomendas passaram a usar um relógio monótono (`common/monotonic-clock.ts`: cada nota é pelo menos 1 ms posterior
+  à anterior). Um e2e com o relógio parado prova a ordem; as duas mutações (`new Date()` nas notas da encomenda e nas
+  das reservas) são apanhadas.
 - **Bloqueios:** encomenda → produtos (por id) → linhas; os movimentos de stock bloqueiam o produto e as linhas à
   espera (`FOR UPDATE OF`), nunca a encomenda.
 - **Interface:** na lista de produtos, o disponível aparece por baixo do stock (quando há reservas), em vez de uma
   coluna nova; na ficha do produto, as encomendas confirmadas com esse produto.
 - **Testes:**
-  - 7 e2e novos em `test/order-reservations.e2e-spec.ts`; um e2e do 6a passou a esperar também o envio na auditoria;
-  - total: 529 e2e e 300 unitários;
+  - 8 e2e novos em `test/order-reservations.e2e-spec.ts` e 2 unitários (`monotonic-clock.spec.ts`); um e2e do 6a passou
+    a esperar também o envio na auditoria;
+  - total: 530 e2e e 302 unitários;
   - na suite completa, 3 testes de outras áreas (módulos e utilizadores) falharam por tempo na limpeza da base de
     testes, que nessa altura partilhava o servidor com o ensaio da migração; passam sozinhos.
-- **Prova por mutação:** 22 mutações, todas apanhadas:
+- **Prova por mutação:** 22 mutações, todas apanhadas (mais as 2 da ordem das notas):
   - reservas: confirmar sem reservar, ordem invertida, reservar acima do disponível, entradas e peças devolvidas sem
     reservar, confirmar sem bloquear os produtos (concorrência);
   - envio: ignorar as linhas à espera, sem saídas, sem libertar, saída de produto sem stock, sem auditoria;

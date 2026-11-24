@@ -694,5 +694,6 @@ Segundo pacote da [Fase 6](plano-fase-6-encomendas.md).
 - **Enviar** lança uma saída `SALE_OUT` por linha (origem na encomenda) e liberta as reservas. Com linhas à espera, só com «enviar mesmo assim» (409 sem isso); fica na timeline e na auditoria. Com o stock desligado, não lança saídas.
 - **Cancelar** liberta, e o que fica disponível passa para quem aguarda. As encomendas confirmadas antes do 6b não reservam na migração: «Reservar stock» na ficha.
 - **Bloqueios pela mesma ordem** (encomenda → produtos por id → linhas) para não haver impasses.
-- **Validação:** 7 e2e novos (529 e2e e 300 unitários), 22 mutações todas apanhadas, migração ensaiada e revertida, verificação no browser. Detalhes no plano, em «Execução do 6b».
+- **Notas da timeline pela ordem em que são escritas:** as notas das encomendas levam a hora de um relógio monótono do processo (`common/monotonic-clock.ts`), porque várias notas da mesma ação caíam no mesmo milissegundo e o desempate por uuid baralhava-as.
+- **Validação:** 8 e2e e 2 unitários novos (530 e2e e 302 unitários), 24 mutações todas apanhadas, migração ensaiada e revertida, verificação no browser. Detalhes no plano, em «Execução do 6b».
 

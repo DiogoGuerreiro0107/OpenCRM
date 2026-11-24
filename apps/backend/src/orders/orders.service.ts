@@ -5,6 +5,7 @@ import { ModulesService } from "../modules/modules.service";
 import { foldSearch } from "../common/search-text";
 import { KeyField, orderByKey, readPage } from "../common/pagination";
 import { lockedTransaction } from "../common/locked-transaction";
+import { monotonicNow } from "../common/monotonic-clock";
 import { recordMovement } from "../stock/stock.service";
 import { allocateWaiting, lockProducts, reservationText, SALES_ORDER_SOURCE, waitingLines } from "../stock/reservations";
 import { CancelOrderDto, CreateOrderDto, CreateOrderLineDto, QueryOrdersDto, ShipOrderDto, UpdateOrderDto, UpdateOrderLineDto } from "./dto/order.dto";
@@ -182,7 +183,7 @@ export class OrdersService {
   }
 
   private note(tx: Tx | PrismaService, orderId: string, description: string, userId: string) {
-    return tx.timelineEvent.create({ data: { entityType: "ORDER", entityId: orderId, type: "SYSTEM", description, userId } });
+    return tx.timelineEvent.create({ data: { entityType: "ORDER", entityId: orderId, type: "SYSTEM", description, userId, createdAt: monotonicNow() } });
   }
 
   /** Cliente válido: pelo menos um; existe; o contacto, se tiver empresa, é dessa empresa. */

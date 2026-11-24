@@ -45,7 +45,12 @@ describe("Reservas e saída de stock das encomendas (e2e)", () => {
   const confirmed = async (lines: Array<[string, number] | "avulsa">) => (await step((await draft(lines)).id, "confirm").expect(200)).body;
   const get = async (id: string) => (await api().get(`/orders/${id}`).set("Authorization", comercial).expect(200)).body;
   const reservedOf = async (id: string) => (await get(id)).lines.map((l: { reservedQuantity: number; waitingQuantity: number }) => [l.reservedQuantity, l.waitingQuantity]);
-  const notes = async (id: string) => (await prisma().timelineEvent.findMany({ where: { entityType: "ORDER", entityId: id }, orderBy: [{ createdAt: "asc" }, { id: "asc" }] })).map((e) => e.description);
+  /** Notas da encomenda por ordem; cada uma tem de ser estritamente posterior à anterior (sem empates no mesmo ms). */
+  const notes = async (id: string) => {
+    const events = await prisma().timelineEvent.findMany({ where: { entityType: "ORDER", entityId: id }, orderBy: [{ createdAt: "asc" }, { id: "asc" }] });
+    for (let i = 1; i < events.length; i++) expect(events[i].createdAt.getTime()).toBeGreaterThan(events[i - 1].createdAt.getTime());
+    return events.map((e) => e.description);
+  };
   const setModule = (id: string, enabled: boolean) => api().patch(`/modules/${id}`).set("Authorization", admin).send({ enabled }).expect(200);
   /** O reservado no produto é sempre a soma das linhas (trigger). */
   const assertReservedSum = async (productId: string) => {
@@ -87,6 +92,20 @@ describe("Reservas e saída de stock das encomendas (e2e)", () => {
     const res = await api().patch(`/products/${toner.id}`).set("Authorization", admin).send({ tracksStock: false }).expect(409);
     expect(res.body.message).toMatch(/reservado/);
     await assertReservedSum(toner.id);
+  });
+
+  it("as notas da mesma ação ficam pela ordem em que foram escritas, mesmo no mesmo milissegundo", async () => {
+    const toner = await newProduct({ sku: "TN-2420" });
+    await move(toner.id, "INITIAL", 1);
+    const order = await draft([[toner.id, 3]]);
+    // Relógio parado (só a data; os temporizadores continuam reais): todas as notas da confirmação caem no mesmo ms.
+    jest.useFakeTimers({ now: Date.now(), doNotFake: ["nextTick", "setImmediate", "clearImmediate", "setTimeout", "clearTimeout", "setInterval", "clearInterval", "queueMicrotask", "hrtime", "performance"] });
+    try {
+      await step(order.id, "confirm").expect(200);
+    } finally {
+      jest.useRealTimers();
+    }
+    expect((await notes(order.id)).slice(-3)).toEqual(["Encomenda confirmada", "Stock reservado: 1 × Toner preto (TN-2420)", "A aguardar stock: 2 × Toner preto (TN-2420)"]);
   });
 
   it("entradas de stock servem as encomendas à espera pela ordem da confirmação; peças devolvidas também reservam", async () => {

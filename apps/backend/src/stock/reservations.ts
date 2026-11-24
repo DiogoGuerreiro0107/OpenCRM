@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { monotonicNow } from "../common/monotonic-clock";
 
 /**
  * Reservas de stock para as encomendas (Fase 6b, docs/plano-fase-6-encomendas.md). A reserva é a quantidade reservada
@@ -75,9 +76,9 @@ export async function allocateWaiting(tx: Tx, productId: string, userId: string)
     served.set(line.orderId, entry);
   }
   for (const [orderId, entry] of served) {
-    await tx.timelineEvent.create({ data: { entityType: "ORDER", entityId: orderId, type: "SYSTEM", description: `Stock reservado: ${entry.items.join("; ")}`, userId } });
+    await tx.timelineEvent.create({ data: { entityType: "ORDER", entityId: orderId, type: "SYSTEM", description: `Stock reservado: ${entry.items.join("; ")}`, userId, createdAt: monotonicNow() } });
     if ((await waitingLines(tx, orderId)).length === 0) {
-      await tx.timelineEvent.create({ data: { entityType: "ORDER", entityId: orderId, type: "SYSTEM", description: "Todo o stock da encomenda está reservado", userId } });
+      await tx.timelineEvent.create({ data: { entityType: "ORDER", entityId: orderId, type: "SYSTEM", description: "Todo o stock da encomenda está reservado", userId, createdAt: monotonicNow() } });
     }
   }
   return served;
