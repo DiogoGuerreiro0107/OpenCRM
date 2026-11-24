@@ -221,14 +221,67 @@ Detalhado depois do 5a (2026-11-23).
 
 ---
 
-## Pacotes seguintes (esboço; cada um terá plano detalhado antes de começar)
+## Pacote 5c — Peças ligadas a produtos
+Detalhado depois do 5b (2026-11-24).
 
-### 5c — Peças ligadas a produtos
-- A peça da assistência pode vir do catálogo (preenche descrição e referência; o texto livre continua para peças
-  avulsas).
-- Com o módulo de stock ligado e o produto a controlar stock, a peça gasta stock: adicionar lança uma saída, mudar
-  a quantidade lança a diferença e retirar lança a devolução. Tudo com a origem na assistência.
-- «Peças mais usadas» passa a agrupar pelo produto quando existe.
+### Modelo
+- **`ServicePart.productId`** (opcional): o produto do catálogo de onde a peça veio. O produto não se apaga enquanto
+  houver peças com ele (chave estrangeira `Restrict`, e 409 com mensagem antes disso).
+- **`ServicePart.stockTaken`** (decimal, ≥ 0 por CHECK, 0 por omissão): quanto esta peça tirou do stock, líquido. É o
+  que se devolve ao retirar e o que limita o que se devolve ao baixar a quantidade.
+- Os movimentos de stock das peças têm o tipo **«consumo em assistência»** (`SERVICE_PART`, já previsto no 5b), a
+  origem na assistência (`sourceType = SERVICE_CASE`, `sourceId` = a assistência) e o motivo com o número dela
+  («AS-0007: peça adicionada»).
+
+### Regras
+- **Escolher do catálogo:** só ao adicionar, com o módulo `produtos` ligado e o produto ativo. A descrição e a
+  referência vêm do produto (nome e referência), mas ficam como texto editável, como antes. O texto livre continua
+  para peças avulsas. Trocar o produto de uma peça é retirá-la e adicionar outra.
+- **A peça mexe no stock** quando o módulo `stock` está ligado **e** o produto controla stock:
+  - adicionar: sai a quantidade;
+  - mudar a quantidade: sai ou volta a diferença, mas nunca volta mais do que a peça tirou
+    (`novo tirado = max(0, tirado + nova − antiga)`);
+  - retirar a peça: volta o que ela tirou.
+
+  Caso contrário a peça não mexe no stock (e o que já tirou fica registado na peça). Ou seja, com o stock desligado
+  as peças não gastam nem devolvem; quem religar o stock acerta a contagem.
+- Tudo na mesma transação que a peça, com a linha do produto bloqueada (o `lockProduct` do 5b) e a da peça também,
+  para duas alterações à mesma peça não se pisarem.
+- **Quem:** quem já escreve nas peças (área «Trabalho diário»). Os movimentos são lançados pelo sistema em nome de
+  quem mexeu na peça; não pedem a área «Movimentos de stock».
+- **Apagar a tarefa de uma assistência** com peças que tiraram stock → 409 («retira primeiro as peças, para o stock
+  voltar»). Sem isto, o apagar em cascata das peças deixava o stock por devolver.
+- **Peças mais usadas** (indicadores): agrupadas pelo produto quando existe (com o nome e a referência atuais do
+  produto); as avulsas continuam agrupadas pela descrição e referência.
+
+### API
+- `POST /service-cases/:id/parts` aceita `productId`; a descrição passa a ser opcional quando há produto.
+- As peças vêm com `productId`, `product` (referência, nome, se controla stock e o stock atual) e `stockTaken`.
+- `topParts` dos indicadores ganha `productId`.
+- Tempo real: mexer nas peças também atualiza produtos e stock no ecrã.
+
+### Interface
+- **Peças da assistência:**
+  - com os produtos ligados, um seletor «Do catálogo» (com pesquisa; mostra a referência e, com o stock ligado, o
+    stock atual) preenche a descrição e a referência;
+  - as peças do catálogo mostram a referência com ligação ao produto e, quando tiraram stock, a indicação «saiu do
+    stock».
+- **Histórico de stock do produto:** os consumos em assistência ligam à assistência.
+- **Indicadores:** as peças mais usadas ligam ao produto.
+
+### Validação prevista
+- **e2e:**
+  - peça do catálogo preenche descrição e referência; produto inativo ou módulo de produtos desligado → 400;
+  - com o stock: adicionar, mudar a quantidade (para cima e para baixo, sem devolver mais do que tirou) e retirar
+    lançam os movimentos certos, com a origem, e o stock bate certo;
+  - sem o stock (módulo desligado ou produto sem controlo de stock): nada se lança;
+  - apagar a tarefa com peças que tiraram stock → 409; apagar o produto com peças → 409;
+  - técnico (sem a área de stock) gasta stock pelas peças;
+  - peças mais usadas agrupadas pelo produto.
+- Prova por mutação.
+- Migração ensaiada numa cópia da base de desenvolvimento, com reversão e sem desvio de esquema.
+- **Browser** (base de testes): escolher do catálogo, ver o stock a sair, mudar a quantidade, retirar, histórico do
+  produto com a ligação à assistência.
 
 ## Decisões assumidas (a rever)
 - **Reservas** passam para a Fase 6: só as encomendas reservam stock. As peças de assistência gastam diretamente.
