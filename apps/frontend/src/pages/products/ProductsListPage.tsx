@@ -71,6 +71,7 @@ export function ProductsListPage() {
   const [filters, setFilters] = useState<ProductFilters>({ active: "true" });
   const { data: categories = [] } = useQuery({ queryKey: ["product-categories"], queryFn: listProductCategories });
   const stockOn = useModuleEnabled("stock");
+  const ordersOn = useModuleEnabled("encomendas");
   const { data: alerts } = useQuery({ queryKey: ["stock", "summary"], queryFn: getStockSummary, enabled: stockOn });
   const list = usePagedList(["products", "list", term, filters], (cursor) => listProducts({ ...filters, search: term || undefined, cursor }));
 
@@ -171,6 +172,11 @@ export function ProductsListPage() {
                     ) : (
                       <span className={p.stockOnHand < 0 ? "font-medium text-red-700" : p.belowMin ? "font-medium text-amber-700" : ""} title={p.belowMin ? "Abaixo do mínimo" : undefined}>
                         {formatQty(p.stockOnHand)}
+                      </span>
+                    )}
+                    {p.tracksStock && ordersOn && p.reserved !== 0 && (
+                      <span className={`block text-xs ${p.available < 0 ? "text-red-700" : "text-muted-foreground"}`} title={`Reservado para encomendas: ${formatQty(p.reserved)}`}>
+                        disponível {formatQty(p.available)}
                       </span>
                     )}
                   </td>

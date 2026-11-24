@@ -7,7 +7,7 @@ import { Audit } from "../audit/audit.decorator";
 import { ModuleGuard } from "../modules/module.guard";
 import { RequireModule } from "../modules/require-module.decorator";
 import { OrdersService } from "./orders.service";
-import { CancelOrderDto, CreateOrderDto, CreateOrderLineDto, QueryOrdersDto, UpdateOrderDto, UpdateOrderLineDto } from "./dto/order.dto";
+import { CancelOrderDto, CreateOrderDto, CreateOrderLineDto, QueryOrdersDto, ShipOrderDto, UpdateOrderDto, UpdateOrderLineDto } from "./dto/order.dto";
 
 type Actor = { userId: string };
 
@@ -68,19 +68,28 @@ export class OrdersController {
   @HttpCode(HttpStatus.OK)
   @Audit("order.confirmed", { target: "order" })
   confirm(@Param("id") id: string, @CurrentUser() user: Actor) {
-    return this.orders.advance(id, "confirm", user.userId);
+    return this.orders.confirm(id, user.userId);
   }
 
+  /** Reserva o stock disponível para as linhas à espera (Fase 6b). */
+  @Post(":id/reserve")
+  @HttpCode(HttpStatus.OK)
+  reserve(@Param("id") id: string, @CurrentUser() user: Actor) {
+    return this.orders.reserve(id, user.userId);
+  }
+
+  /** Lança as saídas de stock e liberta as reservas (Fase 6b). Enviar sem stock reservado fica na auditoria. */
   @Post(":id/ship")
   @HttpCode(HttpStatus.OK)
-  ship(@Param("id") id: string, @CurrentUser() user: Actor) {
-    return this.orders.advance(id, "ship", user.userId);
+  @Audit("order.shipped", { target: "order", fields: ["allowShortage"] })
+  ship(@Param("id") id: string, @Body() dto: ShipOrderDto, @CurrentUser() user: Actor) {
+    return this.orders.ship(id, dto, user.userId);
   }
 
   @Post(":id/deliver")
   @HttpCode(HttpStatus.OK)
   deliver(@Param("id") id: string, @CurrentUser() user: Actor) {
-    return this.orders.advance(id, "deliver", user.userId);
+    return this.orders.deliver(id, user.userId);
   }
 
   @Post(":id/cancel")

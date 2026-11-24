@@ -6,6 +6,7 @@ import { createOrder, customerName, listOrders, ORDER_STATUS_CLASSES, ORDER_STAT
 import { formatMoney } from "@/lib/products-api";
 import { LoadMore, useDebounced, usePagedList } from "@/lib/pagination";
 import { useCanWrite } from "@/lib/useCanWrite";
+import { useModuleEnabled } from "@/lib/useModules";
 import { errorMessage } from "@/lib/errors";
 import { CompanyPicker, ContactPicker, UserPicker } from "@/components/pickers";
 import { Dialog, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -80,12 +81,23 @@ export function OrderStatusBadge({ status }: { status: SalesOrderStatus }) {
   return <Badge className={ORDER_STATUS_CLASSES[status]}>{ORDER_STATUS_LABELS[status]}</Badge>;
 }
 
+/** Confirmada com linhas à espera de stock (Fase 6b). */
+export function WaitingStockBadge({ lines }: { lines: number }) {
+  if (lines <= 0) return null;
+  return (
+    <Badge className="border-amber-200 bg-amber-100 text-amber-900" title={lines === 1 ? "1 linha aguarda stock" : `${lines} linhas aguardam stock`}>
+      Aguarda stock
+    </Badge>
+  );
+}
+
 const STATUSES = Object.keys(ORDER_STATUS_LABELS) as SalesOrderStatus[];
 
 /** Encomendas (Fase 6a): mais recentes primeiro; pesquisa (número, referência, cliente) e filtros por estado, cliente e responsável. */
 export function OrdersListPage() {
   const navigate = useNavigate();
   const canWrite = useCanWrite("orders");
+  const stockOn = useModuleEnabled("stock");
   const [creating, setCreating] = useState(false);
   const [search, setSearch] = useState("");
   const term = useDebounced(search.trim());
@@ -111,6 +123,11 @@ export function OrdersListPage() {
         </Select>
         <CompanyPicker aria-label="Empresa" value={filters.companyId ?? ""} onChange={(id) => setFilters({ ...filters, companyId: id || undefined })} emptyLabel="Todas as empresas" className="w-56" />
         <UserPicker aria-label="Responsável" value={filters.assigneeId ?? ""} onChange={(id) => setFilters({ ...filters, assigneeId: id || undefined })} emptyLabel="Todos os responsáveis" className="w-52" />
+        {stockOn && (
+          <label className="flex items-center gap-1.5 text-sm">
+            <input type="checkbox" checked={filters.waiting === "true"} onChange={(e) => setFilters({ ...filters, waiting: e.target.checked ? "true" : undefined })} />A aguardar stock
+          </label>
+        )}
       </div>
 
       <div className="overflow-hidden rounded-lg border border-border bg-background">
@@ -147,7 +164,10 @@ export function OrdersListPage() {
                 </td>
                 <td className="px-4 py-2 font-medium">{customerName(o)}</td>
                 <td className="px-4 py-2">
-                  <OrderStatusBadge status={o.status} />
+                  <span className="flex flex-wrap gap-1">
+                    <OrderStatusBadge status={o.status} />
+                    {stockOn && <WaitingStockBadge lines={o.waitingLines} />}
+                  </span>
                 </td>
                 <td className="px-4 py-2 text-right tabular-nums">{o.lineCount}</td>
                 <td className="whitespace-nowrap px-4 py-2 text-right tabular-nums">{formatMoney(o.total)}</td>

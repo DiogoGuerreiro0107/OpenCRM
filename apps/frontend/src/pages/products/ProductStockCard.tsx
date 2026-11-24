@@ -14,6 +14,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { useModuleEnabled } from "@/lib/useModules";
+import { customerName, listOrders } from "@/lib/orders-api";
+import { WaitingStockBadge } from "@/pages/orders/OrdersListPage";
 
 const dateTime = (iso: string) => new Date(iso).toLocaleString("pt-PT", { dateStyle: "short", timeStyle: "short" });
 
@@ -89,8 +92,32 @@ function MovementDialog({ product, type, onClose }: { product: Product; type: Ma
  * Stock de um produto (Fase 5b): atual (com o mínimo e os avisos), botões para lançar movimentos (área «Movimentos de
  * stock») e histórico. Os movimentos não se alteram: corrige-se com outro.
  */
+/** Encomendas confirmadas com este produto (Fase 6b): as que reservam e as que aguardam stock. */
+function ProductReservations({ productId }: { productId: string }) {
+  const list = usePagedList(["orders", "list", "product", productId], (cursor) => listOrders({ productId, status: "CONFIRMED", cursor, limit: 10 }));
+  if (list.isLoading || list.items.length === 0) return null;
+  return (
+    <div className="space-y-1">
+      <p className="text-xs font-medium text-muted-foreground">Encomendas confirmadas com este produto</p>
+      <ul className="space-y-1 text-sm">
+        {list.items.map((o) => (
+          <li key={o.id} className="flex flex-wrap items-center gap-2">
+            <Link to={`/encomendas/${o.id}`} className="font-mono text-xs hover:underline">
+              {o.code}
+            </Link>
+            <span>{customerName(o)}</span>
+            <WaitingStockBadge lines={o.waitingLines} />
+          </li>
+        ))}
+      </ul>
+      <LoadMore shown={list.items.length} hasMore={list.hasNextPage} loading={list.isFetchingNextPage} onMore={() => list.fetchNextPage()} noun={["encomenda", "encomendas"]} />
+    </div>
+  );
+}
+
 export function ProductStockCard({ product }: { product: Product }) {
   const canMove = useCanWrite("stock");
+  const ordersOn = useModuleEnabled("encomendas");
   const [dialog, setDialog] = useState<ManualMovementType | null>(null);
   const history = usePagedList(["stock", "movements", product.id], (cursor) => listStockMovements({ productId: product.id, cursor, limit: 10 }));
   const negative = product.stockOnHand < 0;
@@ -108,6 +135,14 @@ export function ProductStockCard({ product }: { product: Product }) {
           {negative && <Badge className="border-red-200 bg-red-100 text-red-800">Negativo</Badge>}
           {!negative && product.belowMin && <Badge className="border-amber-200 bg-amber-100 text-amber-900">Abaixo do mínimo</Badge>}
         </div>
+        {ordersOn && (product.reserved !== 0 || product.available !== product.stockOnHand) && (
+          <p className="text-sm">
+            Reservado para encomendas: <span className="font-medium tabular-nums">{formatQty(product.reserved)}</span> · disponível{" "}
+            <span className={cn("font-medium tabular-nums", product.available < 0 && "text-red-700")}>{formatQty(product.available)}</span>
+            {product.available < 0 && <span className="text-red-700"> (reservado acima do stock)</span>}
+          </p>
+        )}
+        {ordersOn && <ProductReservations productId={product.id} />}
         {canMove && (
           <div className="flex flex-wrap gap-2">
             {types.map((t) => (
@@ -123,6 +158,10 @@ export function ProductStockCard({ product }: { product: Product }) {
               <span className={cn("w-16 shrink-0 text-right font-mono tabular-nums", m.quantity < 0 ? "text-red-700" : "text-green-700")}>{formatQty(m.quantity, true)}</span>
               {m.sourceType === "SERVICE_CASE" && m.sourceId ? (
                 <Link to={`/assistencias/${m.sourceId}`} className="font-medium hover:underline" title="Abrir a assistência">
+                  {MOVEMENT_LABELS[m.type]}
+                </Link>
+              ) : m.sourceType === "SALES_ORDER" && m.sourceId ? (
+                <Link to={`/encomendas/${m.sourceId}`} className="font-medium hover:underline" title="Abrir a encomenda">
                   {MOVEMENT_LABELS[m.type]}
                 </Link>
               ) : (

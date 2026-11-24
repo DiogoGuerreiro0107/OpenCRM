@@ -59,6 +59,9 @@ export class ProductsService {
       vatRate,
       minStock: num(p.minStock),
       stockOnHand: Number(p.stockOnHand),
+      // Reservado para encomendas (Fase 6b); disponível = em stock − reservado.
+      reserved: Number(p.reserved),
+      available: round2(Number(p.stockOnHand) - Number(p.reserved)),
       salePriceWithVat: salePrice === null ? null : round2(salePrice * (1 + vatRate / 100)),
       suppliers: supplierViews,
       preferredSupplier: preferred ? preferred.company : null,
@@ -129,6 +132,9 @@ export class ProductsService {
     // Deixar de controlar stock só com o stock a zero (Fase 5b): senão o stock que existe ficava escondido.
     if (dto.tracksStock === false && existing.tracksStock && Number(existing.stockOnHand) !== 0) {
       throw new ConflictException("Para deixar de controlar stock, acerta primeiro o stock para zero");
+    }
+    if (dto.tracksStock === false && existing.tracksStock && Number(existing.reserved) !== 0) {
+      throw new ConflictException("O produto tem stock reservado para encomendas: envia ou cancela-as antes de deixar de controlar stock");
     }
     const product = await this.write(() =>
       this.prisma.product.update({

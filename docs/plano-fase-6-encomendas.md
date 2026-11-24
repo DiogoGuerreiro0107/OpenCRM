@@ -254,6 +254,60 @@ Detalhado a 2026-11-24, depois do merge do 6a.
 - **Browser** (base de testes): confirmar uma encomenda com stock parcial, ver a linha à espera, dar entrada de stock
   e ver a reserva; enviar com saída de stock; cartão do produto com o reservado; filtro na lista.
 
+### Execução do 6b (2026-11-24)
+**Implementado como planeado**, com estes pormenores decididos na implementação:
+- **Uma só regra de distribuição** (`stock/reservations.ts`, `allocateWaiting`): confirmar, «Reservar stock», cada
+  movimento de stock (manual ou das peças) e cada reserva libertada chamam-na para os produtos em causa. Dá o
+  disponível às linhas à espera pela data de confirmação. Por isso «Reservar stock» pode servir primeiro uma encomenda
+  mais antiga que também aguarde.
+- **Notas na timeline da encomenda:**
+  - «Stock reservado: 2 × Toner (TN-2420)», «Todo o stock da encomenda está reservado» e «A aguardar stock: …»;
+  - no envio, «Saída de stock: …» e, se faltava stock, «Enviada sem stock reservado para: …»;
+  - no cancelamento, «Reservas libertadas: …».
+- **Auditoria:** o envio passou a ficar registado (`order.shipped`, com `allowShortage`), além de confirmar, cancelar
+  e apagar.
+- **Base de dados:**
+  - trigger nas linhas que só toca no produto quando a reserva muda (os rascunhos não bloqueiam o produto);
+  - CHECKs `0 ≤ reservado ≤ quantidade`, só linhas com produto, e `Product.reserved ≥ 0`.
+- **Bloqueios:** encomenda → produtos (por id) → linhas; os movimentos de stock bloqueiam o produto e as linhas à
+  espera (`FOR UPDATE OF`), nunca a encomenda.
+- **Interface:** na lista de produtos, o disponível aparece por baixo do stock (quando há reservas), em vez de uma
+  coluna nova; na ficha do produto, as encomendas confirmadas com esse produto.
+- **Testes:**
+  - 7 e2e novos em `test/order-reservations.e2e-spec.ts`; um e2e do 6a passou a esperar também o envio na auditoria;
+  - total: 529 e2e e 300 unitários;
+  - na suite completa, 3 testes de outras áreas (módulos e utilizadores) falharam por tempo na limpeza da base de
+    testes, que nessa altura partilhava o servidor com o ensaio da migração; passam sozinhos.
+- **Prova por mutação:** 22 mutações, todas apanhadas:
+  - reservas: confirmar sem reservar, ordem invertida, reservar acima do disponível, entradas e peças devolvidas sem
+    reservar, confirmar sem bloquear os produtos (concorrência);
+  - envio: ignorar as linhas à espera, sem saídas, sem libertar, saída de produto sem stock, sem auditoria;
+  - cancelamento: sem libertar, sem passar à seguinte;
+  - módulos e estados: reservar com o stock desligado, «Reservar stock» num rascunho ou com o stock desligado;
+  - produto: deixar de controlar stock com reservas, disponível sem descontar o reservado;
+  - lista: filtros «a aguardar» e por produto, linhas à espera na lista, rascunho a contar como à espera.
+- **Migração:** ensaiada numa cópia da base de desenvolvimento, com uma encomenda confirmada do 6a (linha de produto
+  e avulsa):
+  - as linhas antigas ficam com 0 reservado;
+  - em SQL, numa transação desfeita: o trigger (reservar, mudar, outra coluna, inserir e apagar linhas, apagar a
+    encomenda em cascata) e as CHECKs;
+  - sem desvio de esquema;
+  - a reversão, com uma reserva gravada, repôs os dados e o esquema;
+  - a base de desenvolvimento foi migrada depois de uma cópia de segurança.
+- **Browser** (base de testes; 4 toners em stock):
+  - como Comercial:
+    - em rascunho, a linha mostra «Disponível: 4»;
+    - confirmar a EN-0001 (3 toners) reservou 3;
+    - confirmar a EN-0002 (5 toners e portes) reservou 1, ficou «aguarda stock: 4» com o aviso e «Reservar stock»;
+    - «Marcar como enviada» pediu confirmação (recusada);
+    - o filtro «A aguardar stock» e a marca na lista;
+    - no produto, «disponível 0» na lista e «Reservado para encomendas: 4 · disponível 0» na ficha, com as duas
+      encomendas;
+  - como Administrador:
+    - entrada de 10 completou a EN-0002 (stock 14, reservado 8, disponível 6);
+    - enviar a EN-0002 lançou a saída de 5 (stock 9, reservado 3);
+    - o movimento abre a encomenda, e a timeline conta a história toda.
+
 ## Pacotes seguintes (esboço; cada um terá plano detalhado antes de começar)
 
 ### 6c — Compras a fornecedor
