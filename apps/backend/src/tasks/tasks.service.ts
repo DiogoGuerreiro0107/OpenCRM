@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException, OnModuleInit } from "@nestjs/common";
+import { BadRequestException, ConflictException, Injectable, NotFoundException, OnModuleInit } from "@nestjs/common";
 import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { AutomationsService } from "../automations/automations.service";
@@ -307,6 +307,10 @@ export class TasksService implements OnModuleInit {
 
   async remove(id: string) {
     await this.ensureExists(id);
+    // Peças de assistência que tiraram stock (Fase 5c): apagá-las em cascata deixava o stock por devolver.
+    if ((await this.prisma.servicePart.count({ where: { serviceCaseId: id, stockTaken: { gt: 0 } } })) > 0) {
+      throw new ConflictException("A assistência tem peças que saíram do stock: retira primeiro as peças, para o stock voltar");
+    }
     // Os valores dos campos personalizados não têm chave estrangeira (polimórficos): apagam-se juntamente.
     await this.prisma.$transaction([
       this.prisma.customFieldValue.deleteMany({ where: { entityType: "WORK_ITEM", entityId: id } }),

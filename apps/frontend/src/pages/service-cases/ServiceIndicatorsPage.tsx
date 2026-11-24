@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { formatQuantity, getServiceIndicators } from "@/lib/service-cases-api";
 import { formatDuration } from "@/lib/time-entries-api";
 import { errorMessage } from "@/lib/errors";
+import { useModuleEnabled } from "@/lib/useModules";
 import { UserPicker } from "@/components/pickers";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -84,6 +85,7 @@ export function ServiceIndicatorsPage() {
   const [preset, setPreset] = useState<Preset>("thisMonth");
   const [custom, setCustom] = useState(() => ({ from: dayInput(new Date(new Date().getFullYear(), new Date().getMonth(), 1)), to: dayInput(new Date()) }));
   const [assigneeId, setAssigneeId] = useState("");
+  const productsOn = useModuleEnabled("produtos");
   const period = useMemo(() => periodOf(preset, custom), [preset, custom]);
   const query = useQuery({
     queryKey: ["service-cases", "indicators", period?.from.toISOString(), period?.to.toISOString(), assigneeId],
@@ -208,8 +210,16 @@ export function ServiceIndicatorsPage() {
                   </thead>
                   <tbody>
                     {data.topParts.map((p) => (
-                      <tr key={`${p.description}|${p.reference ?? ""}`} className="border-t border-border">
-                        <td className="py-1">{p.description}</td>
+                      <tr key={p.productId ?? `${p.description}|${p.reference ?? ""}`} className="border-t border-border">
+                        <td className="py-1">
+                          {p.productId && productsOn ? (
+                            <Link to={`/produtos/${p.productId}`} className="hover:underline">
+                              {p.description}
+                            </Link>
+                          ) : (
+                            p.description
+                          )}
+                        </td>
                         <td className="py-1 font-mono text-xs text-muted-foreground">{p.reference ?? "—"}</td>
                         <td className="py-1 text-right tabular-nums">{formatQuantity(p.quantity)}</td>
                         <td className="py-1 text-right tabular-nums">{p.cases}</td>

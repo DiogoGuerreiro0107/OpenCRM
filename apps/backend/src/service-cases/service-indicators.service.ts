@@ -76,14 +76,19 @@ export class ServiceIndicatorsService {
       GROUP BY te."userId", u."name"
       ORDER BY total DESC, u."name"`;
 
-    // Peças mais usadas no período (mesma descrição e referência, sem distinguir maiúsculas; com a escrita da primeira).
-    const partRows = await this.prisma.$queryRaw<Array<{ description: string; reference: string | null; quantity: number; cases: bigint }>>`
-      SELECT (array_agg(p."description" ORDER BY p."createdAt", p."id"))[1] AS description,
-             (array_agg(p."reference" ORDER BY p."createdAt", p."id"))[1] AS reference,
+    // Peças mais usadas no período: as do catálogo agrupadas pelo produto (com o nome e a referência atuais dele); as
+    // avulsas pela descrição e referência, sem distinguir maiúsculas, com a escrita da primeira (Fase 5c).
+    const partRows = await this.prisma.$queryRaw<Array<{ productId: string | null; description: string; reference: string | null; quantity: number; cases: bigint }>>`
+      SELECT p."productId",
+             COALESCE(MIN(pr."name"), (array_agg(p."description" ORDER BY p."createdAt", p."id"))[1]) AS description,
+             CASE WHEN p."productId" IS NULL THEN (array_agg(p."reference" ORDER BY p."createdAt", p."id"))[1] ELSE MIN(pr."sku") END AS reference,
              SUM(p."quantity")::float8 AS quantity, COUNT(DISTINCT p."serviceCaseId") AS cases
       FROM "ServicePart" p JOIN "WorkItem" w ON w."id" = p."serviceCaseId"
+      LEFT JOIN "Product" pr ON pr."id" = p."productId"
       WHERE p."createdAt" >= ${from} AND p."createdAt" < ${to} ${assignee}
-      GROUP BY lower(trim(p."description")), lower(trim(coalesce(p."reference", '')))
+      GROUP BY p."productId",
+               CASE WHEN p."productId" IS NULL THEN lower(trim(p."description")) END,
+               CASE WHEN p."productId" IS NULL THEN lower(trim(coalesce(p."reference", ''))) END
       ORDER BY quantity DESC, description
       LIMIT ${TOP_PARTS}`;
 
@@ -97,7 +102,7 @@ export class ServiceIndicatorsService {
       notRepaired,
       resolution: { averageHours: hours(resolution?.avg ?? null), medianHours: hours(resolution?.median ?? null) },
       timeByTechnician: timeRows.map((r) => ({ user: { id: r.userId, name: r.name }, totalSeconds: Math.round(r.total), billableSeconds: Math.round(r.billable) })),
-      topParts: partRows.map((r) => ({ description: r.description, reference: r.reference, quantity: r.quantity, cases: Number(r.cases) })),
+      topParts: partRows.map((r) => ({ productId: r.productId, description: r.description, reference: r.reference, quantity: r.quantity, cases: Number(r.cases) })),
     };
   }
 }

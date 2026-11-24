@@ -740,6 +740,11 @@ export interface ServicePart {
   description: string;
   reference: string | null;
   quantity: number;
+  /** Produto do catálogo de onde a peça veio (Fase 5c). */
+  productId: string | null;
+  product: { id: string; sku: string; name: string; tracksStock: boolean; stockOnHand: number } | null;
+  /** Quanto a peça tirou do stock (Fase 5c). */
+  stockTaken: number;
   createdBy: { id: string; name: string } | null;
   createdAt: string;
   updatedAt: string;
@@ -755,7 +760,8 @@ export interface ServiceIndicators {
   notRepaired: number;
   resolution: { averageHours: number | null; medianHours: number | null };
   timeByTechnician: Array<{ user: { id: string; name: string }; totalSeconds: number; billableSeconds: number }>;
-  topParts: Array<{ description: string; reference: string | null; quantity: number; cases: number }>;
+  /** As do catálogo agrupadas pelo produto (`productId`, Fase 5c); as avulsas pela descrição. */
+  topParts: Array<{ productId: string | null; description: string; reference: string | null; quantity: number; cases: number }>;
 }
 
 /** Catálogo de produtos (Fase 5a). */

@@ -197,8 +197,8 @@ describe("Assistências: peças, fecho e indicadores (e2e)", () => {
         { user: { id: ruiUser.id, name: "Rui Técnico" }, totalSeconds: 5400, billableSeconds: 3600 },
       ]);
       expect(all.topParts).toEqual([
-        { description: "Rolo de alimentação", reference: "RM2", quantity: 3, cases: 2 },
-        { description: "Fusor", reference: null, quantity: 1, cases: 1 },
+        { productId: null, description: "Rolo de alimentação", reference: "RM2", quantity: 3, cases: 2 },
+        { productId: null, description: "Fusor", reference: null, quantity: 1, cases: 1 },
       ]);
 
       // Por pessoa: responsável das assistências; técnico no tempo.

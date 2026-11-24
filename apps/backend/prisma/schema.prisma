@@ -840,12 +840,18 @@ model ServicePart {
   description   String
   reference     String?
   quantity      Decimal     @default(1) @db.Decimal(10, 2)
+  /// Produto do catálogo de onde a peça veio (Fase 5c). Não se apaga enquanto houver peças com ele.
+  productId     String?
+  product       Product?    @relation(fields: [productId], references: [id], onDelete: Restrict)
+  /// Quanto esta peça tirou do stock, líquido (Fase 5c; ≥ 0 por CHECK). É o que volta ao retirá-la.
+  stockTaken    Decimal     @default(0) @db.Decimal(12, 2)
   createdById   String?
   createdBy     User?       @relation(fields: [createdById], references: [id], onDelete: SetNull)
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
   @@index([serviceCaseId, createdAt])
+  @@index([productId])
 }
 
 /// Registo de tempo num item de trabalho (Fase 4b, docs/plano-fase-4-assistencias.md). Sem fim = a correr.
@@ -911,6 +917,7 @@ model Product {
   searchText     String            @default("")
   suppliers      ProductSupplier[]
   stockMovements StockMovement[]
+  serviceParts   ServicePart[]
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
 

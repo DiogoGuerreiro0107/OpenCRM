@@ -62,7 +62,8 @@ export async function listServiceParts(serviceCaseId: string) {
   return data;
 }
 
-export async function createServicePart(serviceCaseId: string, input: { description: string; reference?: string; quantity?: number }) {
+/** Com `productId` (Fase 5c), a descrição e a referência vêm do produto quando não se indicam. */
+export async function createServicePart(serviceCaseId: string, input: { description?: string; reference?: string; quantity?: number; productId?: string }) {
   const { data } = await api.post<ServicePart>(`/service-cases/${serviceCaseId}/parts`, input);
   return data;
 }

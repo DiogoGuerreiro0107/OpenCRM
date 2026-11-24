@@ -1,9 +1,13 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { ServicePart } from "@opencrm/shared-types";
+import type { Product, ServicePart } from "@opencrm/shared-types";
 import { createServicePart, deleteServicePart, formatQuantity, listServiceParts, updateServicePart } from "@/lib/service-cases-api";
+import { formatQty } from "@/lib/stock-api";
 import { errorMessage } from "@/lib/errors";
 import { useCanWrite } from "@/lib/useCanWrite";
+import { useModuleEnabled } from "@/lib/useModules";
+import { ProductPicker } from "@/components/pickers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
@@ -11,6 +15,8 @@ interface PartForm {
   description: string;
   reference: string;
   quantity: string;
+  /** Produto do catálogo (só ao adicionar, Fase 5c). */
+  productId?: string;
 }
 
 const emptyForm: PartForm = { description: "", reference: "", quantity: "1" };
@@ -18,10 +24,34 @@ const emptyForm: PartForm = { description: "", reference: "", quantity: "1" };
 const parseQuantity = (value: string) => Number(value.trim().replace(",", "."));
 
 /** Linha de edição (nova peça ou peça existente). */
-function PartRow({ initial, saving, error, onSave, onCancel, submitLabel }: { initial: PartForm; saving: boolean; error: unknown; onSave: (form: PartForm) => void; onCancel?: () => void; submitLabel: string }) {
+function PartRow({
+  initial,
+  saving,
+  error,
+  onSave,
+  onCancel,
+  submitLabel,
+  catalog,
+}: {
+  initial: PartForm;
+  saving: boolean;
+  error: unknown;
+  onSave: (form: PartForm) => void;
+  onCancel?: () => void;
+  submitLabel: string;
+  /** Mostra o seletor «Do catálogo» (produtos ligados; só ao adicionar). `showStock`: o stock está ligado. */
+  catalog?: { showStock: boolean };
+}) {
   const [form, setForm] = useState(initial);
+  const [product, setProduct] = useState<Product | null>(null);
   const quantity = parseQuantity(form.quantity);
   const valid = form.description.trim().length > 0 && quantity > 0;
+  const pick = (id: string, item: Product | null) => {
+    setProduct(item);
+    // Escolher preenche a descrição e a referência (editáveis); limpar deixa o texto, já sem produto.
+    setForm(item ? { ...form, productId: id, description: item.name, reference: item.sku } : { ...form, productId: undefined });
+  };
+  const takesStock = !!product && !!catalog?.showStock && product.tracksStock;
   return (
     <form
       className="space-y-1"
@@ -30,6 +60,12 @@ function PartRow({ initial, saving, error, onSave, onCancel, submitLabel }: { in
         if (valid) onSave(form);
       }}
     >
+      {catalog && (
+        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <ProductPicker aria-label="Peça do catálogo" value={form.productId ?? ""} onChange={pick} selectedLabel={product?.name} showStock={catalog.showStock} emptyLabel="Do catálogo..." className="w-72" />
+          {product && (takesStock ? <span>Sai do stock (atual {formatQty(product.stockOnHand)})</span> : <span>Não mexe no stock</span>)}
+        </div>
+      )}
       <div className="grid grid-cols-[4.5rem_1fr_8rem_auto] gap-2">
         <Input aria-label="Quantidade" inputMode="decimal" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} />
         <Input aria-label="Descrição da peça" placeholder="Descrição da peça" maxLength={300} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
@@ -52,11 +88,14 @@ function PartRow({ initial, saving, error, onSave, onCancel, submitLabel }: { in
 
 /**
  * Peças usadas numa assistência (Fase 4c): lista inteira (no máximo 100), adicionar numa linha, editar e retirar. Cada
- * mudança fica na timeline (servidor).
+ * mudança fica na timeline (servidor). Com os produtos ligados, a peça pode vir do catálogo; com o stock, gasta stock
+ * (Fase 5c).
  */
 export function ServicePartsSection({ serviceCaseId }: { serviceCaseId: string }) {
   const queryClient = useQueryClient();
   const canEdit = useCanWrite("dailyWork");
+  const productsOn = useModuleEnabled("produtos");
+  const stockOn = useModuleEnabled("stock");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [addKey, setAddKey] = useState(0);
@@ -65,12 +104,15 @@ export function ServicePartsSection({ serviceCaseId }: { serviceCaseId: string }
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ["service-cases", "parts", serviceCaseId] });
     queryClient.invalidateQueries({ queryKey: ["timeline"] });
+    // As peças do catálogo mexem no stock (Fase 5c).
+    queryClient.invalidateQueries({ queryKey: ["products"] });
+    queryClient.invalidateQueries({ queryKey: ["stock"] });
   };
   const toInput = (form: PartForm) => ({ description: form.description.trim(), reference: form.reference.trim(), quantity: parseQuantity(form.quantity) });
   const add = useMutation({
     mutationFn: (form: PartForm) => {
       const input = toInput(form);
-      return createServicePart(serviceCaseId, { ...input, reference: input.reference || undefined });
+      return createServicePart(serviceCaseId, { ...input, reference: input.reference || undefined, productId: form.productId });
     },
     onSuccess: () => {
       setAddKey((k) => k + 1); // linha nova vazia
@@ -111,7 +153,14 @@ export function ServicePartsSection({ serviceCaseId }: { serviceCaseId: string }
               <span className="w-14 shrink-0 text-right font-mono">{formatQuantity(p.quantity)} ×</span>
               <span className="min-w-0 flex-1">
                 {p.description}
-                {p.reference && <span className="ml-2 font-mono text-xs text-muted-foreground">{p.reference}</span>}
+                {p.product && productsOn ? (
+                  <Link to={`/produtos/${p.product.id}`} className="ml-2 font-mono text-xs text-muted-foreground hover:underline" title="Abrir o produto">
+                    {p.reference ?? p.product.sku}
+                  </Link>
+                ) : (
+                  p.reference && <span className="ml-2 font-mono text-xs text-muted-foreground">{p.reference}</span>
+                )}
+                {p.stockTaken > 0 && <span className="ml-2 text-xs text-muted-foreground">· saiu do stock: {formatQty(p.stockTaken)}</span>}
               </span>
               {canEdit &&
                 (removingId === p.id ? (
@@ -139,7 +188,7 @@ export function ServicePartsSection({ serviceCaseId }: { serviceCaseId: string }
         )}
       </ul>
       {remove.isError && <p className="text-xs text-red-600">{errorMessage(remove.error, "Não foi possível retirar.")}</p>}
-      {canEdit && <PartRow key={addKey} initial={emptyForm} saving={add.isPending} error={add.error} submitLabel="Adicionar" onSave={(form) => add.mutate(form)} />}
+      {canEdit && <PartRow key={addKey} initial={emptyForm} saving={add.isPending} error={add.error} submitLabel="Adicionar" onSave={(form) => add.mutate(form)} catalog={productsOn ? { showStock: stockOn } : undefined} />}
     </div>
   );
 }

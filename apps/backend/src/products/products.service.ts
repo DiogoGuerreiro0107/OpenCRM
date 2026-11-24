@@ -158,6 +158,9 @@ export class ProductsService {
     if ((await this.prisma.stockMovement.count({ where: { productId: id } })) > 0) {
       throw new ConflictException("O produto tem movimentos de stock: desativa-o em vez de o apagar");
     }
+    if ((await this.prisma.servicePart.count({ where: { productId: id } })) > 0) {
+      throw new ConflictException("O produto foi usado em peças de assistências: desativa-o em vez de o apagar");
+    }
     await this.prisma.product.delete({ where: { id } });
   }
 
