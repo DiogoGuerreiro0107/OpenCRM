@@ -123,16 +123,105 @@ preços por cliente ou por quantidade, leitura de produtos pela API pública (Fa
 
 ---
 
-## Pacotes seguintes (esboço; cada um terá plano detalhado antes de começar)
+## Pacote 5b — Stock
+Detalhado depois do 5a (2026-11-23).
 
-### 5b — Stock
-- `StockMovement` (produto, quantidade com sinal, tipo — stock inicial, entrada, saída, ajuste, devolução, consumo
-  em assistência —, motivo, origem, quem, quando). **Só se acrescenta:** a base de dados recusa alterar ou apagar,
-  como na auditoria. Corrigir é lançar o movimento contrário.
-- **Stock atual = soma dos movimentos**, só nos produtos que controlam stock. Pode ficar negativo, com aviso:
-  a faturação manda no stock e o CRM não bloqueia uma venda real.
-- Ajuste manual com motivo obrigatório; stock mínimo com alerta (lista «abaixo do mínimo» e indicador); histórico
-  por produto.
+### Modelo
+- Módulo opcional **`stock`**, que depende de `produtos`.
+- **`StockMovement`**:
+  - produto, quantidade com sinal (decimal, nunca zero) e tipo;
+  - motivo, nota, origem (tipo e id, ex.: a assistência na 5c), quem e quando;
+  - **só se acrescenta**: um trigger recusa alterar ou apagar, como na auditoria. Corrigir é lançar outro movimento.
+- **Tipos e sinal** (garantidos por CHECK):
+
+  | Tipo | Sinal | Notas |
+  |---|---|---|
+  | stock inicial | + | uma vez, antes de qualquer outro movimento do produto |
+  | entrada (compra) | + | |
+  | saída | − | |
+  | devolução | + | |
+  | acerto de contagem | + ou − | com motivo obrigatório |
+  | consumo em assistência | − ou + | 5c: lançado pelo sistema |
+
+- **Stock atual** = soma dos movimentos, guardado em `Product.stockOnHand` e mantido por um trigger em cada movimento
+  novo. É o que permite filtrar e ordenar sem somar tudo; um teste confirma que é igual à soma.
+
+### Regras
+- Só há movimentos em produtos que **controlam stock**.
+  - Deixar de controlar stock só com o stock a zero.
+  - Um produto com movimentos já não se apaga; desativa-se.
+- **Acerto de contagem:** indica-se a quantidade contada e o servidor lança a diferença, com a linha do produto
+  bloqueada para dois acertos ao mesmo tempo não se pisarem. Contagem igual ao atual → 400. Motivo obrigatório.
+- Nas entradas, saídas e devoluções indica-se a quantidade positiva; o servidor aplica o sinal.
+- **O stock pode ficar negativo**, com aviso, porque a faturação manda no stock (D3).
+- **Alertas:**
+  - «abaixo do mínimo»: o stock atual é menor do que o mínimo definido;
+  - «negativo»: o stock atual é menor do que zero.
+
+  Ambos são filtros na lista de produtos e contagens no topo da página.
+- **Quem:** área de escrita nova **«Movimentos de stock»**, por omissão Administrador e Backoffice. Ver o stock é para
+  todos. Os movimentos são o próprio registo (quem, quando, motivo), por isso não vão à auditoria.
+
+### API
+- `GET /stock/movements`: paginada, mais recentes primeiro; filtros por produto, tipo e período.
+- `POST /stock/movements`: tipos manuais (stock inicial, entrada, saída, devolução, acerto com `countedQuantity`).
+- `GET /stock/summary`: quantos produtos estão abaixo do mínimo e quantos estão negativos.
+- **Produtos:**
+  - `stockOnHand` vem em cada produto;
+  - filtro `?stock=below_min|negative`.
+- Tempo real: recurso `stock`.
+
+### Interface
+- **Cartão «Stock» na ficha do produto** (módulo ligado e produto que controla stock):
+  - stock atual com o mínimo e o aviso;
+  - botões «Entrada», «Saída», «Devolução», «Acertar contagem» e «Stock inicial» (só sem movimentos);
+  - histórico paginado.
+- **Lista de produtos:** coluna «Stock» (em destaque se estiver abaixo do mínimo ou negativo), filtro e contagens no
+  topo.
+
+### Validação prevista
+- **e2e:**
+  - tipos e sinais; stock inicial uma só vez; acerto pela contagem (também em simultâneo);
+  - só em produtos que controlam stock; não apagar nem deixar de controlar stock com stock;
+  - imutabilidade (a base de dados recusa alterar e apagar);
+  - `stockOnHand` igual à soma;
+  - filtros e contagens; permissões e área nova; módulo desligado (e a dependência de `produtos`).
+- Prova por mutação.
+- Migração ensaiada numa cópia da base de desenvolvimento, com reversão e sem desvio de esquema.
+- **Browser** (base de testes): stock inicial, entrada, saída, acerto com motivo, histórico, alerta e filtro na
+  lista.
+
+### Execução do 5b (2026-11-23)
+**Implementado como planeado**, com estes pormenores decididos na implementação:
+- **Triggers:** stock atual somado a cada movimento novo (`StockMovement_soma_no_produto`); «abaixo do mínimo»
+  recalculado sempre que o produto muda (`Product_abaixo_do_minimo`); movimentos só de acrescentar
+  (`StockMovement_sem_update_delete`). A migração calcula o «abaixo do mínimo» dos produtos que já tinham mínimo.
+- **Movimentos simultâneos no mesmo produto:** a linha fica bloqueada e os pedidos esperam em fila. O primeiro ensaio
+  com 8 saídas simultâneas deu 500, porque o Prisma só espera 2 s por uma transação. Esta transação passou a esperar
+  até 15 s, e se mesmo assim não começar responde 409 («tenta de novo») em vez de 500.
+- **Primeira dependência real entre módulos:** `stock` → `produtos`. Desligar os produtos com o stock ligado é
+  recusado (400), por isso o teste dos produtos desliga primeiro o stock. Os testes estruturais (dependências, áreas,
+  matriz de permissões) foram atualizados de propósito.
+- **No ecrã:**
+  - antes do primeiro movimento, o cartão «Stock» oferece «Stock inicial»; depois, «Entrada», «Saída», «Devolução»
+    e «Acertar contagem», que mostra a diferença antes de lançar;
+  - na lista, a coluna «Stock» destaca os produtos abaixo do mínimo ou com stock negativo, e as contagens no topo
+    filtram a lista com um clique.
+- **Testes:** 7 e2e novos em `test/stock.e2e-spec.ts`; atualizados os testes de produtos (o módulo desliga-se depois do stock), módulos e permissões. Total: 509 e2e e 289 unitários. Na suite completa, alguns testes de outras áreas falharam por tempo na limpeza da base de testes; passam sozinhos.
+- **Prova por mutação:** 13 mutações, todas apanhadas: produtos sem stock, acerto sem motivo, acerto igual aceite, acerto a somar a contagem, stock inicial repetido, saída sem sinal, sem bloquear a linha (apanhada pelo teste das contagens simultâneas), alertas com desativados, filtro abaixo do mínimo, deixar de controlar com stock, apagar com movimentos, sem área de escrita, sem módulo.
+- **Migração:** ensaiada numa cópia da base de desenvolvimento, com dois produtos acrescentados (um com mínimo e outro
+  sem):
+  - o «abaixo do mínimo» foi calculado na migração;
+  - em SQL, numa transação desfeita, o stock somou (7, depois 4, abaixo do mínimo 5) e a base de dados recusou
+    alterar, apagar e lançar com o sinal errado;
+  - sem desvio de esquema;
+  - a reversão repôs o esquema e os dados;
+  - a base de desenvolvimento foi migrada depois de uma cópia de segurança.
+- **Browser** (base de testes): stock inicial 10, saída 8, mínimo 5 (aviso «Abaixo do mínimo»), acerto de contagem para 3 com motivo (o diálogo mostrou a diferença «+1»), histórico com sinais e motivo; na lista, a coluna «Stock» em destaque e a contagem «1 abaixo do mínimo», que filtra a lista com um clique.
+
+---
+
+## Pacotes seguintes (esboço; cada um terá plano detalhado antes de começar)
 
 ### 5c — Peças ligadas a produtos
 - A peça da assistência pode vir do catálogo (preenche descrição e referência; o texto livre continua para peças

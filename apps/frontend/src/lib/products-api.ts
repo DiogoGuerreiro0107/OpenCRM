@@ -24,6 +24,8 @@ export interface ProductFilters {
   active?: "true" | "false" | "all";
   tracksStock?: "true" | "false";
   supplierId?: string;
+  /** Alertas de stock (Fase 5b). */
+  stock?: "below_min" | "negative";
 }
 
 export async function listProducts(filters: ProductFilters & PageParams) {

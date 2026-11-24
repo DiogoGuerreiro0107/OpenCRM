@@ -33,10 +33,10 @@ describe("Permissões configuráveis (e2e)", () => {
     it("GET /me/permissions devolve a predefinição de cada papel", async () => {
       const expected: Record<string, string[]> = {
         // `catalog` (Fase 5a): área nova, só para quem gere preços.
-        ADMINISTRADOR: ["companies", "contacts", "leads", "deals", "dailyWork", "sendEmail", "makeCall", "emailTemplates", "catalog"],
+        ADMINISTRADOR: ["companies", "contacts", "leads", "deals", "dailyWork", "sendEmail", "makeCall", "emailTemplates", "catalog", "stock"],
         COMERCIAL: ["companies", "contacts", "leads", "deals", "dailyWork", "sendEmail", "makeCall"],
         TECNICO: ["dailyWork", "makeCall"],
-        BACKOFFICE: ["companies", "contacts", "leads", "deals", "dailyWork", "sendEmail", "makeCall", "emailTemplates", "catalog"],
+        BACKOFFICE: ["companies", "contacts", "leads", "deals", "dailyWork", "sendEmail", "makeCall", "emailTemplates", "catalog", "stock"],
         FINANCEIRO: ["companies", "dailyWork", "catalog"],
         LEITURA_APENAS: [],
       };
