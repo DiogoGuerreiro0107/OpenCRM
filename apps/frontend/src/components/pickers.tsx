@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import type { CompanySummary, ContactSummary, Product, UserSummary } from "@opencrm/shared-types";
+import type { Carrier, CompanySummary, ContactSummary, Product, UserSummary } from "@opencrm/shared-types";
+import { listCarriers } from "@/lib/orders-api";
 import { getCompany, listCompanies } from "@/lib/companies-api";
 import { getContact, listContacts } from "@/lib/contacts-api";
 import { getProduct, listProducts } from "@/lib/products-api";
@@ -121,6 +122,33 @@ export function UserPicker({
       getId={(u) => u.id}
       getLabel={(u) => u.name}
       getDetail={(u) => (u.active === false ? `${ROLE_LABELS[u.role]} · desativado` : ROLE_LABELS[u.role])}
+      pageSize={Number.POSITIVE_INFINITY}
+    />
+  );
+}
+
+/**
+ * Transportadora (Fase 6d): lista curta, filtrada aqui. Só as ativas, mais a já escolhida (mesmo que entretanto
+ * desativada), para uma expedição antiga continuar a mostrar a sua.
+ */
+export function CarrierPicker({ emptyLabel = "Sem transportadora", ...props }: PickerBase<Carrier>) {
+  const { data: carriers } = useQuery({ queryKey: ["carriers"], queryFn: listCarriers, staleTime: 60_000 });
+  const usable = (carriers ?? []).filter((c) => c.active || c.id === props.value);
+  const known = props.value ? carriers?.find((c) => c.id === props.value)?.name : null;
+  return (
+    <RecordPicker<Carrier>
+      {...props}
+      selectedLabel={props.selectedLabel ?? known}
+      emptyLabel={emptyLabel}
+      placeholder="Pesquisar transportadora"
+      queryKey={["carriers", props.value, carriers?.length ?? 0, usable.length]}
+      search={async (term) => {
+        const t = fold(term);
+        return t ? usable.filter((c) => fold(c.name).includes(t)) : usable;
+      }}
+      getId={(c) => c.id}
+      getLabel={(c) => c.name}
+      getDetail={(c) => (c.active ? null : "desativada")}
       pageSize={Number.POSITIVE_INFINITY}
     />
   );

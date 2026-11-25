@@ -581,6 +581,63 @@ do 6b (o que aguarda stock passa a ser o que falta enviar menos o reservado).
 - **Browser** (base de testes): criar transportadora; envio parcial com transportadora e código; ver o link, o cartão
   «Expedições» e a marca na lista; corrigir o código; enviar o resto; «Dar por enviada sem o resto» noutra encomenda.
 
+### Execução do 6d (2026-11-25)
+**Implementado como planeado**, com estes pormenores decididos na implementação:
+- **Sem módulo novo:** as expedições e as transportadoras fazem parte de «Encomendas» (todo o envio passa a criar uma
+  expedição). As transportadoras ficam em Configurações → Transportadoras, com a área «Encomendas».
+- **Primeiro sai o reservado:** num envio, o reservado da linha desce o que sai (até 0); enviar mais do que o
+  reservado é a «falta de stock» que pede «enviar mesmo assim». A mensagem de recusa é a do 6b.
+- **Parcial = fica alguma coisa por enviar.** Um envio com linhas que leva tudo o que falta fecha a encomenda como o
+  envio total (o motivo da saída de stock é «EN-0001: encomenda enviada»; nos parciais, «EN-0001: envio parcial»).
+- **Depois de «dar por enviada sem o resto»** a encomenda fica enviada com linhas ainda «por enviar» (é o que não
+  foi). A ficha mostra «enviado 1 de 4 · não foi: 3». Na migração, só as encomendas já enviadas por inteiro.
+- **Timeline:** a nota do transporte («Expedição: CTT · código … · 2 volumes») só aparece com algum dado do
+  transporte, para os envios sem dados ficarem como no 6b. Uma correção sem mudanças não escreve nada nem dispara o
+  webhook.
+- **Webhooks** com os estados como estão na API (`CONFIRMED`, `SHIPPED`…). `order.created` sai também para os rascunhos
+  (a loja da 6e vai precisar). Documentados em [api-publica.md](api-publica.md).
+- **O teste de concorrência** falhou uma vez quando corria depois do teste dos webhooks: as primeiras tentativas de
+  entrega (para um endereço que recusa) ainda escreviam quando o teste seguinte limpava a base. O teste dos webhooks
+  passou a esperar por elas. Depois disso: 8 voltas do teste sozinho e 3 do ficheiro inteiro sem falhas.
+- **Testes que falhavam de vez em quando na bateria completa (também antes do 6d):** a limpeza da base entre testes
+  (`TRUNCATE` de ~80 tabelas) chegava a demorar mais do que os 30 s do `beforeEach`, e o teste seguinte falhava a
+  criar o utilizador. Vigiando a base durante a bateria, o `TRUNCATE` estava à espera do disco
+  (`IO / DataFileImmediateSync`): reconstrói todos os índices e grava cada um com `fsync`, lento no Docker do Windows,
+  e cada pacote acrescenta tabelas. A limpeza (`test/helpers.ts`) passou a usar `DELETE` com as chaves estrangeiras e
+  os triggers desligados nessa transação (`session_replication_role = replica`, que o superutilizador da base de
+  testes, local e do CI, pode usar) e a recomeçar as sequências; sem esse direito, volta ao `TRUNCATE`. Explica
+  provavelmente a falha de «compras + reservas» do 6c. Duas baterias completas seguidas sem falhas, em 7–8 min em vez
+  de 16–17.
+
+**Validação:**
+- 9 e2e novos (`order-shipments.e2e-spec.ts`) e 3 unitários novos; os testes do 6a, 6b e 6c passam sem mudar o que
+  verificam. Bateria completa: 546 e2e e 305 unitários.
+- **Prova por mutação:** 36 mutações, 35 apanhadas e 1 equivalente (a distribuição do stock escolher as linhas pela
+  quantidade em vez do «por enviar»: a quantidade dada já vem do «por enviar», por isso essas linhas recebem 0 e são
+  saltadas). Uma escapou (a nota «Todo o stock da encomenda está reservado» depois de um envio parcial) e passou a ser
+  apanhada com uma verificação nova. Antes da corrida reforcei três pontos que previ que escapariam: o `from` ao
+  cancelar um rascunho, a correção sem mudanças a disparar o webhook e a marca da lista depois do envio total.
+- **Migração** ensaiada numa cópia da base de desenvolvimento (`opencrm_ensaio_6d`, copiada sem ficheiro intermédio),
+  com encomendas em todos os estados: uma expedição por cada enviada/entregue (a entregue sem data de envio ficou com a
+  data da última alteração), enviado = quantidade nessas e 0 nas outras, o trigger do «por enviar» (também contra uma
+  escrita à mão), todos os CHECKs, chaves únicas e estrangeiras; sem desvio de esquema; a reversão deixou os dados e o
+  esquema iguais (impressões digitais 658292c4… e 9a0a0061…). Cópia apagada.
+- **Browser** (base de testes, como Administrador e Técnico):
+  - Configurações → Transportadoras: «CTT Expresso» com link de exemplo e «Entrega própria» sem link;
+  - EN-0001 (5 toners com 3 em stock, 1 HP, portes): «Enviar só parte» propõe o reservado; envio de 3 toners + 1 HP
+    com CTT, código «RR 123/PT», 2 volumes, 3,5 kg, 7,90 €. Fica confirmada com «Parcialmente enviada», «enviado 3
+    de 5 · aguarda stock: 2», cartão «Expedições» com o link (`RR%20123%2FPT`); «Corrigir» para «RR123456789PT»
+    atualizou o link e a timeline;
+  - entrada de 2 toners: a ficha atualizou-se sozinha (reservado 2) e nasceu a tarefa «Preparar encomenda EN-0001»;
+    «Enviar mais» mandou o resto e a encomenda passou a enviada, com a 2.ª expedição;
+  - EN-0002 (3 resmas, 1 em stock): o diálogo recusou 4 («só falta enviar 3»); envio parcial de 1; «Cancelar»
+    desapareceu; filtro «Parcialmente enviada» na lista; «Dar por enviada sem o resto» com motivo → enviada,
+    «enviado 1 de 3 · não foi: 2»;
+  - os quatro eventos `order.*` no formulário de webhooks;
+  - como Técnico: vê as expedições e o link, sem «Corrigir» nem «Transportadoras»;
+  - acertos feitos na verificação: largura mínima das colunas na página das transportadoras e o custo com duas casas
+    no «Corrigir».
+
 ## Pacotes seguintes (esboço; cada um terá plano detalhado antes de começar)
 
 ### 6e — API de encomendas

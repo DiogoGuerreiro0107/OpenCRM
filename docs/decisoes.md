@@ -709,3 +709,15 @@ Terceiro pacote da [Fase 6](plano-fase-6-encomendas.md).
 - **Bloqueios** na ordem de sempre: compra → produtos (por id) → linhas; «Criar compras» bloqueia os rascunhos dos fornecedores antes dos produtos.
 - **Validação:** 7 e2e novos (537 e2e e 302 unitários), 42 mutações (40 apanhadas, 2 equivalentes), migração ensaiada e revertida, verificação no browser. Detalhes no plano, em «Execução do 6c».
 
+## Fase 6d: expedições (2026-11-25)
+Quarto pacote da [Fase 6](plano-fase-6-encomendas.md).
+- **Cada envio é uma expedição** (`Shipment` + `ShipmentLine`): transportadora (opcional), código de seguimento, volumes, peso, custo e notas. Sem módulo novo: faz parte de «Encomendas», com a área «Encomendas» (também para configurar as transportadoras). O custo da expedição é visível para todos (não é preço de fornecedor) e **não vai nos webhooks**.
+- **Transportadoras** em Configurações (lista curta): nome único, link de seguimento com `{codigo}` (http/https, CHECK na base), desativar em vez de apagar quando têm expedições. Uma expedição antiga mantém a sua transportadora mesmo desativada.
+- **Envio parcial** por linha e quantidade. **Primeiro sai o reservado**; mais do que o reservado pede «enviar mesmo assim» (stock negativo), como no 6b. A encomenda continua confirmada («parcialmente enviada») até sair tudo, e o resto continua a aguardar e a reservar pela ordem de sempre.
+- **O que aguarda stock = por enviar − reservado** em todo o lado (distribuição das entradas, «Reservar stock», tarefa «Preparar encomenda», sugestões de compra, filtros). `SalesOrderLine.unshippedQuantity` é mantido por trigger para os filtros poderem comparar colunas; a reserva fica limitada ao que falta enviar (CHECK).
+- **Com parte enviada já não se cancela:** «Dar por enviada sem o resto» (com motivo) passa a enviada e liberta as reservas do resto para quem aguarda.
+- **As quantidades de uma expedição não se corrigem** (o stock já saiu; acerta-se com um movimento de stock); os dados do transporte, sim, em qualquer estado.
+- **Migração:** as encomendas já enviadas ou entregues ganham uma expedição com tudo e ficam com as linhas enviadas por inteiro.
+- **Webhooks novos:** `order.created`, `order.status_changed` (com `from`, `to` e o motivo), `order.shipped` (cada expedição, com `partial`) e `order.shipment_updated`.
+- **Limpeza da base nos testes com `DELETE`, não `TRUNCATE`** (`test/helpers.ts`): o `TRUNCATE` reconstrói e grava em disco todos os índices e, com cada vez mais tabelas, passava às vezes dos 30 s do `beforeEach` (falhas intermitentes na bateria completa, também antes do 6d). Os `DELETE` correm com `session_replication_role = replica` (superutilizador da base de testes, local e CI), com o `TRUNCATE` como alternativa. A bateria passou de 16–17 para 7–8 min.
+- **Validação:** 9 e2e e 3 unitários novos (546 e2e e 305 unitários), 36 mutações (35 apanhadas, 1 equivalente), migração ensaiada e revertida. Detalhes no plano, em «Execução do 6d».

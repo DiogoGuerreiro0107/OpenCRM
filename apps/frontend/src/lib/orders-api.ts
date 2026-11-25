@@ -1,4 +1,4 @@
-import type { Page, SalesOrder, SalesOrderStatus, SalesOrderSummary } from "@opencrm/shared-types";
+import type { Carrier, Page, SalesOrder, SalesOrderStatus, SalesOrderSummary } from "@opencrm/shared-types";
 import type { PageParams } from "./pagination";
 import { api } from "./api";
 
@@ -14,6 +14,8 @@ export interface OrderFilters {
   waiting?: "true";
   /** «Pronta a preparar» (Fase 6c): confirmadas sem linhas à espera. */
   ready?: "true";
+  /** «Parcialmente enviada» (Fase 6d). */
+  partiallyShipped?: "true";
   productId?: string;
 }
 
@@ -77,10 +79,72 @@ export async function deleteOrderLine(orderId: string, lineId: string) {
 
 export type OrderStep = "confirm" | "ship" | "deliver";
 
-/** No envio, `allowShortage` envia mesmo com linhas à espera de stock (Fase 6b). */
-export async function advanceOrder(id: string, step: OrderStep, body: { allowShortage?: boolean } = {}) {
-  const { data } = await api.post<SalesOrder>(`/orders/${id}/${step}`, body);
+/** Confirmar e marcar como entregue (o envio tem o seu diálogo: `shipOrder`). */
+export async function advanceOrder(id: string, step: OrderStep) {
+  const { data } = await api.post<SalesOrder>(`/orders/${id}/${step}`, {});
   return data;
+}
+
+/** Dados do transporte de uma expedição (Fase 6d). Na correção, `null` apaga. */
+export interface ShipmentDetailsInput {
+  carrierId?: string | null;
+  trackingCode?: string | null;
+  packages?: number | null;
+  weightKg?: number | null;
+  cost?: number | null;
+  notes?: string | null;
+}
+
+/**
+ * Regista uma expedição (Fase 6d). Sem `lines`, sai tudo o que falta enviar; com elas, é um envio parcial.
+ * `allowShortage` envia mesmo sem o stock reservado (Fase 6b; o stock fica negativo).
+ */
+export async function shipOrder(id: string, input: ShipmentDetailsInput & { allowShortage?: boolean; lines?: Array<{ lineId: string; quantity: number }> }) {
+  const { data } = await api.post<SalesOrder>(`/orders/${id}/ship`, input);
+  return data;
+}
+
+export async function updateShipment(orderId: string, shipmentId: string, input: ShipmentDetailsInput) {
+  const { data } = await api.patch<SalesOrder>(`/orders/${orderId}/shipments/${shipmentId}`, input);
+  return data;
+}
+
+/** «Dar por enviada sem o resto» (Fase 6d). */
+export async function finishOrder(id: string, reason: string) {
+  const { data } = await api.post<SalesOrder>(`/orders/${id}/finish`, { reason });
+  return data;
+}
+
+/** Transportadoras (Fase 6d): lista curta de configuração. */
+export async function listCarriers() {
+  const { data } = await api.get<Carrier[]>("/carriers");
+  return data;
+}
+
+export interface CarrierInput {
+  name?: string;
+  trackingUrlTemplate?: string | null;
+  sortOrder?: number;
+  active?: boolean;
+}
+
+export async function createCarrier(input: CarrierInput) {
+  const { data } = await api.post<Carrier>("/carriers", input);
+  return data;
+}
+
+export async function updateCarrier(id: string, input: CarrierInput) {
+  const { data } = await api.patch<Carrier>(`/carriers/${id}`, input);
+  return data;
+}
+
+export async function deleteCarrier(id: string) {
+  await api.delete(`/carriers/${id}`);
+}
+
+/** O link de seguimento com um código: o mesmo que o servidor faz (para o exemplo nas Configurações). */
+export function trackingLink(template: string | null | undefined, code: string) {
+  return template && code ? template.split("{codigo}").join(encodeURIComponent(code)) : null;
 }
 
 /** Reserva o stock disponível para as linhas à espera (Fase 6b). */

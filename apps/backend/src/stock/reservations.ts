@@ -37,18 +37,21 @@ export async function lockProducts(tx: Tx, ids: Array<string | null>) {
   return locked;
 }
 
-/** Quanto falta reservar, por linha de produto que controla stock, numa encomenda confirmada. */
+/**
+ * Linhas de produto que controla stock com o que falta enviar por reservar, numa encomenda confirmada. `quantity` é o
+ * que falta enviar (Fase 6d: depois de um envio parcial, só o resto aguarda).
+ */
 export async function waitingLines(tx: Tx, orderId: string) {
   return tx.$queryRaw<Array<{ id: string; productId: string; quantity: Prisma.Decimal; reservedQuantity: Prisma.Decimal; description: string; sku: string | null }>>`
-    SELECT l."id", l."productId", l."quantity", l."reservedQuantity", l."description", l."sku"
+    SELECT l."id", l."productId", l."unshippedQuantity" AS "quantity", l."reservedQuantity", l."description", l."sku"
     FROM "SalesOrderLine" l JOIN "Product" p ON p."id" = l."productId"
-    WHERE l."orderId" = ${orderId} AND p."tracksStock" AND l."reservedQuantity" < l."quantity"
+    WHERE l."orderId" = ${orderId} AND p."tracksStock" AND l."reservedQuantity" < l."unshippedQuantity"
     ORDER BY l."position", l."id"`;
 }
 
 /**
- * Dá o disponível do produto (que tem de estar bloqueado nesta transação) às linhas que aguardam stock, das encomendas
- * confirmadas há mais tempo para as mais recentes. Escreve na timeline de cada encomenda servida. Devolve o que
+ * Dá o disponível do produto (que tem de estar bloqueado nesta transação) às linhas que aguardam stock (o que falta
+ * enviar e não está reservado), das encomendas confirmadas há mais tempo para as mais recentes. Escreve na timeline de cada encomenda servida. Devolve o que
  * reservou, por encomenda (as chaves são as encomendas servidas: depois de gravar, `OrderPreparationService` vê quais
  * ficaram completas — Fase 6c).
  */
@@ -61,9 +64,9 @@ export async function allocateWaiting(tx: Tx, productId: string, userId: string)
   if (available <= 0) return served;
 
   const lines = await tx.$queryRaw<Array<{ id: string; orderId: string; number: number; quantity: Prisma.Decimal; reservedQuantity: Prisma.Decimal; description: string; sku: string | null }>>`
-    SELECT l."id", l."orderId", o."number", l."quantity", l."reservedQuantity", l."description", l."sku"
+    SELECT l."id", l."orderId", o."number", l."unshippedQuantity" AS "quantity", l."reservedQuantity", l."description", l."sku"
     FROM "SalesOrderLine" l JOIN "SalesOrder" o ON o."id" = l."orderId"
-    WHERE l."productId" = ${productId} AND o."status" = 'CONFIRMED' AND l."reservedQuantity" < l."quantity"
+    WHERE l."productId" = ${productId} AND o."status" = 'CONFIRMED' AND l."reservedQuantity" < l."unshippedQuantity"
     ORDER BY o."confirmedAt" ASC, o."number" ASC, l."position" ASC, l."id" ASC
     FOR UPDATE OF l`;
   for (const line of lines) {

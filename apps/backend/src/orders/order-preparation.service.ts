@@ -56,7 +56,7 @@ export class OrderPreparationService {
     });
     if (!order || order.status !== "CONFIRMED" || order.preparationTaskAt) return;
     const waiting = await this.prisma.salesOrderLine.count({
-      where: { orderId, product: { tracksStock: true }, reservedQuantity: { lt: this.prisma.salesOrderLine.fields.quantity } },
+      where: { orderId, product: { tracksStock: true }, reservedQuantity: { lt: this.prisma.salesOrderLine.fields.unshippedQuantity } },
     });
     if (waiting > 0) return;
 

@@ -164,6 +164,7 @@ Estado atual: **todas as fases do roadmap consolidado e a revisão final conclu�
   - [x] Encomendas de cliente: linhas do catálogo ou avulsas com desconto e IVA, totais indicativos, estados (rascunho, confirmada, enviada, entregue, cancelada com motivo), cartão nas fichas de empresa e contacto (Fase 6a) — ver [docs/plano-fase-6-encomendas.md](docs/plano-fase-6-encomendas.md)
   - [x] Reservas de stock para as encomendas: confirmar reserva o disponível, linhas «a aguardar stock» servidas pela ordem da confirmação a cada entrada, enviar lança as saídas, cancelar liberta; reservado e disponível nos produtos (Fase 6b)
   - [x] Compras a fornecedor: rascunho com o custo do catálogo, enviada, receção (também em parte) que dá entrada no stock e serve as encomendas à espera, fechar com falta; «O que comprar» a partir das encomendas; tarefa «Preparar encomenda» quando uma encomenda à espera fica completa (Fase 6c)
+  - [x] Expedições: transportadoras com link de seguimento, cada envio com transportadora, código, volumes, peso e custo; envio parcial por linha (o resto continua a aguardar stock); «dar por enviada sem o resto»; webhooks `order.created`, `order.status_changed`, `order.shipped` e `order.shipment_updated` (Fase 6d)
 
 ### Por fazer (backlog)
 

@@ -48,6 +48,7 @@ model User {
   salesOrdersAssigned   SalesOrder[]          @relation("SalesOrderAssignee")
   salesOrdersCreated    SalesOrder[]          @relation("SalesOrderCreatedBy")
   purchaseOrdersCreated PurchaseOrder[]       @relation("PurchaseOrderCreatedBy")
+  shipmentsCreated      Shipment[]            @relation("ShipmentCreatedBy")
 }
 
 enum TimelineEventType {
@@ -1053,6 +1054,8 @@ model SalesOrder {
   lines             SalesOrderLine[]
   /// Tarefas ligadas (Fase 6c: «Preparar encomenda»).
   workItems         WorkItem[]
+  /// Expedições (Fase 6d): cada envio, total ou parcial.
+  shipments         Shipment[]
 
   @@index([status, createdAt])
   @@index([createdAt, id])
@@ -1064,27 +1067,83 @@ model SalesOrder {
 
 /// Linha de uma encomenda de cliente (Fase 6a): produto do catálogo (opcional) ou texto livre. Limites por CHECK.
 model SalesOrderLine {
-  id               String     @id @default(uuid())
-  orderId          String
-  order            SalesOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  position         Int
-  productId        String?
-  product          Product?   @relation(fields: [productId], references: [id], onDelete: Restrict)
-  sku              String?
-  description      String
-  quantity         Decimal    @db.Decimal(12, 2)
-  unitPrice        Decimal    @db.Decimal(12, 2)
-  discountPct      Decimal    @default(0) @db.Decimal(5, 2)
-  vatRate          Decimal    @db.Decimal(5, 2)
+  id                String         @id @default(uuid())
+  orderId           String
+  order             SalesOrder     @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  position          Int
+  productId         String?
+  product           Product?       @relation(fields: [productId], references: [id], onDelete: Restrict)
+  sku               String?
+  description       String
+  quantity          Decimal        @db.Decimal(12, 2)
+  unitPrice         Decimal        @db.Decimal(12, 2)
+  discountPct       Decimal        @default(0) @db.Decimal(5, 2)
+  vatRate           Decimal        @db.Decimal(5, 2)
   /// Total da linha sem IVA, já com o desconto (arredondado a cêntimos).
-  lineTotal        Decimal    @db.Decimal(14, 2)
-  /// Stock reservado para esta linha (Fase 6b): 0 até à quantidade; o resto «aguarda stock». CHECK na migração.
-  reservedQuantity Decimal    @default(0) @db.Decimal(12, 2)
-  createdAt        DateTime   @default(now())
-  updatedAt        DateTime   @updatedAt
+  lineTotal         Decimal        @db.Decimal(14, 2)
+  /// Stock reservado para esta linha (Fase 6b): 0 até ao que falta enviar; o resto «aguarda stock». CHECK na migração.
+  reservedQuantity  Decimal        @default(0) @db.Decimal(12, 2)
+  /// Quanto já saiu em expedições (Fase 6d): 0 até à quantidade. CHECK na migração.
+  shippedQuantity   Decimal        @default(0) @db.Decimal(12, 2)
+  /// Por enviar = quantidade − enviado (Fase 6d). Mantido por trigger (nunca se escreve), para os filtros o compararem
+  /// com o reservado.
+  unshippedQuantity Decimal        @default(0) @db.Decimal(12, 2)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  shipmentLines     ShipmentLine[]
 
   @@index([orderId, position])
   @@index([productId])
+}
+
+/// Transportadora (Fase 6d): lista curta de configuração. O link de seguimento tem `{codigo}` (CHECK na migração).
+model Carrier {
+  id                  String     @id @default(uuid())
+  name                String
+  nameKey             String     @unique
+  trackingUrlTemplate String?
+  active              Boolean    @default(true)
+  sortOrder           Int        @default(0)
+  shipments           Shipment[]
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+}
+
+/// Expedição de uma encomenda (Fase 6d): um envio, total ou parcial. As quantidades não mudam depois de registada
+/// (o stock já saiu); os dados do transporte corrigem-se. Limites por CHECK.
+model Shipment {
+  id           String         @id @default(uuid())
+  orderId      String
+  order        SalesOrder     @relation(fields: [orderId], references: [id], onDelete: Restrict)
+  carrierId    String?
+  carrier      Carrier?       @relation(fields: [carrierId], references: [id], onDelete: Restrict)
+  trackingCode String?
+  packages     Int?
+  weightKg     Decimal?       @db.Decimal(10, 2)
+  cost         Decimal?       @db.Decimal(12, 2)
+  notes        String?
+  shippedAt    DateTime       @default(now())
+  createdById  String?
+  createdBy    User?          @relation("ShipmentCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  lines        ShipmentLine[]
+
+  @@index([orderId, shippedAt])
+  @@index([carrierId])
+}
+
+/// Linha de uma expedição (Fase 6d): quanto saiu de uma linha da encomenda. Uma vez por linha em cada expedição.
+model ShipmentLine {
+  id          String         @id @default(uuid())
+  shipmentId  String
+  shipment    Shipment       @relation(fields: [shipmentId], references: [id], onDelete: Cascade)
+  orderLineId String
+  orderLine   SalesOrderLine @relation(fields: [orderLineId], references: [id], onDelete: Restrict)
+  quantity    Decimal        @db.Decimal(12, 2)
+
+  @@unique([shipmentId, orderLineId])
+  @@index([orderLineId])
 }
 
 /// Estado de uma compra a fornecedor (Fase 6c, docs/plano-fase-6-encomendas.md). «Recebida em parte» é uma enviada com

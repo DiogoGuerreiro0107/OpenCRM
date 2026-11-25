@@ -91,6 +91,11 @@ export function WaitingStockBadge({ lines }: { lines: number }) {
   );
 }
 
+/** Confirmada com parte já enviada (Fase 6d). */
+export function PartiallyShippedBadge() {
+  return <Badge className="border-violet-200 bg-violet-50 text-violet-800">Parcialmente enviada</Badge>;
+}
+
 const STATUSES = Object.keys(ORDER_STATUS_LABELS) as SalesOrderStatus[];
 
 /** Encomendas (Fase 6a): mais recentes primeiro; pesquisa (número, referência, cliente) e filtros por estado, cliente e responsável. */
@@ -133,6 +138,10 @@ export function OrdersListPage() {
             <input type="checkbox" checked={filters.ready === "true"} onChange={(e) => setFilters({ ...filters, ready: e.target.checked ? "true" : undefined, waiting: undefined })} />Pronta a preparar
           </label>
         )}
+        <label className="flex items-center gap-1.5 text-sm">
+          <input type="checkbox" checked={filters.partiallyShipped === "true"} onChange={(e) => setFilters({ ...filters, partiallyShipped: e.target.checked ? "true" : undefined })} />
+          Parcialmente enviada
+        </label>
       </div>
 
       <div className="overflow-hidden rounded-lg border border-border bg-background">
@@ -171,6 +180,7 @@ export function OrdersListPage() {
                 <td className="px-4 py-2">
                   <span className="flex flex-wrap gap-1">
                     <OrderStatusBadge status={o.status} />
+                    {o.partiallyShipped && <PartiallyShippedBadge />}
                     {stockOn && <WaitingStockBadge lines={o.waitingLines} />}
                   </span>
                 </td>
