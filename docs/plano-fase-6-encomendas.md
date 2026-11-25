@@ -23,7 +23,7 @@ indicativos, para a equipa; a fatura sai do programa de faturação (Fase 7), qu
 | **6a — Encomendas de cliente** | Módulo `encomendas` (depende de `produtos`); encomenda com cliente, linhas de produto (preço do catálogo, desconto, IVA) e totais indicativos; estados rascunho → confirmada → enviada → entregue, ou cancelada (com motivo); lista com pesquisa e filtros, ficha, cartão na empresa, timeline, campos personalizados | Médio |
 | **6b — Reservas e saída de stock** | Com o `stock` ligado: confirmar reserva o que há, por linha; disponível = em stock − reservado; linhas «a aguardar stock»; enviar lança as saídas e liberta as reservas; cancelar liberta | Alto |
 | **6c — Compras a fornecedor** | Compra a fornecedor com linhas de produto (custo do catálogo); sugestões do que comprar para as encomendas à espera; receção (parcial) lança as entradas e reserva para as encomendas à espera; tarefa «Preparar encomenda» quando uma encomenda à espera fica completa | Alto |
-| **6d — Expedições** | Transportadoras configuráveis (link de seguimento com `{codigo}`); expedição com código, volumes e custo; envio parcial opcional; eventos de webhook da mudança de estado | Médio |
+| **6d — Expedições** | Transportadoras configuráveis (link de seguimento com `{codigo}`); cada envio é uma expedição com transportadora, código, volumes, peso e custo; envio parcial (por linha e quantidade); eventos de webhook da encomenda | Alto |
 | **6e — API de encomendas** | `POST /api/v1/orders` (âmbito `orders:write`, idempotente por origem + id externo), produtos por referência, cliente por NIF ou email; `GET /api/v1/products` (`products:read`); estado de volta à loja por webhook | Médio |
 
 Fora desta fase: faturação e reconciliação com o programa de faturação (Fase 7); integrações com cada transportadora
@@ -484,13 +484,104 @@ Detalhado em 2026-11-25, antes de começar.
   - como Comercial: na encomenda à espera, «aguarda stock: 2 · em compra: 2» e a ligação «O que comprar»; nas compras,
     sem custos, totais nem botões; cartão «Compras» na empresa fornecedora.
 
-## Pacotes seguintes (esboço; cada um terá plano detalhado antes de começar)
+## Pacote 6d — Expedições
+Detalhado a 2026-11-25, depois do merge do 6c. Risco revisto para **alto**: o envio parcial mexe na regra das reservas
+do 6b (o que aguarda stock passa a ser o que falta enviar menos o reservado).
 
-### 6d — Expedições
-- `Carrier` (nome, link de seguimento com `{codigo}`, ativo) em Configurações; `Shipment` (encomenda, transportadora,
-  código, volumes, peso, custo, data). Marcar como enviada pede a expedição (opcional).
-- Envio parcial como opção por encomenda.
-- Eventos `order.created`, `order.status_changed`, `order.shipped` no catálogo dos webhooks.
+### Modelo
+- **`Carrier`** (transportadora): nome (único, sem distinguir maiúsculas), link de seguimento opcional com `{codigo}`,
+  ativa, ordem. Lista curta de configuração (vem inteira).
+  - CHECK: o link, quando existe, tem `{codigo}`.
+  - Com expedições, desativa-se em vez de apagar (409), como as categorias de produtos.
+- **`Shipment`** (expedição): encomenda, transportadora (opcional), código de seguimento, volumes, peso (kg), custo,
+  notas, data de envio, quem registou.
+  - CHECKs: volumes ≥ 1, peso ≥ 0 e custo ≥ 0, quando preenchidos.
+- **`ShipmentLine`**: expedição, linha da encomenda, quantidade (> 0); uma vez por linha em cada expedição.
+- **`SalesOrderLine.shippedQuantity`** (enviado) e **`unshippedQuantity`** (por enviar = quantidade − enviado, mantido
+  por trigger, para os filtros poderem comparar com o reservado).
+  - CHECKs: `0 ≤ enviado ≤ quantidade` e `reservado ≤ por enviar` (substitui `reservado ≤ quantidade`).
+- **Migração:** cada encomenda já enviada ou entregue fica com as linhas enviadas por inteiro e com **uma expedição**
+  (data do envio, sem transportadora, com a nota «Registada na migração»). Assim vale sempre: enviada ⇔ nada por
+  enviar, e o enviado de cada linha = soma das expedições.
+
+### Regras
+- **Enviar** (`POST /orders/:id/ship`, encomenda confirmada) cria sempre uma expedição:
+  - **sem linhas no pedido**, envia tudo o que falta (como hoje);
+  - **com linhas** (`[{ lineId, quantity }]`), é um **envio parcial**: cada linha da encomenda no máximo uma vez, com
+    quantidade > 0 e até ao que falta enviar dessa linha;
+  - **falta de stock:** numa linha de produto que controla stock (com as reservas ativas), enviar mais do que o
+    reservado pede `allowShortage`. Sem ele, 409 com o que falta; o stock fica negativo;
+  - por linha: saída de stock `SALE_OUT` da quantidade enviada (produtos que controlam stock, com o módulo `stock`
+    ligado), o reservado desce até ao que fica por enviar e o enviado sobe;
+  - com tudo enviado a encomenda passa a **enviada**; senão continua **confirmada** («parcialmente enviada») e as linhas
+    que faltam continuam a reservar e a aguardar stock como antes, pela ordem de sempre;
+  - timeline da encomenda: «Encomenda enviada» ou «Envio parcial: …», com transportadora e código, e a saída de stock.
+- **Transportadora:** tem de estar ativa ao registar. O link de seguimento é o da transportadora com `{codigo}`
+  trocado pelo código (codificado para URL); sem código ou sem link, não há link.
+- **Corrigir a expedição** (`PATCH /orders/:id/shipments/:shipmentId`): transportadora, código, volumes, peso, custo e
+  notas, em qualquer estado da encomenda (o código chega muitas vezes depois). As quantidades não se corrigem: o stock
+  já saiu (acerta-se com um movimento de stock). Fica na timeline.
+- **Dar por enviada sem o resto** (`POST /orders/:id/finish`, com motivo): numa encomenda confirmada com parte enviada,
+  passa a enviada, liberta as reservas do que não vai e o disponível vai para quem aguarda. Sem nada enviado, 409
+  (cancela-se).
+- **Cancelar** uma encomenda com parte enviada: recusado (409, «dá-a por enviada sem o resto»).
+- **Entregue** continua a ser da encomenda inteira (só enviada → entregue).
+- **Bloqueios:** os de sempre (encomenda → produtos por id → linhas).
+- **O que aguarda stock** passa a ser «por enviar − reservado» em todo o lado: distribuição das entradas (6b), «Reservar
+  stock», tarefa «Preparar encomenda» e sugestões de compra (6c), filtros «a aguardar stock» e «pronta a preparar».
+- **Webhooks** (catálogo, depois de gravar; nunca falham a operação):
+  - `order.created`: encomenda criada;
+  - `order.status_changed`: confirmada, enviada, entregue, cancelada, com o estado de onde veio e, quando há, o motivo;
+  - `order.shipped`: cada expedição (também as parciais, com `partial`), com transportadora, código, link de
+    seguimento, volumes, peso e linhas. **Sem o custo**, que é interno;
+  - `order.shipment_updated`: expedição corrigida (para a loja receber o código quando chega mais tarde).
+- **Quem:** a área «Encomendas» envia, corrige expedições e configura as transportadoras. Ver é para todos, incluindo o
+  custo da expedição (não é preço de fornecedor).
+
+### API
+- `GET/POST/PATCH/DELETE /carriers` (módulo `encomendas`; escrever com a área «Encomendas»), com o número de
+  expedições de cada uma.
+- `POST /orders/:id/ship` aceita também `lines`, `carrierId`, `trackingCode`, `packages`, `weightKg`, `cost`, `notes`.
+- `PATCH /orders/:id/shipments/:shipmentId`; `POST /orders/:id/finish { reason }`.
+- Encomenda: em cada linha, `shippedQuantity` e `unshippedQuantity`; na ficha, `shipments` (com `trackingUrl`); na
+  ficha e na lista, `partiallyShipped`. Filtro novo `partiallyShipped=true`.
+- **Tempo real:** as transportadoras emitem `carriers`; as expedições vão com as encomendas.
+
+### Interface
+- **Configurações → Transportadoras** (com a área «Encomendas»): lista, criar/editar (nome, link com `{codigo}` e um
+  exemplo do link), ativar/desativar, apagar quando não tem expedições.
+- **Ficha da encomenda:**
+  - «Marcar como enviada» abre um diálogo: transportadora (seletor com pesquisa, só ativas), código, volumes, peso,
+    custo, notas; «Enviar só parte» mostra as linhas com a quantidade a enviar (por omissão o reservado nas linhas de
+    stock e o que falta nas outras). Falta de stock: aviso no diálogo e «Enviar mesmo assim»;
+  - cartão **«Expedições»**: data, transportadora, código com o link de seguimento, volumes, peso, custo, linhas, e
+    «Corrigir»;
+  - linhas com «enviado 2 de 5»; marca «Parcialmente enviada» e o botão «Dar por enviada sem o resto».
+- **Lista de encomendas:** marca «parcialmente enviada» e o filtro.
+- **Webhooks:** os eventos novos aparecem no catálogo da página de webhooks (vêm do servidor).
+
+### Validação prevista
+- **e2e** (`order-shipments.e2e-spec.ts`):
+  - transportadoras: CRUD, nome repetido, link sem `{codigo}`, apagar com expedições (409), inativa recusada;
+  - envio total com transportadora e link; envio parcial com stock reservado (reservado e enviado nas linhas, saída de
+    stock, continua confirmada) e depois o resto;
+  - quantidades acima do que falta, linha repetida ou de outra encomenda (400); falta de stock com e sem
+    `allowShortage`;
+  - entradas de stock depois de um envio parcial servem só o que falta enviar; tarefa «Preparar encomenda» e sugestões
+    de compra com envio parcial;
+  - «Dar por enviada sem o resto» (reservas libertadas para outra encomenda), cancelar com parte enviada (409);
+  - corrigir a expedição; módulo `stock` desligado (expedições sem movimentos);
+  - webhooks: entregas criadas para `order.created`, `order.status_changed`, `order.shipped` (com `partial`, sem custo)
+    e `order.shipment_updated`;
+  - concorrência: dois envios parciais da mesma linha ao mesmo tempo nunca passam da quantidade.
+- Os testes do 6b e do 6c continuam a passar sem mudar o que verificam.
+- Prova por mutação.
+- Migração ensaiada numa cópia da base de desenvolvimento (com encomendas enviadas e entregues): expedições criadas,
+  enviado = quantidade, reversão e sem desvio de esquema.
+- **Browser** (base de testes): criar transportadora; envio parcial com transportadora e código; ver o link, o cartão
+  «Expedições» e a marca na lista; corrigir o código; enviar o resto; «Dar por enviada sem o resto» noutra encomenda.
+
+## Pacotes seguintes (esboço; cada um terá plano detalhado antes de começar)
 
 ### 6e — API de encomendas
 - `POST /api/v1/orders` (âmbito `orders:write`, `Idempotency-Key`, e o id externo da loja numa `ExternalLink` para
