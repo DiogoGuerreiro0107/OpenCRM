@@ -74,6 +74,10 @@ export class CompaniesService {
     if ((await this.prisma.salesOrder.count({ where: { companyId: id } })) > 0) {
       throw new ConflictException("A empresa tem encomendas: não se pode eliminar");
     }
+    // Compras (Fase 6c): o fornecedor não desaparece de uma compra.
+    if ((await this.prisma.purchaseOrder.count({ where: { supplierId: id } })) > 0) {
+      throw new ConflictException("A empresa tem compras como fornecedor: não se pode eliminar");
+    }
     // Os valores dos campos personalizados não têm chave estrangeira (polimórficos): apagam-se juntamente.
     await this.prisma.$transaction([
       this.prisma.customFieldValue.deleteMany({ where: { entityType: "COMPANY", entityId: id } }),

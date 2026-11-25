@@ -5,6 +5,7 @@ import { KeyField, orderByKey, readPage } from "../common/pagination";
 import { lockedTransaction } from "../common/locked-transaction";
 import { ModulesService } from "../modules/modules.service";
 import { allocateWaiting } from "./reservations";
+import { OrderPreparationService } from "../orders/order-preparation.service";
 import { CreateStockMovementDto, QueryStockMovementsDto } from "./dto/stock.dto";
 
 const INCLUDE = {
@@ -62,6 +63,7 @@ export class StockService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly modules: ModulesService,
+    private readonly preparation: OrderPreparationService,
   ) {}
 
   /** As encomendas reservam stock (Fase 6b): com os módulos «Stock» e «Encomendas» ligados. */
@@ -76,12 +78,14 @@ export class StockService {
   async create(dto: CreateStockMovementDto, userId: string) {
     const reason = dto.reason?.trim() || null;
     const note = dto.note?.trim() || null;
-    const movement = await this.withLock(async (tx) => {
+    const { created: movement, served } = await this.withLock(async (tx) => {
       const created = await this.createLocked(tx, dto, reason, note, userId);
       // O que entrou vai para as encomendas que aguardam stock (Fase 6b).
-      if (this.reservationsApply()) await allocateWaiting(tx, dto.productId, userId);
-      return created;
+      const served = this.reservationsApply() ? [...(await allocateWaiting(tx, dto.productId, userId)).keys()] : [];
+      return { created, served };
     });
+    // As encomendas à espera que ficaram completas pedem a tarefa «Preparar encomenda» (Fase 6c).
+    await this.preparation.afterAllocation(served, userId);
     const product = await this.prisma.product.findUniqueOrThrow({ where: { id: dto.productId }, select: { stockOnHand: true, reserved: true, belowMin: true } });
     return { movement: this.view(movement), stockOnHand: Number(product.stockOnHand), reserved: Number(product.reserved), belowMin: product.belowMin };
   }

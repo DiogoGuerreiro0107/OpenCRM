@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Product, SalesOrder, SalesOrderLine } from "@opencrm/shared-types";
+import type { Product, SalesOrder, SalesOrderLine, Task } from "@opencrm/shared-types";
+import { listTasks } from "@/lib/tasks-api";
+import { TaskDialog } from "@/pages/tasks/TaskDialog";
+import { TASK_STATUS_LABELS } from "@/pages/tasks/task-labels";
 import {
   addOrderLine,
   advanceOrder,
@@ -50,6 +53,8 @@ function LineStock({ line, status }: { line: SalesOrderLine; status: SalesOrder[
     return (
       <div className="text-xs font-medium text-amber-700">
         {line.reservedQuantity > 0 ? `Reservado ${qty(line.reservedQuantity)} · ` : ""}aguarda stock: {qty(line.waitingQuantity)}
+        {/* Fase 6c: o que já está em compra do produto (para esta e para as outras encomendas à espera). */}
+        {p.onOrder !== undefined && <span className="font-normal text-muted-foreground"> · em compra: {qty(p.onOrder)}</span>}
       </div>
     );
   }
@@ -421,6 +426,35 @@ function CancelDialog({ order, onClose, onDone }: { order: SalesOrder; onClose: 
   );
 }
 
+/** Tarefas «Preparar encomenda» (Fase 6c): criadas quando a encomenda que aguardava stock fica com tudo reservado. */
+function PreparationTasksCard({ orderId }: { orderId: string }) {
+  const { data } = useQuery({ queryKey: ["tasks", "order", orderId], queryFn: () => listTasks({ salesOrderId: orderId, limit: 10 }) });
+  const [open, setOpen] = useState<Task | null>(null);
+  if (!data || data.items.length === 0) return null;
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Tarefas</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ul className="space-y-1 text-sm">
+          {data.items.map((t) => (
+            <li key={t.id} className="flex flex-wrap items-center gap-2">
+              <button type="button" className="font-medium hover:underline" onClick={() => setOpen(t)}>
+                {t.title}
+              </button>
+              <span className="text-xs text-muted-foreground">
+                {TASK_STATUS_LABELS[t.status]} · {t.assignee.name}
+              </span>
+            </li>
+          ))}
+        </ul>
+        {open && <TaskDialog open task={open} onClose={() => setOpen(null)} />}
+      </CardContent>
+    </Card>
+  );
+}
+
 /**
  * Ficha da encomenda (Fase 6a): cabeçalho, linhas (editáveis em rascunho) com os totais, o passo seguinte do estado,
  * cancelar com motivo, campos personalizados e timeline.
@@ -435,6 +469,8 @@ export function OrderDetailPage() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmShortage, setConfirmShortage] = useState(false);
   const stockOn = useModuleEnabled("stock");
+  const ordersOn = useModuleEnabled("encomendas");
+  const purchasesOn = useModuleEnabled("compras");
 
   const changed = (o: SalesOrder) => {
     queryClient.setQueryData(["orders", "one", id], o);
@@ -547,11 +583,18 @@ export function OrderDetailPage() {
           <span>
             {waiting === 1 ? "1 linha aguarda stock." : `${waiting} linhas aguardam stock.`} As entradas de stock reservam primeiro para as encomendas confirmadas há mais tempo.
           </span>
-          {canEdit && (
-            <Button size="sm" variant="outline" disabled={reserve.isPending} onClick={() => reserve.mutate()}>
-              {reserve.isPending ? "A reservar..." : "Reservar stock"}
-            </Button>
-          )}
+          <span className="flex gap-2">
+            {purchasesOn && ordersOn && (
+              <Link to="/compras/sugestoes" className="self-center text-sm font-medium underline">
+                O que comprar
+              </Link>
+            )}
+            {canEdit && (
+              <Button size="sm" variant="outline" disabled={reserve.isPending} onClick={() => reserve.mutate()}>
+                {reserve.isPending ? "A reservar..." : "Reservar stock"}
+              </Button>
+            )}
+          </span>
         </div>
       )}
       {reserve.isError && <p className="text-sm text-red-600">{errorMessage(reserve.error, "Não foi possível reservar.")}</p>}
@@ -560,6 +603,7 @@ export function OrderDetailPage() {
       <div className="grid gap-4 lg:grid-cols-2">
         <HeaderCard order={order} canEdit={canEdit} onSaved={changed} />
         <div className="space-y-4">
+          {stockOn && <PreparationTasksCard orderId={order.id} />}
           <Card>
             <CardHeader>
               <CardTitle>Campos personalizados</CardTitle>

@@ -10,7 +10,7 @@ export interface AuthUser {
 export type TimelineEventType = "NOTE" | "CALL" | "EMAIL" | "MEETING" | "FILE" | "SYSTEM";
 
 /** `ORDER`: encomendas de cliente (Fase 6a). */
-export type TimelineEntityType = "COMPANY" | "CONTACT" | "LEAD" | "DEAL" | "TASK" | "ORDER";
+export type TimelineEntityType = "COMPANY" | "CONTACT" | "LEAD" | "DEAL" | "TASK" | "ORDER" | "PURCHASE_ORDER";
 
 export interface TimelineEvent {
   id: string;
@@ -234,6 +234,9 @@ export interface Task {
   company: { id: string; name: string } | null;
   dealId: string | null;
   deal: { id: string; title: string } | null;
+  /** Encomenda da tarefa «Preparar encomenda» (Fase 6c). */
+  salesOrderId?: string | null;
+  salesOrder?: { id: string; number: number } | null;
   reminders: Reminder[];
   /** Quando fechou (concluída ou cancelada); vazio em aberto. Fase 4c. */
   closedAt?: string | null;
@@ -809,6 +812,8 @@ export interface Product {
   reserved: number;
   /** Em stock − reservado; pode ser negativo. */
   available: number;
+  /** Em compra (rascunho ou enviada, por receber). Só na ficha e com o módulo «Compras» ligado (Fase 6c). */
+  onOrder?: number;
   suppliers: ProductSupplier[];
   preferredSupplier: { id: string; name: string } | null;
   /** % sobre o preço de venda, com o custo do preferido. Só vem a quem pode escrever no catálogo. */
@@ -854,7 +859,8 @@ export interface SalesOrderLine {
   reservedQuantity: number;
   /** O que falta reservar, numa encomenda confirmada com produto que controla stock. */
   waitingQuantity: number;
-  product: { id: string; tracksStock: boolean; stockOnHand: number; reserved: number; available: number } | null;
+  /** `onOrder` (Fase 6c): em compra, só nas linhas à espera e com o módulo «Compras» ligado. */
+  product: { id: string; tracksStock: boolean; stockOnHand: number; reserved: number; available: number; onOrder?: number } | null;
 }
 
 interface SalesOrderBase {
@@ -894,5 +900,87 @@ export interface SalesOrder extends SalesOrderBase {
   createdBy: { id: string; name: string } | null;
   lines: SalesOrderLine[];
   waitingLines: number;
+}
+
+/** Compras a fornecedor (Fase 6c). Os custos e totais só vêm a quem tem a área «Catálogo de produtos». */
+export type PurchaseOrderStatus = "DRAFT" | "SENT" | "RECEIVED" | "CLOSED" | "CANCELLED";
+
+export interface PurchaseOrderLine {
+  id: string;
+  position: number;
+  productId: string;
+  sku: string;
+  description: string;
+  supplierSku: string | null;
+  quantity: number;
+  receivedQuantity: number;
+  remainingQuantity: number;
+  unitCost?: number;
+  lineTotal?: number;
+  product: { id: string; tracksStock: boolean; active: boolean };
+}
+
+interface PurchaseOrderBase {
+  id: string;
+  number: number;
+  code: string;
+  status: PurchaseOrderStatus;
+  supplierId: string;
+  supplierReference: string | null;
+  /** Dia (AAAA-MM-DD). */
+  expectedAt: string | null;
+  notes: string | null;
+  total?: number;
+  sentAt: string | null;
+  receivedAt: string | null;
+  closedAt: string | null;
+  cancelledAt: string | null;
+  closeReason: string | null;
+  /** Enviada com alguma receção. */
+  partiallyReceived: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PurchaseOrderSummary extends PurchaseOrderBase {
+  supplier: { id: string; name: string };
+  lineCount: number;
+}
+
+export interface PurchaseReceipt {
+  id: string;
+  quantity: number;
+  note: string | null;
+  createdAt: string;
+  product: { id: string; sku: string; name: string };
+  user: { id: string; name: string };
+}
+
+export interface PurchaseOrder extends PurchaseOrderBase {
+  supplier: { id: string; name: string; taxId: string | null };
+  createdBy: { id: string; name: string } | null;
+  lines: PurchaseOrderLine[];
+  /** Entradas de stock das receções. */
+  receipts: PurchaseReceipt[];
+}
+
+/** O que comprar para as encomendas à espera, por produto. */
+export interface PurchaseSuggestion {
+  product: { id: string; sku: string; name: string };
+  waiting: number;
+  /** Reservado acima do stock. */
+  overReserved: number;
+  onOrder: number;
+  need: number;
+  /** O preferido, senão o único; `null` = sem fornecedor ou vários sem preferido. */
+  supplier: { id: string; name: string } | null;
+  supplierCount: number;
+  unitCost?: number | null;
+  orders: Array<{ id: string; code: string }>;
+}
+
+export interface GeneratePurchasesResult {
+  purchases: Array<{ id: string; code: string; supplier: { id: string; name: string }; created: boolean }>;
+  skipped: Array<{ product: { id: string; sku: string; name: string }; reason: string }>;
 }
 

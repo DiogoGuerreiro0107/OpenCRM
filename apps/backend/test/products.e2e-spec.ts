@@ -190,8 +190,9 @@ describe("Catálogo de produtos (e2e)", () => {
     await api().post("/custom-fields/values").set("Authorization", admin).send({ entityType: "PRODUCT", entityId: p.id, values: [{ customFieldId: field.id, value: "Preto" }] }).expect(201);
     await api().post("/custom-fields/values").set("Authorization", await as("TECNICO")).send({ entityType: "PRODUCT", entityId: p.id, values: [{ customFieldId: field.id, value: "x" }] }).expect(403);
 
-    // O stock (5b) e as encomendas (6a) dependem dos produtos: sem os desligar primeiro, os produtos não se desligam.
+    // O stock (5b), as encomendas (6a) e as compras (6c) dependem dos produtos: sem os desligar primeiro, os produtos não se desligam.
     await api().patch("/modules/produtos").set("Authorization", admin).send({ enabled: false }).expect(400);
+    await api().patch("/modules/compras").set("Authorization", admin).send({ enabled: false }).expect(200);
     await api().patch("/modules/stock").set("Authorization", admin).send({ enabled: false }).expect(200);
     await api().patch("/modules/produtos").set("Authorization", admin).send({ enabled: false }).expect(400);
     await api().patch("/modules/encomendas").set("Authorization", admin).send({ enabled: false }).expect(200);

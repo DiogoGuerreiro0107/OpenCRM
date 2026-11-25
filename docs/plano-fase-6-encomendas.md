@@ -415,6 +415,75 @@ Detalhado em 2026-11-25, antes de começar.
   e completa, a encomenda fica completa e a tarefa aparece; fechar outra com falta; Comercial sem custos; Técnico só
   a ver.
 
+### Execução do 6c (2026-11-25)
+**Implementado como planeado**, com estes pormenores decididos na implementação:
+- **Custo por omissão:** o do fornecedor no catálogo; sem ele, 0 (editável por quem vê custos). As notas da timeline
+  nunca levam custos (a timeline é para todos).
+- **«Criar compras»** trata os produtos pela referência (linhas e notas por uma ordem que se lê) e escreve na compra
+  «Para as encomendas à espera (EN-0001, EN-0002): …». Produtos sem fornecedor, com vários e nenhum preferido, ou já
+  cobertos voltam na resposta com o motivo.
+- **A tarefa «Preparar encomenda»** é criada por `OrderPreparationService` (usado pelo stock, pelas peças, pelas
+  encomendas e pelas compras) depois de gravada a transação; volta a ver se a encomenda está completa e reclama
+  `SalesOrder.preparationTaskAt` com um `UPDATE … WHERE … IS NULL`. Uma falha ao criar a tarefa fica no registo e
+  desfaz a reclamação, mas não desfaz a entrada de stock.
+- **Limitação conhecida (do 6b):** a nota «Todo o stock da encomenda está reservado» é escrita dentro da transação;
+  com duas entradas simultâneas de produtos diferentes da mesma encomenda, pode não sair. A tarefa não depende dela
+  (é decidida depois de gravar).
+- **Interface:** menu «Compras» (com «O que comprar» quando as encomendas estão ligadas), ficha com receção em diálogo
+  (por omissão o que falta), «Recebida em parte» como marca, cartão «Compras» nas empresas fornecedoras, «Em compra»
+  e as compras abertas no cartão do stock do produto, «em compra: N» nas linhas à espera, ligação «O que comprar» no
+  aviso da encomenda, filtro «Pronta a preparar», cartão «Tarefas» na encomenda e a ligação à encomenda no diálogo da
+  tarefa.
+- **Testes:**
+  - 7 e2e novos em `test/purchases.e2e-spec.ts`; nos e2e do 6b, as notas e as tarefas das encomendas completadas por
+    entradas, devoluções, peças retiradas, cancelamentos e «Reservar stock»; os testes que desligam o stock desligam
+    antes as compras;
+  - total: 537 e2e e 302 unitários, todos a passar na volta completa;
+  - numa volta seguinte só com as compras e as reservas, 2 testes das reservas falharam uma vez (sem detalhe guardado);
+    não se repetiu em 6 voltas seguidas (5 só das reservas e 1 das duas).
+- **Prova por mutação:** 42 mutações, 40 apanhadas:
+  - receção: sem entrada de stock, a mais, sem ficar recebida, sem servir as encomendas, entrada de produto sem stock,
+    sem atualizar o recebido, sem auditoria;
+  - tarefa: sem ver se está completa, repetida (sem as duas proteções; e só sem a reclamação, com 10 pedidos em
+    simultâneo), ao confirmar a própria, por movimento manual, «Reservar stock», peça retirada e cancelamento, sempre
+    para quem fez a entrada, sem nota ao fechar, filtro por encomenda;
+  - em compra e sugestões: sem rascunhos, sem descontar o recebido, sem o reservado acima do stock, sem descontar o em
+    compra, sem o fornecedor único, sem juntar ao rascunho, sem bloquear os produtos, na linha da encomenda e no
+    produto;
+  - estados e linhas: enviar sem linhas, linhas depois de enviar, cancelar com receções, fechar sem receções,
+    fornecedor que não é fornecedor, produto repetido;
+  - custos, apagar, pesquisa, módulo: custos sem a área do catálogo, custo alterado sem ela, produto e fornecedor com
+    compras apagam-se, pesquisa pelo fornecedor, compras sem depender do stock, filtro «pronta a preparar»;
+  - as 2 que escaparam são equivalentes: tirar só a verificação inicial da tarefa (a reclamação no `UPDATE` impede a
+    segunda) e tirar a verificação do tipo desativado (`tasks.create` já recusa um tipo desativado e a reclamação é
+    desfeita).
+- **Migração:** ensaiada numa cópia da base de desenvolvimento (copiada por pipe, sem ficheiro no contentor), com
+  fornecedor, cliente, produto, encomenda confirmada e tarefa de antes:
+  - as colunas novas ficam vazias; o tipo «Preparar encomenda» é criado;
+  - em SQL, numa transação desfeita: pesquisa («cf-0001 prop-acao»), CHECKs (recebido acima da quantidade,
+    quantidade 0, custo negativo, fechada sem motivo, motivo sem estado, total negativo), produto repetido, produto e
+    fornecedor com compras não se apagam, cancelada com motivo aceite, timeline da compra, linhas em cascata, tarefa
+    fica sem encomenda quando esta é apagada;
+  - sem desvio de esquema;
+  - a reversão, com uma compra, uma linha, uma nota, a ligação da tarefa e `preparationTaskAt` gravados, repôs os dados
+    e o esquema (md5 iguais);
+  - a base de desenvolvimento foi migrada depois de uma cópia de segurança (`/tmp/opencrm-antes-6c.dump` no contentor).
+- **Browser** (base de testes; 2 × TN-2420 em stock; EN-0001 com 3 e EN-0002 com 4 TN-2420 e 1 CF259A, confirmadas):
+  - como Administrador:
+    - «O que comprar» mostrou TN-2420 (5, para EN-0001 e EN-0002) e CF259A (1), do fornecedor preferido, com custos;
+      «Criar compras» criou o rascunho CF-0001 e a lista ficou vazia;
+    - na ficha: referências e custos do fornecedor, total 204,95 €, notas; data prevista e referência guardadas;
+      «Marcar como enviada»;
+    - receção de 2 TN-2420 com a guia: «Recebida em parte»; a EN-0001 ficou completa, com a tarefa «Preparar encomenda
+      EN-0001» para a Comercial que a criou, a nota na atividade e o filtro «Pronta a preparar»; o diálogo da tarefa
+      liga à encomenda;
+    - receção do resto: «Recebida», entradas de stock na ficha; a EN-0002 ficou completa com a tarefa; no produto, as
+      entradas «CF-0001: receção» abrem a compra e o «em compra» desapareceu;
+    - compra nova CF-0002 (só fornecedores no seletor; papel 10 × 3,10 €), enviada, receção de 12 recusada no diálogo
+      («só falta 10»), receção de 4, «Fechar com falta» com o motivo e a nota «não vem: 6 × …»;
+  - como Comercial: na encomenda à espera, «aguarda stock: 2 · em compra: 2» e a ligação «O que comprar»; nas compras,
+    sem custos, totais nem botões; cartão «Compras» na empresa fornecedora.
+
 ## Pacotes seguintes (esboço; cada um terá plano detalhado antes de começar)
 
 ### 6d — Expedições

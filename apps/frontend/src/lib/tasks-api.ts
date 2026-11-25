@@ -32,6 +32,8 @@ export interface TaskFilters {
   assigneeId?: string;
   companyId?: string;
   contactId?: string;
+  /** Tarefas de uma encomenda (Fase 6c). */
+  salesOrderId?: string;
   from?: string;
   to?: string;
   overdue?: "true";

@@ -17,6 +17,8 @@ import { cn } from "@/lib/utils";
 import { useModuleEnabled } from "@/lib/useModules";
 import { customerName, listOrders } from "@/lib/orders-api";
 import { WaitingStockBadge } from "@/pages/orders/OrdersListPage";
+import { formatDay, listPurchases } from "@/lib/purchases-api";
+import { PurchaseStatusBadge } from "@/pages/purchases/PurchasesListPage";
 
 const dateTime = (iso: string) => new Date(iso).toLocaleString("pt-PT", { dateStyle: "short", timeStyle: "short" });
 
@@ -115,9 +117,35 @@ function ProductReservations({ productId }: { productId: string }) {
   );
 }
 
+/** Compras abertas com este produto (Fase 6c): rascunhos e enviadas, com o que falta receber. */
+function ProductPurchases({ productId }: { productId: string }) {
+  const drafts = usePagedList(["purchase-orders", "list", "product", productId, "DRAFT"], (cursor) => listPurchases({ productId, status: "DRAFT", cursor, limit: 5 }));
+  const sent = usePagedList(["purchase-orders", "list", "product", productId, "SENT"], (cursor) => listPurchases({ productId, status: "SENT", cursor, limit: 5 }));
+  const items = [...sent.items, ...drafts.items];
+  if (items.length === 0) return null;
+  return (
+    <div className="space-y-1">
+      <p className="text-xs font-medium text-muted-foreground">Compras abertas com este produto</p>
+      <ul className="space-y-1 text-sm">
+        {items.map((p) => (
+          <li key={p.id} className="flex flex-wrap items-center gap-2">
+            <Link to={`/compras/${p.id}`} className="font-mono text-xs hover:underline">
+              {p.code}
+            </Link>
+            <span>{p.supplier.name}</span>
+            <PurchaseStatusBadge purchase={p} />
+            {p.expectedAt && <span className="text-xs text-muted-foreground">prevista {formatDay(p.expectedAt)}</span>}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
 export function ProductStockCard({ product }: { product: Product }) {
   const canMove = useCanWrite("stock");
   const ordersOn = useModuleEnabled("encomendas");
+  const purchasesOn = useModuleEnabled("compras");
   const [dialog, setDialog] = useState<ManualMovementType | null>(null);
   const history = usePagedList(["stock", "movements", product.id], (cursor) => listStockMovements({ productId: product.id, cursor, limit: 10 }));
   const negative = product.stockOnHand < 0;
@@ -142,7 +170,13 @@ export function ProductStockCard({ product }: { product: Product }) {
             {product.available < 0 && <span className="text-red-700"> (reservado acima do stock)</span>}
           </p>
         )}
+        {purchasesOn && product.onOrder !== undefined && product.onOrder > 0 && (
+          <p className="text-sm">
+            Em compra: <span className="font-medium tabular-nums">{formatQty(product.onOrder)}</span>
+          </p>
+        )}
         {ordersOn && <ProductReservations productId={product.id} />}
+        {purchasesOn && <ProductPurchases productId={product.id} />}
         {canMove && (
           <div className="flex flex-wrap gap-2">
             {types.map((t) => (
@@ -162,6 +196,10 @@ export function ProductStockCard({ product }: { product: Product }) {
                 </Link>
               ) : m.sourceType === "SALES_ORDER" && m.sourceId ? (
                 <Link to={`/encomendas/${m.sourceId}`} className="font-medium hover:underline" title="Abrir a encomenda">
+                  {MOVEMENT_LABELS[m.type]}
+                </Link>
+              ) : m.sourceType === "PURCHASE_ORDER" && m.sourceId ? (
+                <Link to={`/compras/${m.sourceId}`} className="font-medium hover:underline" title="Abrir a compra">
                   {MOVEMENT_LABELS[m.type]}
                 </Link>
               ) : (

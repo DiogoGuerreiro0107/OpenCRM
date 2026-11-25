@@ -125,7 +125,12 @@ export function OrdersListPage() {
         <UserPicker aria-label="Responsável" value={filters.assigneeId ?? ""} onChange={(id) => setFilters({ ...filters, assigneeId: id || undefined })} emptyLabel="Todos os responsáveis" className="w-52" />
         {stockOn && (
           <label className="flex items-center gap-1.5 text-sm">
-            <input type="checkbox" checked={filters.waiting === "true"} onChange={(e) => setFilters({ ...filters, waiting: e.target.checked ? "true" : undefined })} />A aguardar stock
+            <input type="checkbox" checked={filters.waiting === "true"} onChange={(e) => setFilters({ ...filters, waiting: e.target.checked ? "true" : undefined, ready: undefined })} />A aguardar stock
+          </label>
+        )}
+        {stockOn && (
+          <label className="flex items-center gap-1.5 text-sm">
+            <input type="checkbox" checked={filters.ready === "true"} onChange={(e) => setFilters({ ...filters, ready: e.target.checked ? "true" : undefined, waiting: undefined })} />Pronta a preparar
           </label>
         )}
       </div>

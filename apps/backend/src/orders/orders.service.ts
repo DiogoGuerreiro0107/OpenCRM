@@ -6,6 +6,9 @@ import { foldSearch } from "../common/search-text";
 import { KeyField, orderByKey, readPage } from "../common/pagination";
 import { lockedTransaction } from "../common/locked-transaction";
 import { monotonicNow } from "../common/monotonic-clock";
+import { orderCode } from "./order-code";
+import { OrderPreparationService } from "./order-preparation.service";
+import { onOrderByProduct } from "../purchases/purchases.service";
 import { recordMovement } from "../stock/stock.service";
 import { allocateWaiting, lockProducts, reservationText, SALES_ORDER_SOURCE, waitingLines } from "../stock/reservations";
 import { CancelOrderDto, CreateOrderDto, CreateOrderLineDto, QueryOrdersDto, ShipOrderDto, UpdateOrderDto, UpdateOrderLineDto } from "./dto/order.dto";
@@ -13,7 +16,7 @@ import { CancelOrderDto, CreateOrderDto, CreateOrderLineDto, QueryOrdersDto, Shi
 /** No máximo isto por encomenda: as linhas vêm sempre todas com a encomenda. */
 export const MAX_LINES_PER_ORDER = 200;
 
-export const orderCode = (n: number) => `EN-${String(n).padStart(4, "0")}`;
+export { orderCode };
 
 const D = Prisma.Decimal;
 const round2 = (n: number) => Math.round(n * 100) / 100;
@@ -83,6 +86,7 @@ export class OrdersService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly modules: ModulesService,
+    private readonly preparation: OrderPreparationService,
   ) {}
 
   /** As encomendas reservam e gastam stock (Fase 6b) com o módulo «Stock» ligado (as encomendas estão, se cá chegou). */
@@ -150,6 +154,8 @@ export class OrdersService {
     const and: Prisma.SalesOrderWhereInput[] = [];
     // «A aguardar stock» (Fase 6b): confirmadas com alguma linha à espera.
     if (query.waiting === "true") and.push({ status: "CONFIRMED", lines: { some: this.waitingLineWhere() } });
+    // «Pronta a preparar» (Fase 6c): confirmadas sem nenhuma linha à espera.
+    if (query.ready === "true") and.push({ status: "CONFIRMED", lines: { none: this.waitingLineWhere() } });
     if (query.productId) and.push({ lines: { some: { productId: query.productId } } });
     if (and.length) where.AND = and;
     const page = await readPage(LIST_KEY, query, (after, take) =>
@@ -164,8 +170,13 @@ export class OrdersService {
     return { ...page, items: page.items.map((o) => this.listView(o, waiting)) };
   }
 
+  /** Nas linhas à espera, o que está em compra do produto (com o módulo «Compras» ligado — Fase 6c). */
   async findOne(id: string) {
-    return this.detailView(await this.load(id));
+    const view = this.detailView(await this.load(id));
+    const waitingProducts = [...new Set(view.lines.filter((l) => l.waitingQuantity > 0).map((l) => l.productId!))];
+    if (!waitingProducts.length || !this.modules.isEnabled("compras")) return view;
+    const onOrder = await onOrderByProduct(this.prisma, waitingProducts);
+    return { ...view, lines: view.lines.map((l) => (l.waitingQuantity > 0 && l.product ? { ...l, product: { ...l.product, onOrder: onOrder.get(l.product.id) ?? 0 } } : l)) };
   }
 
   private async load(id: string, tx: Tx | PrismaService = this.prisma) {
@@ -378,14 +389,19 @@ export class OrdersService {
     return [...new Set(lines.map((l) => l.productId!))].sort();
   }
 
-  /** Dá o disponível de cada produto às linhas à espera (das encomendas mais antigas para as mais recentes). */
+  /**
+   * Dá o disponível de cada produto às linhas à espera (das encomendas mais antigas para as mais recentes). Devolve as
+   * encomendas servidas, para a tarefa «Preparar encomenda» depois de gravar (Fase 6c).
+   */
   private async allocate(tx: Tx, productIds: string[], userId: string) {
-    for (const productId of productIds) await allocateWaiting(tx, productId, userId);
+    const served = new Set<string>();
+    for (const productId of productIds) for (const orderId of (await allocateWaiting(tx, productId, userId)).keys()) served.add(orderId);
+    return served;
   }
 
   /** Confirmar: reserva o disponível, por linha (Fase 6b); o resto aguarda stock. */
   async confirm(id: string, userId: string) {
-    await lockedTransaction(this.prisma, async (tx) => {
+    const served = await lockedTransaction(this.prisma, async (tx) => {
       const order = await this.lock(tx, id);
       this.assertFrom(order, "confirm");
       const full = await tx.salesOrder.findUniqueOrThrow({ where: { id }, select: { companyId: true, contactId: true, _count: { select: { lines: true } } } });
@@ -396,27 +412,31 @@ export class OrdersService {
       await lockProducts(tx, productIds);
       await tx.salesOrder.update({ where: { id }, data: { status: "CONFIRMED", confirmedAt: new Date() } });
       await this.note(tx, id, "Encomenda confirmada", userId);
-      if (reserves) {
-        await this.allocate(tx, productIds, userId);
-        const waiting = await waitingLines(tx, id);
-        if (waiting.length) {
-          await this.note(tx, id, `A aguardar stock: ${waiting.map((l) => reservationText(round2(Number(l.quantity) - Number(l.reservedQuantity)), l)).join("; ")}`, userId);
-        }
+      if (!reserves) return new Set<string>();
+      const served = await this.allocate(tx, productIds, userId);
+      const waiting = await waitingLines(tx, id);
+      if (waiting.length) {
+        await this.note(tx, id, `A aguardar stock: ${waiting.map((l) => reservationText(round2(Number(l.quantity) - Number(l.reservedQuantity)), l)).join("; ")}`, userId);
       }
+      return served;
     });
+    // Completa logo ao confirmar não pede tarefa (quem confirma já sabe); outras que fiquem completas, sim.
+    served.delete(id);
+    await this.preparation.afterAllocation(served, userId);
     return this.findOne(id);
   }
 
   /** «Reservar stock»: para encomendas confirmadas sem as reservas todas (antes do 6b, ou com o stock desligado). */
   async reserve(id: string, userId: string) {
     if (!this.reservationsApply()) throw new BadRequestException("O módulo «Stock» está desligado: não há reservas");
-    await lockedTransaction(this.prisma, async (tx) => {
+    const served = await lockedTransaction(this.prisma, async (tx) => {
       const order = await this.lock(tx, id);
       if (order.status !== "CONFIRMED") throw new ConflictException("Só as encomendas confirmadas reservam stock");
       const productIds = await this.lineProducts(tx, id);
       await lockProducts(tx, productIds);
-      await this.allocate(tx, productIds, userId);
+      return this.allocate(tx, productIds, userId);
     });
+    await this.preparation.afterAllocation(served, userId);
     return this.findOne(id);
   }
 
@@ -425,7 +445,7 @@ export class OrdersService {
    * liberta as reservas. Com linhas à espera de stock, só com `allowShortage` (o stock fica negativo).
    */
   async ship(id: string, dto: ShipOrderDto, userId: string) {
-    await lockedTransaction(this.prisma, async (tx) => {
+    const served = await lockedTransaction(this.prisma, async (tx) => {
       const order = await this.lock(tx, id);
       this.assertFrom(order, "ship");
       const productIds = await this.lineProducts(tx, id);
@@ -458,8 +478,9 @@ export class OrdersService {
       await this.note(tx, id, "Encomenda enviada", userId);
       if (out.length) await this.note(tx, id, `Saída de stock: ${out.join("; ")}`, userId);
       if (waiting.length) await this.note(tx, id, `Enviada sem stock reservado para: ${shortage}`, userId);
-      if (reserves) await this.allocate(tx, productIds, userId);
+      return reserves ? this.allocate(tx, productIds, userId) : new Set<string>();
     });
+    await this.preparation.afterAllocation(served, userId);
     return this.findOne(id);
   }
 
@@ -476,7 +497,7 @@ export class OrdersService {
   /** Cancelar liberta as reservas, e o que fica disponível vai para as encomendas à espera (Fase 6b). */
   async cancel(id: string, dto: CancelOrderDto, userId: string) {
     const reason = dto.reason.trim();
-    await lockedTransaction(this.prisma, async (tx) => {
+    const served = await lockedTransaction(this.prisma, async (tx) => {
       const order = await this.lock(tx, id);
       if (order.status !== "DRAFT" && order.status !== "CONFIRMED") {
         throw new ConflictException(`A encomenda está ${STATUS_LABEL[order.status]}: já não se cancela`);
@@ -488,8 +509,9 @@ export class OrdersService {
       await tx.salesOrder.update({ where: { id }, data: { status: "CANCELLED", cancelledAt: new Date(), cancelReason: reason } });
       await this.note(tx, id, `Encomenda cancelada: ${reason}`, userId);
       if (reserved.length) await this.note(tx, id, `Reservas libertadas: ${reserved.map((l) => reservationText(Number(l.reservedQuantity), l)).join("; ")}`, userId);
-      if (this.reservationsApply()) await this.allocate(tx, [...new Set(reserved.map((l) => l.productId!))].sort(), userId);
+      return this.reservationsApply() ? this.allocate(tx, [...new Set(reserved.map((l) => l.productId!))].sort(), userId) : new Set<string>();
     });
+    await this.preparation.afterAllocation(served, userId);
     return this.findOne(id);
   }
 }

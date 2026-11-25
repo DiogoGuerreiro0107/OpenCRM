@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Task, TaskPriority, TaskStatus } from "@opencrm/shared-types";
 import { createTask, deleteTask, updateTask } from "@/lib/tasks-api";
@@ -266,6 +267,14 @@ export function TaskDialog({ open, onClose, task, defaultDueDate, defaultTypeId,
             />
           </div>
         </div>
+        {task?.salesOrder && (
+          <p className="text-sm">
+            Encomenda:{" "}
+            <Link to={`/encomendas/${task.salesOrder.id}`} className="font-mono text-xs hover:underline" onClick={onClose}>
+              EN-{String(task.salesOrder.number).padStart(4, "0")}
+            </Link>
+          </p>
+        )}
         <div className="space-y-2">
           <Label htmlFor="result">Resultado</Label>
           <Textarea

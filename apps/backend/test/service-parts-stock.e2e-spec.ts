@@ -53,6 +53,7 @@ describe("Peças ligadas a produtos e ao stock (e2e)", () => {
     await api().patch(`/products/${off.id}`).set("Authorization", admin).send({ active: false }).expect(200);
     await api().post(parts(id)).set("Authorization", rui).send({ productId: off.id }).expect(400);
 
+    await setModule("compras", false);
     await setModule("stock", false);
     await setModule("encomendas", false);
     await setModule("produtos", false);
@@ -89,6 +90,7 @@ describe("Peças ligadas a produtos e ao stock (e2e)", () => {
 
     // Adicionada com o stock desligado (não tirou nada): baixar a quantidade depois de o religar não devolve o que
     // nunca saiu, e subir tira só a diferença.
+    await setModule("compras", false);
     await setModule("stock", false);
     const late = (await api().post(parts(id)).set("Authorization", rui).send({ productId: p.id, quantity: 4 }).expect(201)).body;
     expect(late.stockTaken).toBe(0);
@@ -99,6 +101,7 @@ describe("Peças ligadas a produtos e ao stock (e2e)", () => {
     expect((await api().patch(`${parts(id)}/${late.id}`).set("Authorization", rui).send({ quantity: 5 }).expect(200)).body.stockTaken).toBe(3);
     expect(await stockOf(p.id)).toBe(7);
     // Com o stock desligado, retirar não devolve (fica para o acerto de contagem).
+    await setModule("compras", false);
     await setModule("stock", false);
     await api().delete(`${parts(id)}/${late.id}`).set("Authorization", rui).expect(204);
     await setModule("stock", true);

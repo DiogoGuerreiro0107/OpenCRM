@@ -19,34 +19,35 @@ enum Role {
 }
 
 model User {
-  id                   String                @id @default(uuid())
-  email                String                @unique
-  name                 String
-  passwordHash         String
-  role                 Role                  @default(COMERCIAL)
+  id                    String                @id @default(uuid())
+  email                 String                @unique
+  name                  String
+  passwordHash          String
+  role                  Role                  @default(COMERCIAL)
   // Desativar em vez de eliminar: o utilizador está ligado a negócios, tarefas, leads e à timeline.
-  active               Boolean               @default(true)
-  refreshToken         String?
+  active                Boolean               @default(true)
+  refreshToken          String?
   // SHA-256 do token enviado por email (nunca o token). Ver docs/plano-e0-api-publica.md.
-  resetTokenHash       String?               @unique
-  resetTokenExpiresAt  DateTime?
-  createdAt            DateTime              @default(now())
-  updatedAt            DateTime              @updatedAt
-  timelineEvents       TimelineEvent[]
-  deals                Deal[]
-  workItems            WorkItem[]
-  leads                Lead[]
-  ownedCompanies       Company[]
-  ownedContacts        Contact[]
-  auditEvents          AuditEvent[]
-  apiKeys              ApiKey[]
-  webhookSubscriptions WebhookSubscription[]
-  timeEntries          TimeEntry[]           @relation("TimeEntryUser")
-  editedTimeEntries    TimeEntry[]           @relation("TimeEntryEditor")
-  ServicePart          ServicePart[]
-  StockMovement        StockMovement[]
-  salesOrdersAssigned  SalesOrder[]          @relation("SalesOrderAssignee")
-  salesOrdersCreated   SalesOrder[]          @relation("SalesOrderCreatedBy")
+  resetTokenHash        String?               @unique
+  resetTokenExpiresAt   DateTime?
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  timelineEvents        TimelineEvent[]
+  deals                 Deal[]
+  workItems             WorkItem[]
+  leads                 Lead[]
+  ownedCompanies        Company[]
+  ownedContacts         Contact[]
+  auditEvents           AuditEvent[]
+  apiKeys               ApiKey[]
+  webhookSubscriptions  WebhookSubscription[]
+  timeEntries           TimeEntry[]           @relation("TimeEntryUser")
+  editedTimeEntries     TimeEntry[]           @relation("TimeEntryEditor")
+  ServicePart           ServicePart[]
+  StockMovement         StockMovement[]
+  salesOrdersAssigned   SalesOrder[]          @relation("SalesOrderAssignee")
+  salesOrdersCreated    SalesOrder[]          @relation("SalesOrderCreatedBy")
+  purchaseOrdersCreated PurchaseOrder[]       @relation("PurchaseOrderCreatedBy")
 }
 
 enum TimelineEventType {
@@ -66,6 +67,8 @@ enum TimelineEntityType {
   TASK
   /// Encomendas de cliente (Fase 6a).
   ORDER
+  /// Compras a fornecedor (Fase 6c).
+  PURCHASE_ORDER
 }
 
 model TimelineEvent {
@@ -138,7 +141,9 @@ model Company {
   callRecords      CallRecord[]
   leads            Lead[]
 
-  salesOrders SalesOrder[]
+  salesOrders    SalesOrder[]
+  /// Compras a este fornecedor (Fase 6c).
+  purchaseOrders PurchaseOrder[]
 
   @@index([ownerId])
   @@index([name, id])
@@ -385,6 +390,9 @@ model WorkItem {
   deal           Deal?            @relation(fields: [dealId], references: [id], onDelete: SetNull)
   leadId         String?
   lead           Lead?            @relation(fields: [leadId], references: [id], onDelete: SetNull)
+  /// Encomenda a que a tarefa diz respeito (Fase 6c: «Preparar encomenda»).
+  salesOrderId   String?
+  salesOrder     SalesOrder?      @relation(fields: [salesOrderId], references: [id], onDelete: SetNull)
   reminders      Reminder[]
   /// Dados próprios quando o item é uma assistência (módulo assistencias, Fase 4a).
   serviceCase    ServiceCase?
@@ -402,6 +410,7 @@ model WorkItem {
   @@index([stepId])
   @@index([agendaAt])
   @@index([closedAt])
+  @@index([salesOrderId])
   @@index([dueSort, createdAt(sort: Desc), id(sort: Desc)])
   @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin)
 }
@@ -932,7 +941,8 @@ model Product {
   createdAt      DateTime          @default(now())
   updatedAt      DateTime          @updatedAt
 
-  salesOrderLines SalesOrderLine[]
+  salesOrderLines    SalesOrderLine[]
+  purchaseOrderLines PurchaseOrderLine[]
 
   @@index([categoryId])
   @@index([belowMin])
@@ -1033,12 +1043,16 @@ model SalesOrder {
   deliveredAt       DateTime?
   cancelledAt       DateTime?
   cancelReason      String?
+  /// Quando se criou a tarefa «Preparar encomenda» (Fase 6c): uma vez por encomenda, reclamada antes de criar.
+  preparationTaskAt DateTime?
   createdById       String?
   createdBy         User?            @relation("SalesOrderCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
   searchText        String           @default("")
   lines             SalesOrderLine[]
+  /// Tarefas ligadas (Fase 6c: «Preparar encomenda»).
+  workItems         WorkItem[]
 
   @@index([status, createdAt])
   @@index([createdAt, id])
@@ -1070,5 +1084,71 @@ model SalesOrderLine {
   updatedAt        DateTime   @updatedAt
 
   @@index([orderId, position])
+  @@index([productId])
+}
+
+/// Estado de uma compra a fornecedor (Fase 6c, docs/plano-fase-6-encomendas.md). «Recebida em parte» é uma enviada com
+/// alguma receção (calculado).
+enum PurchaseOrderStatus {
+  DRAFT
+  SENT
+  RECEIVED
+  CLOSED
+  CANCELLED
+}
+
+/// Compra a fornecedor (Fase 6c). Valores indicativos (custo sem IVA). `searchText` por trigger (número, referência do
+/// fornecedor); o nome do fornecedor pesquisa-se no texto da empresa.
+model PurchaseOrder {
+  id                String              @id @default(uuid())
+  number            Int                 @unique @default(autoincrement())
+  status            PurchaseOrderStatus @default(DRAFT)
+  supplierId        String
+  supplier          Company             @relation(fields: [supplierId], references: [id], onDelete: Restrict)
+  supplierReference String?
+  expectedAt        DateTime?           @db.Date
+  notes             String?
+  total             Decimal             @default(0) @db.Decimal(14, 2)
+  sentAt            DateTime?
+  receivedAt        DateTime?
+  closedAt          DateTime?
+  cancelledAt       DateTime?
+  /// Motivo de fechar com falta ou de cancelar.
+  closeReason       String?
+  createdById       String?
+  createdBy         User?               @relation("PurchaseOrderCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+  searchText        String              @default("")
+  lines             PurchaseOrderLine[]
+
+  @@index([status, createdAt])
+  @@index([createdAt, id])
+  @@index([supplierId])
+  @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin)
+}
+
+/// Linha de uma compra (Fase 6c): sempre um produto do catálogo, no máximo uma vez por compra. Limites por CHECK
+/// (quantidade > 0, custo ≥ 0, 0 ≤ recebido ≤ quantidade).
+model PurchaseOrderLine {
+  id               String        @id @default(uuid())
+  purchaseOrderId  String
+  purchaseOrder    PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  position         Int
+  productId        String
+  product          Product       @relation(fields: [productId], references: [id], onDelete: Restrict)
+  sku              String
+  description      String
+  supplierSku      String?
+  quantity         Decimal       @db.Decimal(12, 2)
+  unitCost         Decimal       @db.Decimal(12, 4)
+  /// Quantidade × custo, arredondado a cêntimos.
+  lineTotal        Decimal       @db.Decimal(14, 2)
+  receivedQuantity Decimal       @default(0) @db.Decimal(12, 2)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@unique([purchaseOrderId, productId])
+  @@index([purchaseOrderId, position])
   @@index([productId])
 }

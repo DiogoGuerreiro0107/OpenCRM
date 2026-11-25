@@ -5,7 +5,7 @@
  * Este ficheiro é a fonte de verdade de QUE módulos existem; a base de dados (`ModuleSetting`) só guarda SE estão
  * ativos. Módulo sem linha na base = `defaultEnabled`. Ver docs/plano-fase-0-fundacoes.md.
  */
-export type ModuleId = "leads" | "deals" | "email" | "zadarma" | "automations" | "assistencias" | "produtos" | "stock" | "encomendas";
+export type ModuleId = "leads" | "deals" | "email" | "zadarma" | "automations" | "assistencias" | "produtos" | "stock" | "encomendas" | "compras";
 
 export interface ModuleManifest {
   id: ModuleId;
@@ -81,6 +81,14 @@ export const MODULE_MANIFESTS: ModuleManifest[] = [
     label: "Encomendas",
     description: "Encomendas de clientes: linhas de produtos, totais indicativos e estados (rascunho, confirmada, enviada, entregue, cancelada).",
     dependsOn: ["produtos"],
+    defaultEnabled: true,
+  },
+  {
+    id: "compras",
+    label: "Compras a fornecedor",
+    description:
+      "Compras aos fornecedores: linhas de produtos com o custo do catálogo, receção (também em parte) que dá entrada no stock e serve as encomendas à espera, e sugestões do que comprar para as encomendas.",
+    dependsOn: ["produtos", "stock"],
     defaultEnabled: true,
   },
 ];
