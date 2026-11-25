@@ -22,7 +22,7 @@ indicativos, para a equipa; a fatura sai do programa de faturação (Fase 7), qu
 |---|---|---|
 | **6a — Encomendas de cliente** | Módulo `encomendas` (depende de `produtos`); encomenda com cliente, linhas de produto (preço do catálogo, desconto, IVA) e totais indicativos; estados rascunho → confirmada → enviada → entregue, ou cancelada (com motivo); lista com pesquisa e filtros, ficha, cartão na empresa, timeline, campos personalizados | Médio |
 | **6b — Reservas e saída de stock** | Com o `stock` ligado: confirmar reserva o que há, por linha; disponível = em stock − reservado; linhas «a aguardar stock»; enviar lança as saídas e liberta as reservas; cancelar liberta | Alto |
-| **6c — Compras a fornecedor** | Encomenda a fornecedor com linhas (custo do catálogo), ligada às linhas de venda que espera; receção (parcial) lança as entradas e reserva para as encomendas à espera; aviso e tarefa «Preparar encomenda» quando uma encomenda fica completa | Alto |
+| **6c — Compras a fornecedor** | Compra a fornecedor com linhas de produto (custo do catálogo); sugestões do que comprar para as encomendas à espera; receção (parcial) lança as entradas e reserva para as encomendas à espera; tarefa «Preparar encomenda» quando uma encomenda à espera fica completa | Alto |
 | **6d — Expedições** | Transportadoras configuráveis (link de seguimento com `{codigo}`); expedição com código, volumes e custo; envio parcial opcional; eventos de webhook da mudança de estado | Médio |
 | **6e — API de encomendas** | `POST /api/v1/orders` (âmbito `orders:write`, idempotente por origem + id externo), produtos por referência, cliente por NIF ou email; `GET /api/v1/products` (`products:read`); estado de volta à loja por webhook | Médio |
 
@@ -314,14 +314,108 @@ Detalhado a 2026-11-24, depois do merge do 6a.
     - enviar a EN-0002 lançou a saída de 5 (stock 9, reservado 3);
     - o movimento abre a encomenda, e a timeline conta a história toda.
 
-## Pacotes seguintes (esboço; cada um terá plano detalhado antes de começar)
+## Pacote 6c — Compras a fornecedor
+Detalhado em 2026-11-25, antes de começar.
 
-### 6c — Compras a fornecedor
-- `PurchaseOrder`/`PurchaseOrderLine` (fornecedor = empresa marcada como fornecedor, custo do catálogo), estados
-  rascunho → enviada → recebida (parcial) → fechada.
-- Gerar a compra a partir das linhas «a aguardar stock» (agrupadas pelo fornecedor preferido).
-- Receção: entradas `PURCHASE_IN` com origem na compra; reserva para as encomendas ligadas; quando uma encomenda fica
-  completa, notificação e item de trabalho «Preparar encomenda EN-0001».
+### Modelo
+- Módulo opcional novo **`compras`**, que depende de `produtos` e de `stock` (sem stock, receber não teria efeito).
+  As sugestões a partir das encomendas precisam também de `encomendas`.
+- **`PurchaseOrder`**:
+  - número (`CF-0001`, sequência própria), estado, fornecedor (empresa marcada como fornecedor, `Restrict`);
+  - referência do fornecedor (o n.º da encomenda ou da proposta dele), data prevista de entrega, observações;
+  - total indicativo (custo sem IVA), recalculado pelo servidor quando as linhas mudam;
+  - datas de cada estado (enviada, recebida, fechada, cancelada), motivo de fechar ou cancelar, quem criou;
+  - texto de pesquisa (número, referência do fornecedor, nome do fornecedor) por trigger.
+- **`PurchaseOrderLine`**: posição, produto (obrigatório, `Restrict`; um produto no máximo uma vez por compra),
+  referência e nome copiados do produto, referência do fornecedor, quantidade (> 0), custo unitário (≥ 0, 4 casas,
+  como no catálogo), total da linha e **quantidade recebida** (0 até à quantidade — CHECK). No máximo 200 linhas.
+- **Em compra** de um produto = o que falta receber nas compras em rascunho ou enviadas (calculado, não guardado).
+- **`WorkItem.salesOrderId`** (opcional, `SetNull`): a tarefa «Preparar encomenda» fica ligada à encomenda. Tipo de
+  item de sistema novo **«Preparar encomenda»** (`PREPARAR_ENCOMENDA`, ícone pacote).
+- Timeline: tipo de registo novo `PURCHASE_ORDER`.
+
+### Regras
+- **Estados:**
+
+  | De | Para | Quando |
+  |---|---|---|
+  | rascunho | enviada | tem pelo menos uma linha (o CRM não envia nada ao fornecedor: marca que foi feita) |
+  | enviada | recebida | automático, quando a última linha fica recebida por completo |
+  | enviada (com alguma receção) | fechada | com motivo: o resto já não vem e deixa de contar como «em compra» |
+  | rascunho ou enviada (sem receções) | cancelada | com motivo |
+
+  As linhas só se alteram em rascunho; o fornecedor também. Referência, data prevista e observações até ficar
+  recebida, fechada ou cancelada. Apagar: só rascunhos.
+- **Receção** (só em enviadas): quantidades por linha, cada uma > 0 e até ao que falta (receber a mais é recusado — o
+  excesso entra como movimento manual), e uma nota opcional (ex.: a guia do fornecedor):
+  - por linha de produto que controla stock, uma entrada `PURCHASE_IN` com origem na compra
+    (`sourceType = PURCHASE_ORDER`) e o motivo «CF-0001: receção»;
+  - com as reservas ativas (6b), cada entrada serve as encomendas à espera **pela regra única do 6b** (das
+    confirmadas há mais tempo para as mais recentes). A compra não fica presa a linhas de venda: é por produto, e por
+    isso nunca há duas regras a decidir quem recebe;
+  - nota na timeline da compra («Receção: 4 × Toner (TN-2420)», com a nota) e, nas encomendas, as notas do 6b.
+- **Tarefa «Preparar encomenda EN-0001»:** quando uma encomenda **que estava à espera** fica com tudo reservado
+  (por qualquer entrada: receção, movimento manual, peça devolvida, reserva libertada, «Reservar stock»), cria-se uma
+  tarefa do tipo «Preparar encomenda», ligada à encomenda e ao cliente, com prazo hoje, para o responsável da
+  encomenda (ou quem a criou; senão quem fez a entrada). Não se cria outra se já houver uma em aberto para a mesma
+  encomenda. Uma encomenda que fica completa logo ao confirmar não cria tarefa (quem confirma já sabe). A tarefa é
+  criada depois de gravada a entrada (as automações das tarefas correm como sempre).
+- **Sugestões do que comprar** (com `encomendas`): por produto que controla stock, **a comprar = a aguardar nas
+  encomendas confirmadas + reservado acima do stock − em compra**. Fornecedor: o preferido do produto, senão o único;
+  sem nenhum, aparece «sem fornecedor». «Criar compras» volta a calcular com os produtos bloqueados e junta as linhas
+  ao rascunho mais recente desse fornecedor (ou cria um), com o custo do catálogo; o que já está coberto não se repete.
+  A compra regista na timeline as encomendas que a motivaram.
+- **Custos:** só quem tem a área «Catálogo de produtos» vê os custos e totais das compras (a regra que já existe nos
+  produtos); os outros veem quantidades e datas. Sem essa área, as linhas levam o custo do catálogo e não se altera.
+- **Quem:** área de escrita nova «Compras a fornecedor», por omissão Administrador e Backoffice. Ver é para todos.
+- **Bloqueios**, na ordem do 6b: compra → produtos (por id) → linhas da compra → linhas das encomendas à espera.
+- **Auditoria:** compra enviada, recebida (cada receção), fechada, cancelada, apagada e compras criadas a partir das
+  sugestões.
+- **Na encomenda:** filtro «Pronta a preparar» (confirmada, sem linhas à espera); nas linhas à espera, «em compra: N».
+
+### API
+- `GET /purchase-orders` (paginada, mais recentes primeiro; pesquisa, filtros por estado, fornecedor e produto),
+  `POST /purchase-orders` (cria o rascunho), `GET/PATCH/DELETE /purchase-orders/:id`.
+- `POST /purchase-orders/:id/lines`, `PATCH/DELETE /purchase-orders/:id/lines/:lineId` (só em rascunho).
+- `POST /purchase-orders/:id/send`, `/receive` (`{ lines: [{ lineId, quantity }], note }`), `/close` e `/cancel`
+  (com `reason`).
+- `GET /purchase-orders/suggestions` e `POST /purchase-orders/generate` (`{ productIds }`).
+- `GET /products/:id` passa a ter `onOrder`; `GET /orders?ready=true`; `GET /tasks` aceita `salesOrderId`.
+- Tempo real: recurso `purchases`.
+
+### Interface
+- **Menu «Compras»** com a lista: número, fornecedor, estado (com «recebida em parte»), data prevista, total (só com
+  custos); pesquisa, filtros por estado e fornecedor (seletor com pesquisa), paginação.
+- **Compra nova:** diálogo com o fornecedor (só empresas fornecedoras); abre a ficha do rascunho.
+- **Ficha:** cabeçalho; linhas (produto com pesquisa, quantidade, custo, recebido/falta); botões «Marcar como
+  enviada», «Registar receção» (diálogo com o que falta por linha, editável, e a nota), «Fechar com falta» e
+  «Cancelar» com motivo, «Apagar»; os movimentos de stock da compra; timeline.
+- **Sugestões** («O que comprar», na página das compras): produtos com a quantidade a comprar, o fornecedor, as
+  encomendas à espera e o que já está em compra; escolher e «Criar compras».
+- **Produto:** «Em compra: N» na ficha (cartão do stock), com as compras abertas; os movimentos com origem numa compra
+  abrem a compra.
+- **Encomenda:** «em compra: N» nas linhas à espera, ligação «O que comprar» no aviso, filtro «Pronta a preparar»;
+  na ficha, as tarefas «Preparar encomenda». No diálogo da tarefa, a ligação à encomenda.
+- **Cartão «Compras»** na ficha das empresas fornecedoras.
+
+### Validação prevista
+- **e2e:**
+  - criar, linhas (custo do catálogo, produto repetido, limites), totais; estados e transições inválidas; linhas só
+    em rascunho; apagar só rascunhos; fornecedor tem de ser fornecedor;
+  - receção parcial e completa (entradas `PURCHASE_IN`, recebido, estado automático), a mais recusada, produto sem
+    stock; fechar com falta e cancelar; «em compra»;
+  - reservas: a receção serve pela ordem da confirmação; tarefa «Preparar encomenda» (só quando estava à espera,
+    sem repetir, responsável); filtro «Pronta a preparar»;
+  - sugestões (fórmula, fornecedor preferido/único/nenhum, junta ao rascunho, não repete) e concorrência;
+  - custos escondidos sem a área do catálogo; permissões e área nova; módulo desligado e dependências;
+  - pesquisa, filtros, paginação; timeline e auditoria.
+- Prova por mutação.
+- Migração ensaiada numa cópia da base de desenvolvimento, com reversão e sem desvio de esquema.
+- **Browser** (base de testes): sugestões a partir de uma encomenda à espera, criar a compra, enviar, receção parcial
+  e completa, a encomenda fica completa e a tarefa aparece; fechar outra com falta; Comercial sem custos; Técnico só
+  a ver.
+
+## Pacotes seguintes (esboço; cada um terá plano detalhado antes de começar)
 
 ### 6d — Expedições
 - `Carrier` (nome, link de seguimento com `{codigo}`, ativo) em Configurações; `Shipment` (encomenda, transportadora,
