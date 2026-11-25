@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { ModulesService } from "../modules/modules.service";
 import { lockProduct, recordMovement, StockService } from "../stock/stock.service";
+import { allocateWaiting } from "../stock/reservations";
 import { CreateServicePartDto, UpdateServicePartDto } from "./dto/service-part.dto";
 import { serviceCode } from "./service-cases.service";
 
@@ -85,6 +86,8 @@ export class ServicePartsService {
       sourceId: input.serviceCaseId,
       userId: input.userId,
     });
+    // Stock devolvido vai para as encomendas que aguardam (Fase 6b).
+    if (input.quantity > 0 && this.stock.reservationsApply()) await allocateWaiting(tx, input.productId, input.userId);
   }
 
   async list(serviceCaseId: string) {

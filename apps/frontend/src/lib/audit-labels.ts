@@ -39,6 +39,7 @@ const ACTION_LABELS: Record<string, string> = {
   "product.supplier_updated": "Fornecedor de um produto alterado",
   "product.supplier_removed": "Fornecedor retirado de um produto",
   "order.confirmed": "Encomenda confirmada",
+  "order.shipped": "Encomenda enviada",
   "order.cancelled": "Encomenda cancelada",
   "order.deleted": "Rascunho de encomenda apagado",
   "api_key.created": "Chave de API criada",

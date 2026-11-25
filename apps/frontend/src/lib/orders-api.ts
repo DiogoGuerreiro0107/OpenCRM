@@ -10,6 +10,9 @@ export interface OrderFilters {
   companyId?: string;
   contactId?: string;
   assigneeId?: string;
+  /** «A aguardar stock» (Fase 6b). */
+  waiting?: "true";
+  productId?: string;
 }
 
 export async function listOrders(filters: OrderFilters & PageParams) {
@@ -72,8 +75,15 @@ export async function deleteOrderLine(orderId: string, lineId: string) {
 
 export type OrderStep = "confirm" | "ship" | "deliver";
 
-export async function advanceOrder(id: string, step: OrderStep) {
-  const { data } = await api.post<SalesOrder>(`/orders/${id}/${step}`);
+/** No envio, `allowShortage` envia mesmo com linhas à espera de stock (Fase 6b). */
+export async function advanceOrder(id: string, step: OrderStep, body: { allowShortage?: boolean } = {}) {
+  const { data } = await api.post<SalesOrder>(`/orders/${id}/${step}`, body);
+  return data;
+}
+
+/** Reserva o stock disponível para as linhas à espera (Fase 6b). */
+export async function reserveOrderStock(id: string) {
+  const { data } = await api.post<SalesOrder>(`/orders/${id}/reserve`);
   return data;
 }
 

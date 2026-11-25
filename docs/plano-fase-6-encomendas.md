@@ -172,16 +172,149 @@ Detalhado com o plano da fase (2026-11-24).
     - cartão «Encomendas» na ficha da empresa;
   - como Técnico: a ficha só de leitura, sem botões de estado.
 
-## Pacotes seguintes (esboço; cada um terá plano detalhado antes de começar)
+## Pacote 6b — Reservas e saída de stock
+Detalhado a 2026-11-24, depois do merge do 6a.
 
-### 6b — Reservas e saída de stock
-- `StockReservation` por linha (quantidade reservada), `Product.reserved` mantido como o stock atual; disponível =
-  em stock − reservado, na ficha e na lista de produtos.
-- Confirmar reserva o que está disponível; o resto da linha fica «a aguardar stock». Entradas novas (manuais ou
-  receções) reservam para as encomendas mais antigas à espera, por ordem.
-- Enviar lança `SALE_OUT` (origem na encomenda) e liberta a reserva; cancelar liberta.
-- Encomendas já confirmadas antes do 6b: reservam na migração? A decidir no plano detalhado (provavelmente não; um
-  botão «reservar» resolve).
+### Modelo
+- **Reserva = quantidade reservada na própria linha** (`SalesOrderLine.reservedQuantity`, 0 até à quantidade da
+  linha). Desvio ao esboço, que previa uma tabela `StockReservation`: cada linha só reserva um produto e no máximo uma
+  vez, por isso uma tabela só repetia a chave. O histórico das reservas fica na timeline da encomenda.
+  - CHECK: `0 ≤ reservado ≤ quantidade`, e só linhas com produto reservam.
+- **`Product.reserved`**: soma do reservado nas linhas, mantida por trigger nas linhas (como o stock atual, 5b).
+  - CHECK `reserved ≥ 0`.
+  - **Disponível = em stock − reservado**: calculado na resposta, não se guarda.
+  - O alerta «abaixo do mínimo» continua a olhar para o stock físico.
+
+### Regras
+- **Quando há reservas:** encomenda confirmada, produto que controla stock, e os módulos `stock` e `encomendas`
+  ligados. Linhas avulsas e produtos sem controlo de stock nunca reservam nem aguardam.
+- **Confirmar** reserva, por linha, o que está disponível (até à quantidade); o resto da linha fica **«a aguardar
+  stock»**. A timeline da encomenda diz o que ficou reservado e o que aguarda.
+- **Entradas de stock reservam para quem aguarda:**
+  - depois de cada movimento (manual ou das peças das assistências) e de cada reserva libertada (cancelar, enviar), o
+    disponível desse produto vai para as linhas à espera;
+  - ordem: as encomendas confirmadas há mais tempo primeiro (data de confirmação, número, posição da linha);
+  - cada encomenda servida recebe uma nota na timeline («Stock reservado: 2 × Toner (TN-2420)»), e outra quando fica
+    com tudo reservado.
+- **O stock pode descer abaixo do reservado** (acerto de contagem, saída manual, peça de assistência). As reservas não
+  se desfazem: o disponível fica negativo e o produto mostra «reservado acima do stock». A faturação manda no stock
+  (D3); quem gere acerta ou cancela.
+- **Enviar:**
+  - se alguma linha ainda aguarda stock, o servidor recusa (409, com as linhas em falta), a não ser que o pedido diga
+    «enviar mesmo assim» (`allowShortage`); a interface pergunta antes;
+  - lança uma saída `SALE_OUT` por linha com produto que controla stock, pela quantidade toda da linha, com origem na
+    encomenda (`SALES_ORDER`) e o motivo «EN-0001: encomenda enviada»;
+  - liberta as reservas das linhas;
+  - com o módulo `stock` desligado, não lança saídas (como as peças, 5c) e só liberta.
+- **Cancelar** liberta as reservas, e o que fica disponível vai para quem aguarda.
+- **Encomendas confirmadas antes do 6b** (ou com o stock desligado na confirmação) não reservam na migração. Na ficha
+  aparece **«Reservar stock»**, que reserva o disponível para as linhas à espera dessa encomenda; as entradas seguintes
+  tratam-nas também, por ordem.
+- **Deixar de controlar stock** num produto com stock reservado: recusado (409), como já é com o stock diferente de zero.
+- **Módulos desligados:** as reservas ficam guardadas (e escondidas), mas não se reserva nada de novo até voltarem.
+- **Bloqueios, sempre pela mesma ordem**, para não haver impasses: primeiro a encomenda, depois os produtos (por id),
+  e só então as linhas. Um movimento de stock bloqueia o produto e só toca nas linhas, nunca bloqueia encomendas.
+  Antes de mexer nas linhas, relê-se o que está gravado.
+
+### API
+- `POST /orders/:id/ship` aceita `{ allowShortage?: boolean }`; `POST /orders/:id/reserve` (área «Encomendas», só
+  confirmadas).
+- `GET /orders`: filtros novos `waiting=true` («a aguardar stock») e `productId`.
+- Encomenda: em cada linha, o reservado e o que aguarda; na encomenda, quantas linhas aguardam. Produto: `reserved` e
+  `available`.
+- **Tempo real:** as encomendas passam a atualizar também os produtos e o stock; o stock e as assistências atualizam
+  as encomendas.
+
+### Interface
+- **Ficha da encomenda:**
+  - em rascunho, cada linha do catálogo mostra o disponível do produto;
+  - confirmada, mostra «reservado 3» ou «reservado 1 · aguarda 2»;
+  - aviso no topo com as linhas à espera e o botão «Reservar stock»;
+  - «Marcar como enviada» com linhas à espera pede confirmação («o stock fica negativo»).
+- **Produto:** o cartão «Stock» mostra reservado e disponível, e a lista das encomendas que reservam ou aguardam esse
+  produto. Na lista de produtos aparece a coluna «Disponível».
+- **Lista de encomendas:** filtro «a aguardar stock» e a marca «aguarda stock» nas confirmadas.
+- **Movimentos de stock** com origem numa encomenda abrem a encomenda.
+- Tudo isto só com os dois módulos ligados.
+
+### Validação prevista
+- **e2e:**
+  - confirmar com stock suficiente, parcial e sem stock;
+  - entradas a servir as encomendas por ordem; peça retirada de uma assistência devolve stock e reserva;
+  - enviar: saídas, reservas libertadas, recusa com linhas à espera e «enviar mesmo assim»;
+  - cancelar liberta e passa a outra encomenda;
+  - «Reservar stock» numa encomenda confirmada sem reservas; módulo de stock desligado (sem reservas nem saídas);
+  - produto sem controlo de stock e linhas avulsas; deixar de controlar stock com reservas (409);
+  - concorrência: duas encomendas a confirmar ao mesmo tempo com stock para uma (nunca reserva acima do disponível),
+    e uma entrada ao mesmo tempo que um cancelamento;
+  - filtros `waiting` e `productId`; reservado e disponível no produto.
+- Prova por mutação.
+- Migração ensaiada numa cópia da base de desenvolvimento (com encomendas confirmadas do 6a), com reversão e sem
+  desvio de esquema.
+- **Browser** (base de testes): confirmar uma encomenda com stock parcial, ver a linha à espera, dar entrada de stock
+  e ver a reserva; enviar com saída de stock; cartão do produto com o reservado; filtro na lista.
+
+### Execução do 6b (2026-11-24)
+**Implementado como planeado**, com estes pormenores decididos na implementação:
+- **Uma só regra de distribuição** (`stock/reservations.ts`, `allocateWaiting`): confirmar, «Reservar stock», cada
+  movimento de stock (manual ou das peças) e cada reserva libertada chamam-na para os produtos em causa. Dá o
+  disponível às linhas à espera pela data de confirmação. Por isso «Reservar stock» pode servir primeiro uma encomenda
+  mais antiga que também aguarde.
+- **Notas na timeline da encomenda:**
+  - «Stock reservado: 2 × Toner (TN-2420)», «Todo o stock da encomenda está reservado» e «A aguardar stock: …»;
+  - no envio, «Saída de stock: …» e, se faltava stock, «Enviada sem stock reservado para: …»;
+  - no cancelamento, «Reservas libertadas: …».
+- **Auditoria:** o envio passou a ficar registado (`order.shipped`, com `allowShortage`), além de confirmar, cancelar
+  e apagar.
+- **Base de dados:**
+  - trigger nas linhas que só toca no produto quando a reserva muda (os rascunhos não bloqueiam o produto);
+  - CHECKs `0 ≤ reservado ≤ quantidade`, só linhas com produto, e `Product.reserved ≥ 0`.
+- **Ordem das notas:** várias notas da mesma ação (ex.: «Encomenda enviada» e «Saída de stock: …») caíam no mesmo
+  milissegundo e o desempate pelo id (uuid) baralhava-as; no CI, mais rápido, isso fez falhar um teste. As notas das
+  encomendas passaram a usar um relógio monótono (`common/monotonic-clock.ts`: cada nota é pelo menos 1 ms posterior
+  à anterior). Um e2e com o relógio parado prova a ordem; as duas mutações (`new Date()` nas notas da encomenda e nas
+  das reservas) são apanhadas.
+- **Bloqueios:** encomenda → produtos (por id) → linhas; os movimentos de stock bloqueiam o produto e as linhas à
+  espera (`FOR UPDATE OF`), nunca a encomenda.
+- **Interface:** na lista de produtos, o disponível aparece por baixo do stock (quando há reservas), em vez de uma
+  coluna nova; na ficha do produto, as encomendas confirmadas com esse produto.
+- **Testes:**
+  - 8 e2e novos em `test/order-reservations.e2e-spec.ts` e 2 unitários (`monotonic-clock.spec.ts`); um e2e do 6a passou
+    a esperar também o envio na auditoria;
+  - total: 530 e2e e 302 unitários;
+  - na suite completa, 3 testes de outras áreas (módulos e utilizadores) falharam por tempo na limpeza da base de
+    testes, que nessa altura partilhava o servidor com o ensaio da migração; passam sozinhos.
+- **Prova por mutação:** 22 mutações, todas apanhadas (mais as 2 da ordem das notas):
+  - reservas: confirmar sem reservar, ordem invertida, reservar acima do disponível, entradas e peças devolvidas sem
+    reservar, confirmar sem bloquear os produtos (concorrência);
+  - envio: ignorar as linhas à espera, sem saídas, sem libertar, saída de produto sem stock, sem auditoria;
+  - cancelamento: sem libertar, sem passar à seguinte;
+  - módulos e estados: reservar com o stock desligado, «Reservar stock» num rascunho ou com o stock desligado;
+  - produto: deixar de controlar stock com reservas, disponível sem descontar o reservado;
+  - lista: filtros «a aguardar» e por produto, linhas à espera na lista, rascunho a contar como à espera.
+- **Migração:** ensaiada numa cópia da base de desenvolvimento, com uma encomenda confirmada do 6a (linha de produto
+  e avulsa):
+  - as linhas antigas ficam com 0 reservado;
+  - em SQL, numa transação desfeita: o trigger (reservar, mudar, outra coluna, inserir e apagar linhas, apagar a
+    encomenda em cascata) e as CHECKs;
+  - sem desvio de esquema;
+  - a reversão, com uma reserva gravada, repôs os dados e o esquema;
+  - a base de desenvolvimento foi migrada depois de uma cópia de segurança.
+- **Browser** (base de testes; 4 toners em stock):
+  - como Comercial:
+    - em rascunho, a linha mostra «Disponível: 4»;
+    - confirmar a EN-0001 (3 toners) reservou 3;
+    - confirmar a EN-0002 (5 toners e portes) reservou 1, ficou «aguarda stock: 4» com o aviso e «Reservar stock»;
+    - «Marcar como enviada» pediu confirmação (recusada);
+    - o filtro «A aguardar stock» e a marca na lista;
+    - no produto, «disponível 0» na lista e «Reservado para encomendas: 4 · disponível 0» na ficha, com as duas
+      encomendas;
+  - como Administrador:
+    - entrada de 10 completou a EN-0002 (stock 14, reservado 8, disponível 6);
+    - enviar a EN-0002 lançou a saída de 5 (stock 9, reservado 3);
+    - o movimento abre a encomenda, e a timeline conta a história toda.
+
+## Pacotes seguintes (esboço; cada um terá plano detalhado antes de começar)
 
 ### 6c — Compras a fornecedor
 - `PurchaseOrder`/`PurchaseOrderLine` (fornecedor = empresa marcada como fornecedor, custo do catálogo), estados

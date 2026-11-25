@@ -1,6 +1,6 @@
 import { SalesOrderStatus } from "@prisma/client";
 import { Type } from "class-transformer";
-import { IsEnum, IsNumber, IsOptional, IsString, Matches, Max, MaxLength, Min, ValidateIf } from "class-validator";
+import { IsBoolean, IsEnum, IsIn, IsNumber, IsOptional, IsString, Matches, Max, MaxLength, Min, ValidateIf } from "class-validator";
 import { PageQueryDto } from "../../common/pagination";
 
 /** Encomendas de cliente (Fase 6a). Nos campos opcionais, `null` apaga. */
@@ -96,6 +96,16 @@ export class QueryOrdersDto extends PageQueryDto {
   @IsOptional()
   @IsString()
   assigneeId?: string;
+
+  /** «A aguardar stock» (Fase 6b): confirmadas com alguma linha à espera. */
+  @IsOptional()
+  @IsIn(["true"])
+  waiting?: "true";
+
+  /** Encomendas com este produto nas linhas. */
+  @IsOptional()
+  @IsString()
+  productId?: string;
 }
 
 export class CreateOrderLineDto {
@@ -195,4 +205,11 @@ export class CancelOrderDto {
   @Matches(/\S/, { message: "Indica o motivo do cancelamento" })
   @MaxLength(500)
   reason!: string;
+}
+
+export class ShipOrderDto {
+  /** Enviar mesmo com linhas à espera de stock (o stock fica negativo). */
+  @IsOptional()
+  @IsBoolean()
+  allowShortage?: boolean;
 }

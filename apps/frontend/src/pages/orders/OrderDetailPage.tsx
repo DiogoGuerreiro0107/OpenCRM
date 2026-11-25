@@ -12,6 +12,7 @@ import {
   getOrder,
   NEXT_STEP,
   type OrderLineInput,
+  reserveOrderStock,
   updateOrder,
   updateOrderLine,
 } from "@/lib/orders-api";
@@ -33,6 +34,28 @@ import { OrderStatusBadge } from "./OrdersListPage";
 
 const pct = (n: number) => `${n.toLocaleString("pt-PT", { maximumFractionDigits: 2 })}%`;
 const qty = (n: number) => n.toLocaleString("pt-PT", { maximumFractionDigits: 2 });
+/**
+ * Stock da linha (Fase 6b), com os módulos «Stock» e «Encomendas» ligados: em rascunho, o disponível do produto;
+ * confirmada, o reservado e o que aguarda.
+ */
+function LineStock({ line, status }: { line: SalesOrderLine; status: SalesOrder["status"] }) {
+  const p = line.product;
+  if (!p?.tracksStock) return null;
+  if (status === "DRAFT") {
+    const short = p.available < line.quantity;
+    return <div className={`text-xs ${short ? "text-amber-700" : "text-muted-foreground"}`}>Disponível: {qty(p.available)}</div>;
+  }
+  if (status !== "CONFIRMED") return null;
+  if (line.waitingQuantity > 0) {
+    return (
+      <div className="text-xs font-medium text-amber-700">
+        {line.reservedQuantity > 0 ? `Reservado ${qty(line.reservedQuantity)} · ` : ""}aguarda stock: {qty(line.waitingQuantity)}
+      </div>
+    );
+  }
+  return <div className="text-xs text-green-700">Reservado {qty(line.reservedQuantity)}</div>;
+}
+
 const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString("pt-PT", { dateStyle: "short", timeStyle: "short" }) : null);
 
 // ---- Cabeçalho ----
@@ -240,6 +263,7 @@ function LineEditor({
 
 function LinesCard({ order, canEdit, onChanged }: { order: SalesOrder; canEdit: boolean; onChanged: (o: SalesOrder) => void }) {
   const productsOn = useModuleEnabled("produtos");
+  const stockOn = useModuleEnabled("stock");
   const editable = canEdit && order.status === "DRAFT";
   const [editingId, setEditingId] = useState<string | null>(null);
   const [addKey, setAddKey] = useState(0);
@@ -305,6 +329,7 @@ function LinesCard({ order, canEdit, onChanged }: { order: SalesOrder; canEdit: 
                         ) : (
                           <span className="ml-2 font-mono text-xs text-muted-foreground">{l.sku}</span>
                         ))}
+                      {stockOn && <LineStock line={l} status={order.status} />}
                     </td>
                     <td className="py-1.5 text-right tabular-nums">{qty(l.quantity)}</td>
                     <td className="whitespace-nowrap py-1.5 text-right tabular-nums">{formatMoney(l.unitPrice)}</td>
@@ -408,13 +433,22 @@ export function OrderDetailPage() {
   const { data: order, isLoading, isError } = useQuery({ queryKey: ["orders", "one", id], queryFn: () => getOrder(id) });
   const [cancelling, setCancelling] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmShortage, setConfirmShortage] = useState(false);
+  const stockOn = useModuleEnabled("stock");
 
   const changed = (o: SalesOrder) => {
     queryClient.setQueryData(["orders", "one", id], o);
     queryClient.invalidateQueries({ queryKey: ["orders", "list"] });
     queryClient.invalidateQueries({ queryKey: ["timeline"] });
   };
-  const advance = useMutation({ mutationFn: (step: Parameters<typeof advanceOrder>[1]) => advanceOrder(id, step), onSuccess: changed });
+  const advance = useMutation({
+    mutationFn: ({ step, allowShortage }: { step: Parameters<typeof advanceOrder>[1]; allowShortage?: boolean }) => advanceOrder(id, step, allowShortage ? { allowShortage } : {}),
+    onSuccess: (o) => {
+      setConfirmShortage(false);
+      changed(o);
+    },
+  });
+  const reserve = useMutation({ mutationFn: () => reserveOrderStock(id), onSuccess: changed });
   const remove = useMutation({
     mutationFn: () => deleteOrder(id),
     onSuccess: () => {
@@ -435,6 +469,8 @@ export function OrderDetailPage() {
     );
   }
   const next = NEXT_STEP[order.status];
+  // Enviar com linhas à espera de stock pede confirmação: o stock fica negativo (Fase 6b).
+  const waiting = stockOn && order.status === "CONFIRMED" ? order.waitingLines : 0;
   const canCancel = order.status === "DRAFT" || order.status === "CONFIRMED";
   const dates = [
     ["Criada", when(order.createdAt)],
@@ -464,11 +500,22 @@ export function OrderDetailPage() {
         </div>
         {canEdit && (
           <div className="flex flex-wrap items-center gap-2">
-            {next && (
-              <Button disabled={advance.isPending} onClick={() => advance.mutate(next.step)}>
-                {next.label}
-              </Button>
-            )}
+            {next &&
+              (confirmShortage ? (
+                <span className="flex flex-wrap items-center gap-1 text-sm">
+                  Enviar sem o stock todo? O stock fica negativo.
+                  <Button disabled={advance.isPending} onClick={() => advance.mutate({ step: "ship", allowShortage: true })}>
+                    Enviar mesmo assim
+                  </Button>
+                  <Button variant="outline" onClick={() => setConfirmShortage(false)}>
+                    Não
+                  </Button>
+                </span>
+              ) : (
+                <Button disabled={advance.isPending} onClick={() => (next.step === "ship" && waiting > 0 ? setConfirmShortage(true) : advance.mutate({ step: next.step }))}>
+                  {next.label}
+                </Button>
+              ))}
             {canCancel && (
               <Button variant="outline" className="text-red-700" onClick={() => setCancelling(true)}>
                 Cancelar encomenda
@@ -495,6 +542,19 @@ export function OrderDetailPage() {
       </div>
       {advance.isError && <p className="text-sm text-red-600">{errorMessage(advance.error, "Não foi possível mudar o estado.")}</p>}
       {remove.isError && <p className="text-sm text-red-600">{errorMessage(remove.error, "Não foi possível apagar.")}</p>}
+      {waiting > 0 && (
+        <div role="status" className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          <span>
+            {waiting === 1 ? "1 linha aguarda stock." : `${waiting} linhas aguardam stock.`} As entradas de stock reservam primeiro para as encomendas confirmadas há mais tempo.
+          </span>
+          {canEdit && (
+            <Button size="sm" variant="outline" disabled={reserve.isPending} onClick={() => reserve.mutate()}>
+              {reserve.isPending ? "A reservar..." : "Reservar stock"}
+            </Button>
+          )}
+        </div>
+      )}
+      {reserve.isError && <p className="text-sm text-red-600">{errorMessage(reserve.error, "Não foi possível reservar.")}</p>}
 
       <LinesCard order={order} canEdit={canEdit} onChanged={changed} />
       <div className="grid gap-4 lg:grid-cols-2">

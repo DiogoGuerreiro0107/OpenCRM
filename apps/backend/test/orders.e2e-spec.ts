@@ -148,7 +148,7 @@ describe("Encomendas (e2e)", () => {
 
     expect(await notes(order.id)).toEqual(["Encomenda EN-0001 criada", "Linha acrescentada: 1 × Serviço a 100,00 €", "Encomenda confirmada", "Responsável: Carla Comercial", "Encomenda enviada", "Encomenda entregue"]);
     const audit = await prisma().auditEvent.findMany({ where: { targetId: order.id }, select: { action: true } });
-    expect(audit.map((a) => a.action)).toEqual(["order.confirmed"]);
+    expect(audit.map((a) => a.action)).toEqual(["order.confirmed", "order.shipped"]);
   });
 
   it("cancelar com motivo (rascunho ou confirmada); apagar só rascunhos; empresa, contacto e produto com encomendas não se apagam", async () => {

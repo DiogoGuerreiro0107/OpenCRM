@@ -805,6 +805,10 @@ export interface Product {
   stockOnHand: number;
   /** Abaixo do mínimo (Fase 5b). */
   belowMin: boolean;
+  /** Reservado para encomendas confirmadas (Fase 6b). */
+  reserved: number;
+  /** Em stock − reservado; pode ser negativo. */
+  available: number;
   suppliers: ProductSupplier[];
   preferredSupplier: { id: string; name: string } | null;
   /** % sobre o preço de venda, com o custo do preferido. Só vem a quem pode escrever no catálogo. */
@@ -846,6 +850,11 @@ export interface SalesOrderLine {
   /** Sem IVA, já com o desconto. */
   lineTotal: number;
   vatAmount: number;
+  /** Stock reservado para a linha (Fase 6b). */
+  reservedQuantity: number;
+  /** O que falta reservar, numa encomenda confirmada com produto que controla stock. */
+  waitingQuantity: number;
+  product: { id: string; tracksStock: boolean; stockOnHand: number; reserved: number; available: number } | null;
 }
 
 interface SalesOrderBase {
@@ -877,10 +886,13 @@ interface SalesOrderBase {
 /** Na lista: sem as linhas, com quantas são. */
 export interface SalesOrderSummary extends SalesOrderBase {
   lineCount: number;
+  /** Linhas a aguardar stock (Fase 6b; só nas confirmadas). */
+  waitingLines: number;
 }
 
 export interface SalesOrder extends SalesOrderBase {
   createdBy: { id: string; name: string } | null;
   lines: SalesOrderLine[];
+  waitingLines: number;
 }
 

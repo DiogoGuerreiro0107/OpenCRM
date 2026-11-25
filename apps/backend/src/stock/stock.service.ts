@@ -3,6 +3,8 @@ import { Prisma, StockMovementType } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { KeyField, orderByKey, readPage } from "../common/pagination";
 import { lockedTransaction } from "../common/locked-transaction";
+import { ModulesService } from "../modules/modules.service";
+import { allocateWaiting } from "./reservations";
 import { CreateStockMovementDto, QueryStockMovementsDto } from "./dto/stock.dto";
 
 const INCLUDE = {
@@ -57,7 +59,15 @@ export async function lockProduct(tx: Tx, productId: string) {
  */
 @Injectable()
 export class StockService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly modules: ModulesService,
+  ) {}
+
+  /** As encomendas reservam stock (Fase 6b): com os módulos «Stock» e «Encomendas» ligados. */
+  reservationsApply() {
+    return this.modules.isEnabled("stock") && this.modules.isEnabled("encomendas");
+  }
 
   private view<T extends { quantity: Prisma.Decimal }>(m: T) {
     return { ...m, quantity: Number(m.quantity) };
@@ -67,28 +77,35 @@ export class StockService {
     const reason = dto.reason?.trim() || null;
     const note = dto.note?.trim() || null;
     const movement = await this.withLock(async (tx) => {
-      const product = await lockProduct(tx, dto.productId);
-      if (!product) throw new NotFoundException("Produto não encontrado");
-      if (!product.tracksStock) throw new BadRequestException("Este produto não controla stock");
-      const current = Number(product.stockOnHand);
-
-      if (dto.type === "ADJUSTMENT") {
-        if (dto.countedQuantity === undefined) throw new BadRequestException("Indica a quantidade contada");
-        if (!reason) throw new BadRequestException("Indica o motivo do acerto");
-        const delta = round2(dto.countedQuantity - current);
-        if (delta === 0) throw new BadRequestException(`O stock já é ${current.toLocaleString("pt-PT")}`);
-        return recordMovement(tx, { productId: dto.productId, type: "ADJUSTMENT", quantity: delta, reason, note, userId });
-      }
-
-      if (dto.quantity === undefined) throw new BadRequestException("Indica a quantidade");
-      if (dto.type === "INITIAL" && (await tx.stockMovement.count({ where: { productId: dto.productId } })) > 0) {
-        throw new ConflictException("O stock inicial só se lança antes de qualquer outro movimento: usa um acerto de contagem");
-      }
-      const quantity = dto.type === "SALE_OUT" ? -dto.quantity : dto.quantity;
-      return recordMovement(tx, { productId: dto.productId, type: dto.type, quantity, reason, note, userId });
+      const created = await this.createLocked(tx, dto, reason, note, userId);
+      // O que entrou vai para as encomendas que aguardam stock (Fase 6b).
+      if (this.reservationsApply()) await allocateWaiting(tx, dto.productId, userId);
+      return created;
     });
-    const product = await this.prisma.product.findUniqueOrThrow({ where: { id: dto.productId }, select: { stockOnHand: true, belowMin: true } });
-    return { movement: this.view(movement), stockOnHand: Number(product.stockOnHand), belowMin: product.belowMin };
+    const product = await this.prisma.product.findUniqueOrThrow({ where: { id: dto.productId }, select: { stockOnHand: true, reserved: true, belowMin: true } });
+    return { movement: this.view(movement), stockOnHand: Number(product.stockOnHand), reserved: Number(product.reserved), belowMin: product.belowMin };
+  }
+
+  private async createLocked(tx: Tx, dto: CreateStockMovementDto, reason: string | null, note: string | null, userId: string) {
+    const product = await lockProduct(tx, dto.productId);
+    if (!product) throw new NotFoundException("Produto não encontrado");
+    if (!product.tracksStock) throw new BadRequestException("Este produto não controla stock");
+    const current = Number(product.stockOnHand);
+
+    if (dto.type === "ADJUSTMENT") {
+      if (dto.countedQuantity === undefined) throw new BadRequestException("Indica a quantidade contada");
+      if (!reason) throw new BadRequestException("Indica o motivo do acerto");
+      const delta = round2(dto.countedQuantity - current);
+      if (delta === 0) throw new BadRequestException(`O stock já é ${current.toLocaleString("pt-PT")}`);
+      return recordMovement(tx, { productId: dto.productId, type: "ADJUSTMENT", quantity: delta, reason, note, userId });
+    }
+
+    if (dto.quantity === undefined) throw new BadRequestException("Indica a quantidade");
+    if (dto.type === "INITIAL" && (await tx.stockMovement.count({ where: { productId: dto.productId } })) > 0) {
+      throw new ConflictException("O stock inicial só se lança antes de qualquer outro movimento: usa um acerto de contagem");
+    }
+    const quantity = dto.type === "SALE_OUT" ? -dto.quantity : dto.quantity;
+    return recordMovement(tx, { productId: dto.productId, type: dto.type, quantity, reason, note, userId });
   }
 
   /**

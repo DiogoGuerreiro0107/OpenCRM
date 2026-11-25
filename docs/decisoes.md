@@ -685,3 +685,15 @@ Primeiro pacote da [Fase 6](plano-fase-6-encomendas.md) (encomendas, compras e t
 - A fila de espera das transações com linha bloqueada (5b) passou a utilitário comum (`common/locked-transaction.ts`).
 - **Validação:** 7 e2e e 7 unitários novos (522 e2e e 300 unitários), 21 mutações todas apanhadas, migração ensaiada e revertida, verificação no browser, que apanhou um 500 numa linha sem referência, já corrigido e coberto. Detalhes no plano, em «Execução do 6a».
 
+## Fase 6b: reservas e saída de stock (2026-11-24)
+Segundo pacote da [Fase 6](plano-fase-6-encomendas.md).
+- **A reserva é a quantidade reservada na própria linha** (`SalesOrderLine.reservedQuantity`), não uma tabela à parte: cada linha reserva no máximo um produto, uma vez. `Product.reserved` é a soma, por trigger; **disponível = em stock − reservado** (calculado, não guardado). O alerta de mínimo continua a olhar para o stock físico.
+- **Só reservam** as encomendas confirmadas, com produto que controla stock e os módulos «Stock» e «Encomendas» ligados. Confirmar reserva o disponível; o resto aguarda.
+- **Uma só regra de distribuição:** cada entrada de stock (manual ou peça devolvida) e cada reserva libertada dão o disponível às linhas à espera, das encomendas confirmadas há mais tempo para as mais recentes.
+- **O stock pode descer abaixo do reservado** (as reservas não se desfazem; o disponível fica negativo). A faturação manda no stock (D3).
+- **Enviar** lança uma saída `SALE_OUT` por linha (origem na encomenda) e liberta as reservas. Com linhas à espera, só com «enviar mesmo assim» (409 sem isso); fica na timeline e na auditoria. Com o stock desligado, não lança saídas.
+- **Cancelar** liberta, e o que fica disponível passa para quem aguarda. As encomendas confirmadas antes do 6b não reservam na migração: «Reservar stock» na ficha.
+- **Bloqueios pela mesma ordem** (encomenda → produtos por id → linhas) para não haver impasses.
+- **Notas da timeline pela ordem em que são escritas:** as notas das encomendas levam a hora de um relógio monótono do processo (`common/monotonic-clock.ts`), porque várias notas da mesma ação caíam no mesmo milissegundo e o desempate por uuid baralhava-as.
+- **Validação:** 8 e2e e 2 unitários novos (530 e2e e 302 unitários), 24 mutações todas apanhadas, migração ensaiada e revertida, verificação no browser. Detalhes no plano, em «Execução do 6b».
+
