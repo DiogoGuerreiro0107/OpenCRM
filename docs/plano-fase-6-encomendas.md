@@ -608,6 +608,11 @@ do 6b (o que aguarda stock passa a ser o que falta enviar menos o reservado).
   testes, local e do CI, pode usar) e a recomeçar as sequências; sem esse direito, volta ao `TRUNCATE`. Explica
   provavelmente a falha de «compras + reservas» do 6c. Duas baterias completas seguidas sem falhas, em 7–8 min em vez
   de 16–17.
+- **Consequência, vista no CI do PR:** depois de um `DELETE`, o Postgres reaproveita o espaço das tabelas e uma
+  consulta sem `ORDER BY` deixa de devolver as linhas pela ordem em que foram escritas (com o `TRUNCATE` era assim por
+  acaso). Um teste do 6a comparava as entradas da auditoria sem ordenar e falhou no CI; passou a ordenar pela data.
+  Revi as outras consultas dos testes sem `orderBy`: ou ordenam antes de comparar, ou verificam uma só linha, ou
+  procuram por id. **Regra:** um teste que compara uma lista tem de a ordenar.
 
 **Validação:**
 - 9 e2e novos (`order-shipments.e2e-spec.ts`) e 3 unitários novos; os testes do 6a, 6b e 6c passam sem mudar o que
