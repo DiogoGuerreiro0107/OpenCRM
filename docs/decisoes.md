@@ -697,3 +697,15 @@ Segundo pacote da [Fase 6](plano-fase-6-encomendas.md).
 - **Notas da timeline pela ordem em que são escritas:** as notas das encomendas levam a hora de um relógio monótono do processo (`common/monotonic-clock.ts`), porque várias notas da mesma ação caíam no mesmo milissegundo e o desempate por uuid baralhava-as.
 - **Validação:** 8 e2e e 2 unitários novos (530 e2e e 302 unitários), 24 mutações todas apanhadas, migração ensaiada e revertida, verificação no browser. Detalhes no plano, em «Execução do 6b».
 
+## Fase 6c: compras a fornecedor (2026-11-25)
+Terceiro pacote da [Fase 6](plano-fase-6-encomendas.md).
+- **Módulo «Compras a fornecedor»** (`compras`), que depende de «Produtos» e «Stock»; área de escrita nova «Compras a fornecedor» (Administrador e Backoffice). Ver é para todos; **custos e totais só com a área «Catálogo de produtos»** (a regra que já havia nos produtos). Sem ela, as linhas levam o custo do catálogo e o custo não se altera (403).
+- **Compra = fornecedor + linhas de produto** (um produto uma vez por compra; custo com 4 casas, do fornecedor no catálogo, ou 0 se não houver). Estados fixos: rascunho → enviada → recebida (automático quando tudo chega); fechada com falta (com motivo, depois de alguma receção) ou cancelada (com motivo, sem receções). O CRM não envia nada ao fornecedor: marca que o pedido foi feito.
+- **A compra é por produto, não presa a linhas de venda.** A receção lança `PURCHASE_IN` (origem na compra) e o que entra segue **a regra única do 6b** (das encomendas confirmadas há mais tempo para as mais recentes). Assim nunca há duas regras a decidir quem recebe. Desvio ao esboço, que ligava a compra às linhas de venda.
+- **Receber a mais é recusado**: o excesso entra como movimento de stock manual.
+- **Em compra** = o que falta receber nas compras em rascunho ou enviadas (calculado). Aparece na ficha do produto e nas linhas à espera das encomendas.
+- **«O que comprar»** (com «Encomendas»): a aguardar + reservado acima do stock − em compra, por produto; fornecedor = o preferido, senão o único. «Criar compras» recalcula com os produtos bloqueados e junta ao rascunho mais recente do fornecedor; o que já está coberto não se repete.
+- **Tarefa «Preparar encomenda»** (tipo de sistema novo `PREPARAR_ENCOMENDA`; `WorkItem.salesOrderId`): quando uma encomenda **que estava à espera** fica com tudo reservado, por qualquer entrada. Criada depois de gravar, para o responsável da encomenda (senão quem a criou), uma vez por encomenda (`SalesOrder.preparationTaskAt`, reclamado antes de criar). Ao confirmar com tudo em stock não há tarefa. Desativar o tipo desliga a funcionalidade. Fechar a tarefa escreve na timeline da encomenda. Não há um sistema de notificações: a tarefa é o aviso (agenda, «Hoje»).
+- **Bloqueios** na ordem de sempre: compra → produtos (por id) → linhas; «Criar compras» bloqueia os rascunhos dos fornecedores antes dos produtos.
+- **Validação:** 7 e2e novos (537 e2e e 302 unitários), 42 mutações (40 apanhadas, 2 equivalentes), migração ensaiada e revertida, verificação no browser. Detalhes no plano, em «Execução do 6c».
+

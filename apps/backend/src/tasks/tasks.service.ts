@@ -22,6 +22,7 @@ const TASK_INCLUDE = {
   contact: { select: { id: true, name: true } },
   company: { select: { id: true, name: true } },
   deal: { select: { id: true, title: true } },
+  salesOrder: { select: { id: true, number: true } },
   reminders: { orderBy: { remindAt: "asc" as const } },
 };
 
@@ -70,6 +71,7 @@ export class TasksService implements OnModuleInit {
     if (query.assigneeId) where.assigneeId = query.assigneeId;
     if (query.companyId) where.companyId = query.companyId;
     if (query.contactId) where.contactId = query.contactId;
+    if (query.salesOrderId) where.salesOrderId = query.salesOrderId;
     if (query.from || query.to) {
       where.dueDate = {
         ...(query.from ? { gte: new Date(query.from) } : {}),
@@ -178,7 +180,8 @@ export class TasksService implements OnModuleInit {
    * pessoa (ou a API) e começa uma cadeia nova.
    */
   async create(
-    dto: CreateTaskDto & { leadId?: string },
+    /** `leadId` e `salesOrderId` (Fase 6c) só por código: a API não os aceita. */
+    dto: CreateTaskDto & { leadId?: string; salesOrderId?: string },
     creatorId: string,
     chain?: Chain,
     /** Grava dados ligados (ex.: os da assistência) antes das automações, para o «criado» já os ver. */
@@ -259,13 +262,14 @@ export class TasksService implements OnModuleInit {
     let timersStopped = false;
     if (closedAs) {
       const description = `Tarefa ${closedAs === "DONE" ? "concluída" : "cancelada"}: "${task.title}".`;
-      const events: { entityType: "CONTACT" | "COMPANY" | "DEAL" | "LEAD" | "TASK"; entityId: string }[] = [
+      const events: { entityType: "CONTACT" | "COMPANY" | "DEAL" | "LEAD" | "TASK" | "ORDER"; entityId: string }[] = [
         { entityType: "TASK", entityId: task.id },
       ];
       if (task.contactId) events.push({ entityType: "CONTACT", entityId: task.contactId });
       if (task.companyId) events.push({ entityType: "COMPANY", entityId: task.companyId });
       if (task.dealId) events.push({ entityType: "DEAL", entityId: task.dealId });
       if (task.leadId) events.push({ entityType: "LEAD", entityId: task.leadId });
+      if (task.salesOrderId) events.push({ entityType: "ORDER", entityId: task.salesOrderId });
 
       await this.prisma.timelineEvent.createMany({
         data: events.map((e) => ({ ...e, type: "SYSTEM", description, userId: actingUserId })),

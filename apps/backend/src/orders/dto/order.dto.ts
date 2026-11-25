@@ -102,6 +102,11 @@ export class QueryOrdersDto extends PageQueryDto {
   @IsIn(["true"])
   waiting?: "true";
 
+  /** «Pronta a preparar» (Fase 6c): confirmadas sem linhas à espera de stock. */
+  @IsOptional()
+  @IsIn(["true"])
+  ready?: "true";
+
   /** Encomendas com este produto nas linhas. */
   @IsOptional()
   @IsString()

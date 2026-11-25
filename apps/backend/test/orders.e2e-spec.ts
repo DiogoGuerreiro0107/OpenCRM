@@ -228,6 +228,7 @@ describe("Encomendas (e2e)", () => {
     await api().patch("/modules/encomendas").set("Authorization", admin).send({ enabled: true }).expect(200);
 
     // As encomendas dependem dos produtos: com elas ligadas, os produtos não se desligam.
+    await api().patch("/modules/compras").set("Authorization", admin).send({ enabled: false }).expect(200);
     await api().patch("/modules/stock").set("Authorization", admin).send({ enabled: false }).expect(200);
     await api().patch("/modules/produtos").set("Authorization", admin).send({ enabled: false }).expect(400);
   });

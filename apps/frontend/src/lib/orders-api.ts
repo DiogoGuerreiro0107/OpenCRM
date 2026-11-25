@@ -12,6 +12,8 @@ export interface OrderFilters {
   assigneeId?: string;
   /** «A aguardar stock» (Fase 6b). */
   waiting?: "true";
+  /** «Pronta a preparar» (Fase 6c): confirmadas sem linhas à espera. */
+  ready?: "true";
   productId?: string;
 }
 

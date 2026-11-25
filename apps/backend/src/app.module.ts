@@ -26,6 +26,7 @@ import { TimeEntriesModule } from "./time-entries/time-entries.module";
 import { ProductsModule } from "./products/products.module";
 import { StockModule } from "./stock/stock.module";
 import { OrdersModule } from "./orders/orders.module";
+import { PurchasesModule } from "./purchases/purchases.module";
 import { EmailModule } from "./email/email.module";
 import { EmailTemplatesModule } from "./email-templates/email-templates.module";
 import { LeadsModule } from "./leads/leads.module";
@@ -69,6 +70,7 @@ import { RealtimeInterceptor } from "./realtime/realtime.interceptor";
     ProductsModule,
     StockModule,
     OrdersModule,
+    PurchasesModule,
     EmailModule,
     EmailTemplatesModule,
     LeadsModule,

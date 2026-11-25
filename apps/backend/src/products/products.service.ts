@@ -2,6 +2,8 @@ import { BadRequestException, ConflictException, Injectable, NotFoundException }
 import { Prisma, Role } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { PermissionsService } from "../auth/permissions.service";
+import { ModulesService } from "../modules/modules.service";
+import { onOrderByProduct } from "../purchases/purchases.service";
 import { foldSearch } from "../common/search-text";
 import { KeyField, orderByKey, readPage } from "../common/pagination";
 import { AddProductSupplierDto, CreateProductDto, QueryProductsDto, UpdateProductDto, UpdateProductSupplierDto } from "./dto/product.dto";
@@ -33,6 +35,7 @@ export class ProductsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly permissions: PermissionsService,
+    private readonly modules: ModulesService,
   ) {}
 
   /** Quem pode escrever no catálogo vê custos e margens. */
@@ -93,8 +96,11 @@ export class ProductsService {
     return { ...page, items: page.items.map((p) => this.view(p, seesCosts)) };
   }
 
+  /** Com o módulo «Compras» ligado, também o que está em compra (rascunho ou enviada, por receber — Fase 6c). */
   async findOne(id: string, role: Role | undefined) {
-    return this.view(await this.load(id), this.seesCosts(role));
+    const view = this.view(await this.load(id), this.seesCosts(role));
+    if (!this.modules.isEnabled("compras")) return view;
+    return { ...view, onOrder: (await onOrderByProduct(this.prisma, [id])).get(id) ?? 0 };
   }
 
   private async load(id: string) {
@@ -169,6 +175,9 @@ export class ProductsService {
     }
     if ((await this.prisma.salesOrderLine.count({ where: { productId: id } })) > 0) {
       throw new ConflictException("O produto está em encomendas: desativa-o em vez de o apagar");
+    }
+    if ((await this.prisma.purchaseOrderLine.count({ where: { productId: id } })) > 0) {
+      throw new ConflictException("O produto está em compras a fornecedor: desativa-o em vez de o apagar");
     }
     await this.prisma.product.delete({ where: { id } });
   }

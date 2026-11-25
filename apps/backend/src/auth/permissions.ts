@@ -82,6 +82,11 @@ export const WRITE_AREAS = {
     description: "Criar e alterar encomendas de clientes e as suas linhas, confirmar, marcar como enviadas ou entregues e cancelar. Ver as encomendas é para todos.",
     defaultRoles: [ADMIN, COMERCIAL, BACKOFFICE],
   },
+  purchases: {
+    label: "Compras a fornecedor",
+    description: "Criar e alterar compras a fornecedores e as suas linhas, marcar como enviadas, registar receções (dão entrada no stock), fechar e cancelar. Ver as compras é para todos; os custos só com a área «Catálogo de produtos».",
+    defaultRoles: [ADMIN, BACKOFFICE],
+  },
 } satisfies Record<string, WriteAreaDefinition>;
 
 export type WriteArea = keyof typeof WRITE_AREAS;

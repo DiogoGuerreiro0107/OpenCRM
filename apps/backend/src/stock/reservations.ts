@@ -49,7 +49,8 @@ export async function waitingLines(tx: Tx, orderId: string) {
 /**
  * Dá o disponível do produto (que tem de estar bloqueado nesta transação) às linhas que aguardam stock, das encomendas
  * confirmadas há mais tempo para as mais recentes. Escreve na timeline de cada encomenda servida. Devolve o que
- * reservou, por encomenda.
+ * reservou, por encomenda (as chaves são as encomendas servidas: depois de gravar, `OrderPreparationService` vê quais
+ * ficaram completas — Fase 6c).
  */
 export async function allocateWaiting(tx: Tx, productId: string, userId: string) {
   const [product] = await tx.$queryRaw<Array<{ tracksStock: boolean; stockOnHand: Prisma.Decimal; reserved: Prisma.Decimal }>>`

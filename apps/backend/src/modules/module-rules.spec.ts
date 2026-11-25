@@ -78,10 +78,11 @@ describe("dependências", () => {
     expect(activeDependents("deals", set("deals", "leads"), manifests)).toEqual([]);
   });
 
-  it("o stock (5b) e as encomendas (6a) dependem dos produtos; desde a 3b as automações correm por tipo de registo", () => {
+  it("o stock (5b) e as encomendas (6a) dependem dos produtos, as compras (6c) dos produtos e do stock; desde a 3b as automações correm por tipo de registo", () => {
     expect(MODULE_MANIFESTS.filter((x) => x.dependsOn.length > 0).map((x) => [x.id, x.dependsOn])).toEqual([
       ["stock", ["produtos"]],
       ["encomendas", ["produtos"]],
+      ["compras", ["produtos", "stock"]],
     ]);
   });
 });

@@ -1,5 +1,5 @@
 import { lazy } from "react";
-import { FileText, KanbanSquare, Mail, Package, Phone, ShoppingCart, Tags, UserPlus, Wrench, Zap } from "lucide-react";
+import { FileText, KanbanSquare, Mail, Package, Phone, ShoppingCart, Tags, Truck, UserPlus, Wrench, Zap } from "lucide-react";
 import { ADMIN_ONLY } from "@/lib/permissions";
 import type { FrontendModule, RecordPanelProps } from "./types";
 
@@ -135,6 +135,27 @@ export const ordersModule: FrontendModule = {
       entities: ["company", "contact"],
       order: 25,
       component: lazy(() => import("@/pages/orders/OrdersPanel").then((m) => ({ default: m.OrdersPanel }))),
+    },
+  ],
+};
+
+/** Compras a fornecedor (Fase 6c): menu, lista, sugestões, ficha e o cartão nas fichas das empresas fornecedoras. */
+export const purchasesModule: FrontendModule = {
+  id: "compras",
+  nav: [{ id: "compras:list", label: "Compras", icon: Truck, to: "/compras", section: "main", order: 39.5 }],
+  routes: [
+    { path: "/compras", page: lazy(() => import("@/pages/purchases/PurchasesListPage").then((m) => ({ default: m.PurchasesListPage }))) },
+    { path: "/compras/sugestoes", page: lazy(() => import("@/pages/purchases/PurchaseSuggestionsPage").then((m) => ({ default: m.PurchaseSuggestionsPage }))) },
+    { path: "/compras/:id", page: lazy(() => import("@/pages/purchases/PurchaseDetailPage").then((m) => ({ default: m.PurchaseDetailPage }))) },
+  ],
+  recordPanels: [
+    {
+      id: "compras:purchases",
+      title: "Compras",
+      entities: ["company"],
+      order: 31,
+      when: (props) => !!props.isSupplier,
+      component: lazy(() => import("@/pages/purchases/PurchasesPanel").then((m) => ({ default: m.PurchasesPanel }))),
     },
   ],
 };

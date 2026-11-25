@@ -4,6 +4,7 @@ import { PrismaService } from "../prisma/prisma.service";
 import { ModulesService } from "../modules/modules.service";
 import { lockProduct, recordMovement, StockService } from "../stock/stock.service";
 import { allocateWaiting } from "../stock/reservations";
+import { OrderPreparationService } from "../orders/order-preparation.service";
 import { CreateServicePartDto, UpdateServicePartDto } from "./dto/service-part.dto";
 import { serviceCode } from "./service-cases.service";
 
@@ -48,6 +49,7 @@ export class ServicePartsService {
     private readonly prisma: PrismaService,
     private readonly modules: ModulesService,
     private readonly stock: StockService,
+    private readonly preparation: OrderPreparationService,
   ) {}
 
   private view(part: PartRow) {
@@ -74,9 +76,12 @@ export class ServicePartsService {
     return !!product && product.tracksStock && this.modules.isEnabled("stock");
   }
 
-  /** Movimento do consumo (negativo = sai), com a origem na assistência. Zero não se lança. */
-  private async move(tx: Tx, input: { productId: string; quantity: number; caseNumber: number; serviceCaseId: string; what: string; userId: string }) {
-    if (round2(input.quantity) === 0) return;
+  /**
+   * Movimento do consumo (negativo = sai), com a origem na assistência. Zero não se lança. Devolve as encomendas
+   * servidas pelo stock devolvido (para a tarefa «Preparar encomenda», depois de gravar — Fase 6c).
+   */
+  private async move(tx: Tx, input: { productId: string; quantity: number; caseNumber: number; serviceCaseId: string; what: string; userId: string }): Promise<string[]> {
+    if (round2(input.quantity) === 0) return [];
     await recordMovement(tx, {
       productId: input.productId,
       type: "SERVICE_PART",
@@ -87,7 +92,8 @@ export class ServicePartsService {
       userId: input.userId,
     });
     // Stock devolvido vai para as encomendas que aguardam (Fase 6b).
-    if (input.quantity > 0 && this.stock.reservationsApply()) await allocateWaiting(tx, input.productId, input.userId);
+    if (input.quantity > 0 && this.stock.reservationsApply()) return [...(await allocateWaiting(tx, input.productId, input.userId)).keys()];
+    return [];
   }
 
   async list(serviceCaseId: string) {
@@ -130,7 +136,8 @@ export class ServicePartsService {
   async update(serviceCaseId: string, partId: string, dto: UpdateServicePartDto, actorId: string) {
     const serviceCase = await this.loadCase(serviceCaseId);
     const found = await this.findPart(serviceCaseId, partId);
-    await this.stock.withLock(async (tx) => {
+    const served = await this.stock.withLock(async (tx) => {
+      let served: string[] = [];
       const product = found.productId ? await lockProduct(tx, found.productId) : null;
       const existing = await this.lockPart(tx, partId);
       const part = await tx.servicePart.update({
@@ -146,29 +153,34 @@ export class ServicePartsService {
         const nextTaken = nextStockTaken(taken, Number(existing.quantity), Number(part.quantity));
         if (nextTaken !== taken) {
           await tx.servicePart.update({ where: { id: partId }, data: { stockTaken: nextTaken } });
-          await this.move(tx, { productId: product.id, quantity: taken - nextTaken, caseNumber: serviceCase.number, serviceCaseId, what: "quantidade da peça alterada", userId: actorId });
+          served = await this.move(tx, { productId: product.id, quantity: taken - nextTaken, caseNumber: serviceCase.number, serviceCaseId, what: "quantidade da peça alterada", userId: actorId });
         }
       }
       const before = partText(existing);
       const after = partText(part);
       if (before !== after) await this.note(tx, serviceCaseId, `Peça alterada: ${before} → ${after}`, actorId);
+      return served;
     });
+    await this.preparation.afterAllocation(served, actorId);
     return this.view(await this.reload(partId));
   }
 
   async remove(serviceCaseId: string, partId: string, actorId: string) {
     const serviceCase = await this.loadCase(serviceCaseId);
     const found = await this.findPart(serviceCaseId, partId);
-    await this.stock.withLock(async (tx) => {
+    const served = await this.stock.withLock(async (tx) => {
+      let served: string[] = [];
       const product = found.productId ? await lockProduct(tx, found.productId) : null;
       const existing = await this.lockPart(tx, partId);
       await tx.servicePart.delete({ where: { id: partId } });
       const taken = Number(existing.stockTaken);
       if (product && taken > 0 && this.stockApplies(product)) {
-        await this.move(tx, { productId: product.id, quantity: taken, caseNumber: serviceCase.number, serviceCaseId, what: "peça retirada", userId: actorId });
+        served = await this.move(tx, { productId: product.id, quantity: taken, caseNumber: serviceCase.number, serviceCaseId, what: "peça retirada", userId: actorId });
       }
       await this.note(tx, serviceCaseId, `Peça retirada: ${partText(existing)}`, actorId);
+      return served;
     });
+    await this.preparation.afterAllocation(served, actorId);
   }
 
   private reload(partId: string) {

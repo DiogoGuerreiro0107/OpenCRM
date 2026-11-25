@@ -144,11 +144,13 @@ describe("Stock (e2e)", () => {
     }
     await move({ productId: p.id, type: "PURCHASE_IN", quantity: 1 }, await as("BACKOFFICE")).expect(201);
 
+    await api().patch("/modules/compras").set("Authorization", admin).send({ enabled: false }).expect(200);
     await api().patch("/modules/stock").set("Authorization", admin).send({ enabled: false }).expect(200);
     await api().get("/stock/summary").set("Authorization", admin).expect(404);
     await api().get(`/products/${p.id}`).set("Authorization", admin).expect(200);
     await api().patch("/modules/stock").set("Authorization", admin).send({ enabled: true }).expect(200);
     // Sem produtos, o stock não se liga.
+    await api().patch("/modules/compras").set("Authorization", admin).send({ enabled: false }).expect(200);
     await api().patch("/modules/stock").set("Authorization", admin).send({ enabled: false }).expect(200);
     await api().patch("/modules/encomendas").set("Authorization", admin).send({ enabled: false }).expect(200);
     await api().patch("/modules/produtos").set("Authorization", admin).send({ enabled: false }).expect(200);

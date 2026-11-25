@@ -42,6 +42,11 @@ export class TaskFiltersDto {
   @IsString()
   contactId?: string;
 
+  /** Tarefas de uma encomenda (Fase 6c: «Preparar encomenda»). */
+  @IsOptional()
+  @IsString()
+  salesOrderId?: string;
+
   @IsOptional()
   @IsDateString()
   from?: string;

@@ -118,12 +118,14 @@ describe("Reservas e saída de stock das encomendas (e2e)", () => {
     await move(toner.id, "INITIAL", 3);
     expect(await reservedOf(a.id)).toEqual([[2, 0]]);
     expect(await reservedOf(b.id)).toEqual([[1, 2]]);
-    expect((await notes(a.id)).slice(-2)).toEqual(["Stock reservado: 2 × Toner preto (TN-2420)", "Todo o stock da encomenda está reservado"]);
+    // A encomenda que estava à espera e ficou completa pede a tarefa «Preparar encomenda» (Fase 6c).
+    expect((await notes(a.id)).slice(-3)).toEqual(["Stock reservado: 2 × Toner preto (TN-2420)", "Todo o stock da encomenda está reservado", `Tarefa criada: «Preparar encomenda ${a.code}» para Carla Comercial`]);
     expect((await notes(b.id)).slice(-1)).toEqual(["Stock reservado: 1 × Toner preto (TN-2420)"]);
 
     // Uma devolução de 5 completa a segunda e sobram 3.
     await move(toner.id, "RETURN", 5);
     expect(await reservedOf(b.id)).toEqual([[3, 0]]);
+    expect(await prisma().workItem.count({ where: { salesOrderId: b.id, typeId: "PREPARAR_ENCOMENDA" } })).toBe(1);
     expect(await product(toner.id)).toMatchObject({ stockOnHand: 8, reserved: 5, available: 3 });
 
     // Peça de uma assistência: tira 3 (nada a reservar); retirada, o stock volta e vai para uma encomenda à espera.
@@ -134,6 +136,8 @@ describe("Reservas e saída de stock das encomendas (e2e)", () => {
     expect(await reservedOf(c.id)).toEqual([[0, 2]]);
     await api().delete(`/service-cases/${sc.workItemId}/parts/${part.id}`).set("Authorization", tecnico).expect(204);
     expect(await reservedOf(c.id)).toEqual([[2, 0]]);
+    // A peça retirada completou a encomenda: tarefa «Preparar encomenda» (Fase 6c).
+    expect(await prisma().workItem.count({ where: { salesOrderId: c.id, typeId: "PREPARAR_ENCOMENDA" } })).toBe(1);
     await assertReservedSum(toner.id);
   });
 
@@ -186,13 +190,14 @@ describe("Reservas e saída de stock das encomendas (e2e)", () => {
     expect(await reservedOf(b.id)).toEqual([[2, 0]]);
     expect(await product(toner.id)).toMatchObject({ stockOnHand: 3, reserved: 2, available: 1 });
     expect((await notes(a.id)).slice(-2)).toEqual(["Encomenda cancelada: Cliente desistiu", "Reservas libertadas: 3 × Toner preto (TN-2420)"]);
-    expect((await notes(b.id)).slice(-2)).toEqual(["Stock reservado: 2 × Toner preto (TN-2420)", "Todo o stock da encomenda está reservado"]);
+    expect((await notes(b.id)).slice(-3)).toEqual(["Stock reservado: 2 × Toner preto (TN-2420)", "Todo o stock da encomenda está reservado", `Tarefa criada: «Preparar encomenda ${b.code}» para Carla Comercial`]);
     await assertReservedSum(toner.id);
   });
 
   it("com o stock desligado não há reservas nem saídas; «Reservar stock» trata as confirmadas depois", async () => {
     const toner = await newProduct({ sku: "TN-2420" });
     await move(toner.id, "INITIAL", 5);
+    await setModule("compras", false);
     await setModule("stock", false);
 
     const a = await confirmed([[toner.id, 2]]);
@@ -207,6 +212,8 @@ describe("Reservas e saída de stock das encomendas (e2e)", () => {
     await setModule("stock", true);
     expect(await reservedOf(a.id)).toEqual([[0, 2]]);
     expect((await step(a.id, "reserve").expect(200)).body.lines[0]).toMatchObject({ reservedQuantity: 2, waitingQuantity: 0 });
+    // Estava à espera e ficou completa: pede a tarefa «Preparar encomenda» (Fase 6c).
+    expect(await prisma().workItem.count({ where: { salesOrderId: a.id, typeId: "PREPARAR_ENCOMENDA" } })).toBe(1);
     expect(await product(toner.id)).toMatchObject({ stockOnHand: 5, reserved: 2, available: 3 });
     await step((await draft([[toner.id, 1]])).id, "reserve").expect(409);
     // Só quem escreve nas encomendas.

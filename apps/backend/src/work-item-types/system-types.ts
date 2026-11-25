@@ -34,6 +34,9 @@ export interface SystemWorkItemType {
 /** Tipo das assistências (Fase 4a): cada item deste tipo tem os dados próprios em `ServiceCase`. */
 export const SERVICE_CASE_TYPE = "ASSISTENCIA";
 
+/** Tipo da tarefa criada quando uma encomenda à espera fica com todo o stock reservado (Fase 6c). */
+export const PREPARE_ORDER_TYPE = "PREPARAR_ENCOMENDA";
+
 export const SYSTEM_WORK_ITEM_TYPES: SystemWorkItemType[] = [
   { id: "TAREFA", name: "Tarefa", icon: "check-square", color: "slate" },
   { id: "CHAMADA", name: "Chamada", icon: "phone", color: "blue" },
@@ -43,6 +46,7 @@ export const SYSTEM_WORK_ITEM_TYPES: SystemWorkItemType[] = [
   { id: "COBRANCA", name: "Cobrança", icon: "banknote", color: "red" },
   { id: "ASSISTENCIA", name: "Assistência", icon: "wrench", color: "teal" },
   { id: "OUTRO", name: "Outro", icon: "circle-dot", color: "gray" },
+  { id: "PREPARAR_ENCOMENDA", name: "Preparar encomenda", icon: "package", color: "orange" },
 ];
 
 /** Cria os tipos de sistema que faltem (nunca altera os que existem). Corre no arranque e depois de limpar a base de testes. */

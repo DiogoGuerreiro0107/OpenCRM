@@ -19,7 +19,7 @@ const KEYS_BY_RESOURCE: Record<string, string[]> = {
   "time-entries": ["time-entries", "timeline", "automation-runs", "tasks"],
   // Assistências (Fase 4a): cada uma é uma tarefa; a ficha só recarrega o formulário quando muda de assistência.
   // As peças do catálogo gastam stock (Fase 5c).
-  "service-cases": ["service-cases", "tasks", "agenda", "dashboard-summary", "automation-runs", "timeline", "products", "stock", "orders"],
+  "service-cases": ["service-cases", "tasks", "agenda", "dashboard-summary", "automation-runs", "timeline", "products", "stock", "orders", "purchase-suggestions"],
   // Um administrador mudou os tipos de tarefa: formulários, filtros e listas atualizam-se.
   "work-item-types": ["work-item-types", "tasks", "custom-fields", "agenda", "automation-rules"],
   // Passos de um fluxo (tipos de tarefa ou funis) mudaram: tipos, tarefas, quadros e funis atualizam-se.
@@ -44,12 +44,16 @@ const KEYS_BY_RESOURCE: Record<string, string[]> = {
   // Um administrador mudou permissões: os botões de todas as sessões ajustam-se sem recarregar.
   permissions: ["permissions", "products"],
   // Catálogo de produtos (Fase 5a).
-  products: ["products", "stock"],
-  // Stock (Fase 5b): movimentos novos mudam o stock dos produtos e os alertas; e reservam para as encomendas (6b).
-  stock: ["stock", "products", "orders", "timeline"],
+  // Os fornecedores dos produtos mudam as sugestões de compra (Fase 6c).
+  products: ["products", "stock", "purchase-suggestions"],
+  // Stock (Fase 5b): movimentos novos mudam o stock dos produtos e os alertas; e reservam para as encomendas (6b),
+  // que podem pedir a tarefa «Preparar encomenda» (6c).
+  stock: ["stock", "products", "orders", "timeline", "tasks", "agenda", "purchase-suggestions"],
   "product-categories": ["product-categories", "products"],
   // Encomendas (Fase 6a); reservam e gastam stock (6b).
-  orders: ["orders", "timeline", "products", "stock"],
+  orders: ["orders", "timeline", "products", "stock", "tasks", "agenda", "purchase-suggestions"],
+  // Compras a fornecedor (Fase 6c): as receções dão entrada no stock e servem as encomendas à espera.
+  "purchase-orders": ["purchase-orders", "purchase-suggestions", "timeline", "products", "stock", "orders", "tasks", "agenda"],
 };
 
 /** Junta rajadas de eventos (ex.: uma automação + o pedido que a causou) num só refrescamento. */
