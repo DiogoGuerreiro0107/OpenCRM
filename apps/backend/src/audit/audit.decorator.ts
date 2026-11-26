@@ -17,6 +17,11 @@ export interface AuditOptions {
    * "apiSecret"] }` regista `credenciais: "alteradas"` se algum vier no corpo.
    */
   presence?: Record<string, string[]>;
+  /**
+   * O serviço regista o evento (com o mesmo nome de ação), porque só ele sabe o que mudou (ex.: os nomes das definições
+   * alteradas de uma extensão, Fase E1.3). O interceptor não regista nada; a marca fica para o teste de cobertura.
+   */
+  recordedByService?: boolean;
 }
 
 /**

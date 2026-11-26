@@ -9,6 +9,8 @@ import { SecretsService } from "../src/common/secrets.service";
 import { deriveKey, encryptSecret, hashToken, isEncrypted } from "../src/common/secrets";
 import { countPlaintextSecrets, encryptStoredSecrets } from "../src/common/secrets-migration";
 import { signZadarmaRequest } from "../src/zadarma/zadarma.utils";
+import { ModulesService } from "../src/modules/modules.service";
+import { ZadarmaService } from "../src/zadarma/zadarma.service";
 
 // Segredos de integrações cifrados em repouso (pacote E0a, docs/plano-e0-api-publica.md). Instância própria da app
 // porque usa os endpoints de recuperação de password, que têm um limite estrito por minuto.
@@ -22,6 +24,7 @@ describe("Segredos em repouso (e2e)", () => {
 
   beforeEach(async () => {
     await resetDatabase(prismaOf(app));
+    await app.get(ModulesService).reload();
   });
 
   afterEach(() => {
@@ -34,33 +37,33 @@ describe("Segredos em repouso (e2e)", () => {
 
   const adminAuth = async () => bearerFor(app, await createUser(prismaOf(app), "ADMINISTRADOR"));
 
-  describe("Zadarma: apiSecret", () => {
+  describe("Zadarma: apiSecret (definições da extensão, E1.3)", () => {
     const SECRET = "segredo-zadarma-em-claro-123";
+    const storedOptions = async () => ((await prismaOf(app).moduleSetting.findUniqueOrThrow({ where: { moduleId: "zadarma" } })).options ?? {}) as Record<string, unknown>;
+    const save = (auth: string, body: Record<string, unknown>) => api().patch("/extensions/zadarma/settings").set("Authorization", auth).send(body);
 
     it("guardado cifrado, nunca em claro, e a API nunca o devolve", async () => {
       const auth = await adminAuth();
-      const res = await api()
-        .post("/zadarma/account")
-        .set("Authorization", auth)
-        .send({ apiKey: "chave-publica", apiSecret: SECRET, callerExtension: "100", active: true })
-        .expect(201);
+      const res = await save(auth, { apiKey: "chave-publica", apiSecret: SECRET, callerExtension: "100" }).expect(200);
       expect(JSON.stringify(res.body)).not.toContain(SECRET);
+      expect(res.body).toMatchObject({ values: { apiKey: "chave-publica", callerExtension: "100", active: true }, secretsSet: ["apiSecret"] });
+      expect(res.body.values).not.toHaveProperty("apiSecret");
 
-      const stored = await prismaOf(app).zadarmaAccount.findFirstOrThrow();
-      expect(isEncrypted(stored.apiSecret)).toBe(true);
-      expect(stored.apiSecret).not.toContain(SECRET);
+      const stored = String((await storedOptions()).apiSecret);
+      expect(isEncrypted(stored)).toBe(true);
+      expect(stored).not.toContain(SECRET);
+      // O contexto é o do campo desta extensão: não decifra noutro.
+      expect(app.get(SecretsService).decrypt(stored, "ModuleSetting.options.zadarma.apiSecret")).toBe(SECRET);
+      expect(() => app.get(SecretsService).decrypt(stored, "ModuleSetting.options.email.apiSecret")).toThrow();
 
-      const get = await api().get("/zadarma/account").set("Authorization", auth).expect(200);
+      const get = await api().get("/extensions/zadarma/settings").set("Authorization", auth).expect(200);
       expect(JSON.stringify(get.body)).not.toContain(SECRET);
+      expect(JSON.stringify((await api().get("/extensions").set("Authorization", auth).expect(200)).body)).not.toContain(SECRET);
     });
 
     it("os pedidos à Zadarma são assinados com o segredo DECIFRADO", async () => {
       const auth = await adminAuth();
-      await api()
-        .post("/zadarma/account")
-        .set("Authorization", auth)
-        .send({ apiKey: "chave-publica", apiSecret: SECRET, callerExtension: "100", active: true })
-        .expect(201);
+      await save(auth, { apiKey: "chave-publica", apiSecret: SECRET, callerExtension: "100" }).expect(200);
 
       const spy = jest.spyOn(axios, "request").mockResolvedValue({ data: {} });
       await api().post("/zadarma/call").set("Authorization", auth).send({ phoneNumber: "+351912345678" }).expect(201);
@@ -70,21 +73,58 @@ describe("Segredos em repouso (e2e)", () => {
       expect((spy.mock.calls[0][0] as { headers: { Authorization: string } }).headers.Authorization).toBe(expected.authorization);
     });
 
-    it("atualizar sem enviar o segredo mantém o cifrado; enviar um novo substitui-o", async () => {
-      const prisma = prismaOf(app);
+    it("atualizar sem enviar o segredo mantém o cifrado; enviar um novo substitui-o; não se apaga um obrigatório", async () => {
       const auth = await adminAuth();
-      await api().post("/zadarma/account").set("Authorization", auth).send({ apiKey: "k", apiSecret: SECRET, active: true }).expect(201);
-      const first = (await prisma.zadarmaAccount.findFirstOrThrow()).apiSecret;
+      await save(auth, { apiKey: "k", apiSecret: SECRET }).expect(200);
+      const first = (await storedOptions()).apiSecret;
 
-      await api().post("/zadarma/account").set("Authorization", auth).send({ callerExtension: "200" }).expect(201);
-      expect((await prisma.zadarmaAccount.findFirstOrThrow()).apiSecret).toBe(first);
+      await save(auth, { callerExtension: "200" }).expect(200);
+      expect((await storedOptions()).apiSecret).toBe(first);
 
-      await api().post("/zadarma/account").set("Authorization", auth).send({ apiSecret: "outro-segredo-novo" }).expect(201);
-      const replaced = (await prisma.zadarmaAccount.findFirstOrThrow()).apiSecret;
+      await save(auth, { apiSecret: "outro-segredo-novo" }).expect(200);
+      const replaced = String((await storedOptions()).apiSecret);
       expect(replaced).not.toBe(first);
       expect(isEncrypted(replaced)).toBe(true);
       expect(replaced).not.toContain("outro-segredo-novo");
-      expect(app.get(SecretsService).decrypt(replaced, "ZadarmaAccount.apiSecret")).toBe("outro-segredo-novo");
+      expect(app.get(SecretsService).decrypt(replaced, "ModuleSetting.options.zadarma.apiSecret")).toBe("outro-segredo-novo");
+
+      const cleared = await save(auth, { apiSecret: "" }).expect(400);
+      expect(cleared.body.message).toEqual(["API secret: é obrigatório"]);
+      expect((await storedOptions()).apiSecret).toBe(replaced);
+    });
+
+    it("a conta da tabela antiga passa para as definições ao arrancar (uma vez), com o segredo recifrado", async () => {
+      const prisma = prismaOf(app);
+      const zadarma = app.get(ZadarmaService);
+      const lastSyncAt = new Date("2026-11-20T10:00:00Z");
+      await prisma.zadarmaAccount.create({
+        data: { apiKey: "chave-antiga", apiSecret: app.get(SecretsService).encrypt(SECRET, "ZadarmaAccount.apiSecret"), callerExtension: "101", active: false, lastSyncAt },
+      });
+      expect(await zadarma.migrateLegacyAccount()).toBe(true);
+      const options = await storedOptions();
+      expect(options).toMatchObject({ apiKey: "chave-antiga", callerExtension: "101", active: false });
+      expect(app.get(SecretsService).decrypt(String(options.apiSecret), "ModuleSetting.options.zadarma.apiSecret")).toBe(SECRET);
+      expect(await app.get(ModulesService).getState("zadarma")).toEqual({ lastSyncAt: lastSyncAt.toISOString() });
+      // Uma vez: com credenciais nas definições, não volta a copiar (nem por cima de alterações).
+      const auth = await adminAuth();
+      await save(auth, { apiKey: "chave-nova" }).expect(200);
+      expect(await zadarma.migrateLegacyAccount()).toBe(false);
+      expect((await storedOptions()).apiKey).toBe("chave-nova");
+    });
+
+    it("cópia da tabela antiga com o segredo ainda em claro (antes da E0a)", async () => {
+      await prismaOf(app).zadarmaAccount.create({ data: { apiKey: "k", apiSecret: "zadarma-em-claro", active: true } });
+      expect(await app.get(ZadarmaService).migrateLegacyAccount()).toBe(true);
+      const stored = String((await storedOptions()).apiSecret);
+      expect(isEncrypted(stored)).toBe(true);
+      expect(app.get(SecretsService).decrypt(stored, "ModuleSetting.options.zadarma.apiSecret")).toBe("zadarma-em-claro");
+    });
+
+    it("sem tabela antiga, ou com a chave errada, não copia nem falha", async () => {
+      expect(await app.get(ZadarmaService).migrateLegacyAccount()).toBe(false);
+      await prismaOf(app).zadarmaAccount.create({ data: { apiKey: "k", apiSecret: encryptSecret("x", deriveKey("outra-chave-qualquer-com-32-caracteres-ou-mais"), "ZadarmaAccount.apiSecret") } });
+      expect(await app.get(ZadarmaService).migrateLegacyAccount()).toBe(false);
+      expect((await storedOptions().catch(() => ({}))) as Record<string, unknown>).not.toHaveProperty("apiKey");
     });
   });
 

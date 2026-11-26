@@ -1,6 +1,7 @@
-import { PrismaClient } from "@prisma/client";
+import { Prisma, PrismaClient } from "@prisma/client";
 import { decryptSecret, encryptSecret, isEncrypted } from "./secrets";
 import { secretContext } from "./secret-fields";
+import { MODULE_MANIFESTS } from "../modules/module-manifest";
 
 /** Quantos valores ficaram em cada situação (por campo, só contagens, nunca valores). */
 export interface SecretsReport {
@@ -59,7 +60,42 @@ export async function encryptStoredSecrets(db: PrismaClient, keys: Buffer[]): Pr
     }
     reports.push(report);
   }
+  reports.push(await encryptSettingSecrets(db, keys));
   return reports;
+}
+
+/** Contexto de um segredo das definições (igual ao de extensions/extension-settings.service.ts). */
+const settingContext = (moduleId: string, key: string) => `ModuleSetting.options.${moduleId}.${key}`;
+
+/** Os segredos das definições das extensões (Fase E1.3): um por campo `secret` preenchido de cada módulo. */
+async function settingSecrets(db: PrismaClient) {
+  const secretFields = MODULE_MANIFESTS.flatMap((m) => (m.settings ?? []).filter((f) => f.type === "secret").map((f) => ({ moduleId: m.id, key: f.key })));
+  if (!secretFields.length) return [];
+  const rows = await db.moduleSetting.findMany({ where: { moduleId: { in: [...new Set(secretFields.map((f) => f.moduleId))] } }, select: { moduleId: true, options: true } });
+  const optionsOf = new Map(rows.map((r) => [r.moduleId, (r.options ?? {}) as Record<string, unknown>]));
+  return secretFields.flatMap(({ moduleId, key }) => {
+    const value = optionsOf.get(moduleId)?.[key];
+    return typeof value === "string" && value !== "" ? [{ moduleId, key, value }] : [];
+  });
+}
+
+async function encryptSettingSecrets(db: PrismaClient, keys: Buffer[]): Promise<SecretsReport> {
+  const report: SecretsReport = { field: "ModuleSetting.options (definições das extensões)", encrypted: 0, recrypted: 0, unchanged: 0 };
+  for (const s of await settingSecrets(db)) {
+    const context = settingContext(s.moduleId, s.key);
+    const decrypted = decryptSecret(s.value, keys, context);
+    if (!decrypted.legacy && decrypted.keyIndex === 0) {
+      report.unchanged++;
+      continue;
+    }
+    // Relê as opções antes de gravar: só muda este campo.
+    const row = await db.moduleSetting.findUniqueOrThrow({ where: { moduleId: s.moduleId }, select: { options: true } });
+    const options = { ...((row.options ?? {}) as Record<string, unknown>), [s.key]: encryptSecret(decrypted.value, keys[0], context) };
+    await db.moduleSetting.update({ where: { moduleId: s.moduleId }, data: { options: options as Prisma.InputJsonValue } });
+    if (decrypted.legacy) report.encrypted++;
+    else report.recrypted++;
+  }
+  return report;
 }
 
 /** Quantos segredos ainda estão em claro (para avisar na arrancada). */
@@ -68,5 +104,6 @@ export async function countPlaintextSecrets(db: PrismaClient): Promise<number> {
   for (const key of ENCRYPTED_FIELD_KEYS) {
     for (const row of await ACCESSORS[key].list(db)) if (!isEncrypted(row.value)) total++;
   }
+  for (const s of await settingSecrets(db)) if (!isEncrypted(s.value)) total++;
   return total;
 }

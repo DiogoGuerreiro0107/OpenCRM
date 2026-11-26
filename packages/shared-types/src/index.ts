@@ -463,14 +463,6 @@ export interface AutomationRule {
   updatedAt: string;
 }
 
-export interface ZadarmaAccount {
-  id: string;
-  callerExtension: string | null;
-  active: boolean;
-  lastSyncAt: string | null;
-  hasCredentials: true;
-}
-
 export type CallDirection = "INBOUND" | "OUTBOUND";
 
 export interface CallRecord {

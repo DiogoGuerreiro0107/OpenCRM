@@ -1,3 +1,5 @@
+import type { SettingField } from "../extensions/settings";
+
 /**
  * Módulos OPCIONAIS do CRM. O "núcleo" (utilizadores, empresas, contactos, timeline, tarefas, campos
  * personalizados, dashboard, definições) está sempre ativo e não aparece aqui.
@@ -20,6 +22,8 @@ export interface ModuleManifest {
    * Declaração para o Administrador ler, não uma barreira: o código do módulo corre no backend.
    */
   permissions: string[];
+  /** Definições da extensão (Fase E1.3; formato em extensions/settings.ts). */
+  settings?: SettingField[];
 }
 
 export const MODULE_MANIFESTS: ModuleManifest[] = [
@@ -30,6 +34,21 @@ export const MODULE_MANIFESTS: ModuleManifest[] = [
     dependsOn: [],
     defaultEnabled: true,
     permissions: ["data:leads:write", "data:companies:write", "data:contacts:write", "webhooks:emit"],
+    settings: [
+      {
+        key: "mode",
+        label: "Tipo de leads",
+        description: "Só muda o que se pode criar; as leads que já existem ficam como estão.",
+        type: "select",
+        required: true,
+        options: [
+          { value: "BOTH", label: "Empresas e pessoas" },
+          { value: "COMPANY", label: "Só empresas" },
+          { value: "PERSON", label: "Só pessoas" },
+        ],
+        default: "BOTH",
+      },
+    ],
   },
   {
     id: "deals",
@@ -54,6 +73,18 @@ export const MODULE_MANIFESTS: ModuleManifest[] = [
     dependsOn: [],
     defaultEnabled: true,
     permissions: ["data:makeCall:write", "net:egress:api.zadarma.com", "secrets:own", "jobs:schedule"],
+    settings: [
+      { key: "apiKey", label: "API key", description: "Em my.zadarma.com → Definições → API.", type: "text", required: true, maxLength: 200 },
+      { key: "apiSecret", label: "API secret", type: "secret", required: true, maxLength: 200 },
+      {
+        key: "callerExtension",
+        label: "Extensão que liga",
+        description: "A extensão ou o número que toca primeiro nas chamadas com um clique (ex.: 100).",
+        type: "text",
+        maxLength: 50,
+      },
+      { key: "active", label: "Conta ativa", description: "Desligada, não liga nem sincroniza as chamadas.", type: "boolean", default: true },
+    ],
   },
   {
     id: "automations",

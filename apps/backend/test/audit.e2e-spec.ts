@@ -70,15 +70,17 @@ describe("Registo de auditoria (e2e)", () => {
       expect((await events("module.toggled"))[0]).toMatchObject({ actorId: admin.id, targetType: "module", targetId: "leads", metadata: { enabled: false } });
     });
 
-    it("conta Zadarma: regista que as credenciais mudaram, nunca os valores", async () => {
-      const { auth } = await setup();
+    it("definições da Zadarma (E1.3): regista os nomes dos campos alterados, nunca os valores", async () => {
+      const { admin, auth } = await setup();
       await api()
-        .post("/zadarma/account")
+        .patch("/extensions/zadarma/settings")
         .set("Authorization", auth)
         .send({ apiKey: "chave-publica-xyz", apiSecret: "segredo-zadarma-xyz", callerExtension: "100", active: true })
-        .expect(201);
-      const [event] = await events("zadarma.account_saved");
-      expect(event.metadata).toEqual({ callerExtension: "100", active: true, credenciais: "alteradas" });
+        .expect(200);
+      const [event] = await events("extension.settings_updated");
+      expect(event).toMatchObject({ actorId: admin.id, targetType: "extension", targetId: "zadarma" });
+      // «active» já era o valor por omissão: não mudou.
+      expect(event.metadata).toEqual({ changed: ["apiKey", "apiSecret", "callerExtension"] });
       const text = await allAsText();
       expect(text).not.toContain("segredo-zadarma-xyz");
       expect(text).not.toContain("chave-publica-xyz");

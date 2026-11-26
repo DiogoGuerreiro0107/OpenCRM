@@ -1,9 +1,11 @@
+import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { listExtensions, listModules, setModuleEnabled, type ExtensionView, type ModuleId, type ModuleView } from "@/lib/modules-api";
 import { errorMessage } from "@/lib/errors";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { LeadModeSetting } from "./LeadModeSetting";
+import { ExtensionSettingsForm } from "@/components/ExtensionSettingsForm";
 
 export function ModulesSettingsPage() {
   const queryClient = useQueryClient();
@@ -67,7 +69,7 @@ export function ModulesSettingsPage() {
                 <p className="text-sm text-muted-foreground">{module.description}</p>
                 {hint(module) && <p className="text-xs text-muted-foreground">{hint(module)}</p>}
                 {extensionOf(module.id) && <ExtensionDetails extension={extensionOf(module.id)!} />}
-                {module.id === "leads" && module.enabled && <LeadModeSetting />}
+                {extensionOf(module.id)?.hasSettings && <SettingsToggle extensionId={module.id} />}
               </div>
               <label className="flex shrink-0 items-center gap-2 text-sm">
                 <input
@@ -104,5 +106,27 @@ function ExtensionDetails({ extension }: { extension: ExtensionView }) {
         ))}
       </ul>
     </details>
+  );
+}
+
+/** «Definições» no cartão (Fase E1.3): o formulário gerado, aqui mesmo, ou na página própria. */
+function SettingsToggle({ extensionId }: { extensionId: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="pt-1">
+      <div className="flex items-center gap-3 text-xs">
+        <button type="button" className="font-medium text-primary hover:underline" onClick={() => setOpen((v) => !v)} aria-expanded={open}>
+          {open ? "Fechar definições" : "Definições"}
+        </button>
+        <Link to={`/configuracoes/extensoes/${extensionId}`} className="text-muted-foreground hover:underline">
+          Abrir numa página
+        </Link>
+      </div>
+      {open && (
+        <div className="mt-2 rounded-md border border-border p-3">
+          <ExtensionSettingsForm extensionId={extensionId} />
+        </div>
+      )}
+    </div>
   );
 }

@@ -28,13 +28,14 @@ const CASES: Array<[Verb, string, Role[]]> = [
   ["post", "/email-templates", [A, B]],
   ["post", "/email/send", [A, C, B]],
   ["post", "/zadarma/call", [A, C, T, B]],
-  ["post", "/zadarma/account", [A]],
+  ["patch", "/extensions/zadarma/settings", [A]],
   // leituras
   ["get", "/companies", ROLES],
   ["get", "/zadarma/calls", ROLES],
   ["get", "/pipelines", ROLES],
   ["get", "/automation-rules", [A]],
-  ["get", "/zadarma/account", [A]],
+  ["get", "/extensions/zadarma/settings", [A]],
+  ["get", "/extensions", [A]],
 ];
 
 describe("Matriz de permissões por papel (e2e)", () => {

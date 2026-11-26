@@ -36,6 +36,8 @@ export interface ExtensionView {
   version: string;
   origin: "builtin" | "installed";
   enabled: boolean;
+  /** Tem definições (Fase E1.3): formulário gerado a partir do manifesto. */
+  hasSettings: boolean;
   /** O que a extensão DECLARA precisar, com a descrição em português. */
   permissions: Array<{ permission: string; description: string }>;
 }

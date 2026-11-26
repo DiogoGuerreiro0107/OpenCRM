@@ -1,4 +1,5 @@
 import { isPermission } from "./permissions";
+import { SettingField, settingFieldsErrors } from "./settings";
 import { isRange, isVersion, satisfies } from "./semver";
 
 /**
@@ -27,6 +28,8 @@ export interface ExtensionManifest {
   /** O que declara precisar (vocabulário em permissions.ts). */
   permissions: string[];
   defaultEnabled: boolean;
+  /** Definições (Fase E1.3): o núcleo gera o formulário, valida e guarda; os segredos ficam cifrados. */
+  settings: SettingField[];
 }
 
 const ID = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
@@ -44,6 +47,7 @@ const FIELDS: Record<keyof ExtensionManifest, true> = {
   provides: true,
   permissions: true,
   defaultEnabled: true,
+  settings: true,
 };
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
@@ -93,6 +97,7 @@ export function manifestErrors(value: unknown): string[] {
   };
   list("provides", (s) => KNOWN_CONTRACTS.includes(s), "um contrato conhecido");
   list("permissions", isPermission, "uma permissão conhecida");
+  if ("settings" in m) errors.push(...settingFieldsErrors(at, m.settings, m.permissions));
   return errors;
 }
 

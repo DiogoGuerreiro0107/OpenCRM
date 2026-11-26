@@ -750,3 +750,12 @@ Segundo pacote da [Fase E1](plano-fase-e1-extensoes.md).
 - **As tarefas passaram a falhar de verdade** (a Zadarma e a fila de webhooks escondiam o erro, que só ficava nos logs).
 - **Uma tarefa de um módulo desligado não corre**; à mão é recusada com o motivo.
 - **Validação:** 566 e2e e 345 unitários, 27 mutações (26 apanhadas, 1 equivalente), migração ensaiada e revertida. Detalhes no plano, em «Execução do E1.2».
+
+## Fase E1.3: definições das extensões (2026-11-26)
+Terceiro pacote da [Fase E1](plano-fase-e1-extensoes.md).
+- **Definições declaradas no manifesto** (texto, segredo, lista, sim/não), com formulário gerado, validação e gravação do núcleo. Um campo segredo exige a permissão `secrets:own`.
+- **Segredos das definições cifrados** com o contexto da extensão e do campo, nunca devolvidos pela API (só se estão preenchidos), incluídos no comando `secrets:encrypt` (cifrar e rodar). Auditoria só com os nomes dos campos alterados.
+- **Primeiros consumidores:** o modo das leads e as credenciais da Zadarma (a página própria saiu). A conta da tabela antiga passa para as definições ao arrancar, uma vez; a tabela fica até a cópia ter corrido em produção (expandir → migrar → contrair).
+- **Estado interno das extensões** (ex.: até quando a Zadarma sincronizou) numa coluna própria (`ModuleSetting.state`), separado das definições.
+- **Desvio ao plano:** o contrato `TelephonyProvider` fica para quando houver uma segunda telefonia (regra de dois); o primeiro contrato entra com a faturação.
+- **Validação:** 580 e2e e 355 unitários, 32 mutações (todas apanhadas), migração ensaiada e revertida. Detalhes no plano, em «Execução do E1.3».

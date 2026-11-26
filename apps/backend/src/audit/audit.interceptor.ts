@@ -20,7 +20,7 @@ export class AuditInterceptor implements NestInterceptor {
 
   intercept(context: ExecutionContext, next: CallHandler): Observable<unknown> {
     const meta = this.reflector.getAllAndOverride<AuditMeta | undefined>(AUDIT_KEY, [context.getHandler(), context.getClass()]);
-    if (!meta) return next.handle();
+    if (!meta || meta.recordedByService) return next.handle();
 
     const request = context.switchToHttp().getRequest();
     return next.handle().pipe(

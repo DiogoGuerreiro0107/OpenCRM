@@ -38,6 +38,7 @@ export const coreModule: FrontendModule = {
     { path: "/configuracoes/tipos-de-tarefa", roles: ADMIN_ONLY, page: lazy(() => import("@/pages/settings/WorkItemTypesSettingsPage").then((m) => ({ default: m.WorkItemTypesSettingsPage }))) },
     { path: "/configuracoes/menu", roles: ADMIN_ONLY, page: lazy(() => import("@/pages/settings/MenuSettingsPage").then((m) => ({ default: m.MenuSettingsPage }))) },
     { path: "/configuracoes/utilizadores", roles: ADMIN_ONLY, page: lazy(() => import("@/pages/settings/UsersSettingsPage").then((m) => ({ default: m.UsersSettingsPage }))) },
+    { path: "/configuracoes/extensoes/:id", roles: ADMIN_ONLY, page: lazy(() => import("@/pages/settings/ExtensionSettingsPage").then((m) => ({ default: m.ExtensionSettingsPage }))) },
     { path: "/configuracoes/modulos", roles: ADMIN_ONLY, page: lazy(() => import("@/pages/settings/ModulesSettingsPage").then((m) => ({ default: m.ModulesSettingsPage }))) },
     { path: "/configuracoes/tarefas-agendadas", roles: ADMIN_ONLY, page: lazy(() => import("@/pages/settings/JobsSettingsPage").then((m) => ({ default: m.JobsSettingsPage }))) },
     { path: "/configuracoes/permissoes", roles: ADMIN_ONLY, page: lazy(() => import("@/pages/settings/PermissionsSettingsPage").then((m) => ({ default: m.PermissionsSettingsPage }))) },

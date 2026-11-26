@@ -266,7 +266,7 @@ describe("Módulos opcionais (e2e)", () => {
     });
 
     it("a sincronização periódica da Zadarma não corre com o módulo desligado", async () => {
-      await prismaOf(app).zadarmaAccount.create({ data: { apiKey: "k", apiSecret: "s", callerExtension: "100", active: true } });
+      await api().patch("/extensions/zadarma/settings").set(as(admin)).send({ apiKey: "k", apiSecret: "s", callerExtension: "100" }).expect(200);
       const request_ = jest.spyOn(axios, "request").mockResolvedValue({ data: { stats: [] } });
       try {
         const zadarma = app.get(ZadarmaService);

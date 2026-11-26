@@ -17,6 +17,7 @@ export function builtinManifest(m: ModuleManifest): ExtensionManifest {
     provides: [],
     permissions: m.permissions,
     defaultEnabled: m.defaultEnabled,
+    settings: m.settings ?? [],
   };
 }
 
