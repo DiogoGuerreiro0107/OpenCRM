@@ -36,6 +36,8 @@ const CORE_CONTROLLERS = [
   "ModulesController",
   // Extensões (E1.1): o registo de todas as extensões, ligadas ou não.
   "ExtensionsController",
+  // Tarefas agendadas (E1.2): todas, ligadas ou não (a de um módulo desligado aparece como tal).
+  "JobsController",
 ];
 
 const SRC = path.resolve(__dirname, "..");

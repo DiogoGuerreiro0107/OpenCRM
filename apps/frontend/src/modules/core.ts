@@ -1,5 +1,5 @@
 import { lazy } from "react";
-import { Building2, CalendarDays, CheckSquare, KeyRound, LayoutDashboard, ListChecks, PanelLeft, Puzzle, ScrollText, Settings, ShieldCheck, UserCog, Users, Webhook } from "lucide-react";
+import { Building2, CalendarDays, CheckSquare, Clock, KeyRound, LayoutDashboard, ListChecks, PanelLeft, Puzzle, ScrollText, Settings, ShieldCheck, UserCog, Users, Webhook } from "lucide-react";
 import { ADMIN_ONLY } from "@/lib/permissions";
 import type { FrontendModule } from "./types";
 
@@ -16,6 +16,7 @@ export const coreModule: FrontendModule = {
     { id: "core:work-item-types", label: "Tipos de tarefa", icon: ListChecks, to: "/configuracoes/tipos-de-tarefa", section: "settings", order: 10, roles: ADMIN_ONLY },
     { id: "core:menu", label: "Menu", icon: PanelLeft, to: "/configuracoes/menu", section: "settings", order: 15, roles: ADMIN_ONLY },
     { id: "core:users", label: "Utilizadores", icon: UserCog, to: "/configuracoes/utilizadores", section: "settings", order: 40, roles: ADMIN_ONLY },
+    { id: "core:jobs", label: "Tarefas agendadas", icon: Clock, to: "/configuracoes/tarefas-agendadas", section: "settings", order: 65, roles: ADMIN_ONLY },
     { id: "core:modules", label: "Módulos e extensões", icon: Puzzle, to: "/configuracoes/modulos", section: "settings", order: 60, roles: ADMIN_ONLY },
     { id: "core:permissions", label: "Permissões", icon: ShieldCheck, to: "/configuracoes/permissoes", section: "settings", order: 70, roles: ADMIN_ONLY },
     { id: "core:api-keys", label: "Chaves de API", icon: KeyRound, to: "/configuracoes/chaves-api", section: "settings", order: 80, roles: ADMIN_ONLY },
@@ -38,6 +39,7 @@ export const coreModule: FrontendModule = {
     { path: "/configuracoes/menu", roles: ADMIN_ONLY, page: lazy(() => import("@/pages/settings/MenuSettingsPage").then((m) => ({ default: m.MenuSettingsPage }))) },
     { path: "/configuracoes/utilizadores", roles: ADMIN_ONLY, page: lazy(() => import("@/pages/settings/UsersSettingsPage").then((m) => ({ default: m.UsersSettingsPage }))) },
     { path: "/configuracoes/modulos", roles: ADMIN_ONLY, page: lazy(() => import("@/pages/settings/ModulesSettingsPage").then((m) => ({ default: m.ModulesSettingsPage }))) },
+    { path: "/configuracoes/tarefas-agendadas", roles: ADMIN_ONLY, page: lazy(() => import("@/pages/settings/JobsSettingsPage").then((m) => ({ default: m.JobsSettingsPage }))) },
     { path: "/configuracoes/permissoes", roles: ADMIN_ONLY, page: lazy(() => import("@/pages/settings/PermissionsSettingsPage").then((m) => ({ default: m.PermissionsSettingsPage }))) },
     { path: "/configuracoes/chaves-api", roles: ADMIN_ONLY, page: lazy(() => import("@/pages/settings/ApiKeysPage").then((m) => ({ default: m.ApiKeysPage }))) },
     { path: "/configuracoes/webhooks", roles: ADMIN_ONLY, page: lazy(() => import("@/pages/settings/WebhooksPage").then((m) => ({ default: m.WebhooksPage }))) },

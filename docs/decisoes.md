@@ -741,3 +741,12 @@ Primeiro pacote da [Fase E1](plano-fase-e1-extensoes.md) (base de extensões, an
 - **Validação escrita à mão** (forma, *semver*, SDK compatível, dependências, ciclos), sem dependências novas; manifestos embutidos inválidos impedem o arranque.
 - Configurações → «Módulos e extensões» mostra origem, versão e permissões de cada um.
 - **Validação:** 557 e2e e 339 unitários, 27 mutações (todas apanhadas), sem migração. Detalhes no plano, em «Execução do E1.1».
+
+## Fase E1.2: tarefas agendadas do núcleo (2026-11-26)
+Segundo pacote da [Fase E1](plano-fase-e1-extensoes.md).
+- **O agendador é do núcleo:** um catálogo de tarefas em código e um só sítio com `@Cron`, que passa cada tarefa ao registo; o trabalho é registado pelo serviço dono. Teste estrutural: um `@Cron` novo fora do agendador faz falhar o CI.
+- **Cada passagem fica registada** (30 dias), com o que fez ou o erro, exceto as passagens sem trabalho da entrega de webhooks (de 30 em 30 s), que só atualizam o estado.
+- **Limite de tempo** por tarefa (a passagem conta como falha; o trabalho não se interrompe e a seguinte espera por ele) e **disjuntor:** ao fim de N falhas seguidas a tarefa fica em pausa, com auditoria e um aviso a todos os Administradores. Retoma-se à mão (ou correndo-a bem à mão).
+- **As tarefas passaram a falhar de verdade** (a Zadarma e a fila de webhooks escondiam o erro, que só ficava nos logs).
+- **Uma tarefa de um módulo desligado não corre**; à mão é recusada com o motivo.
+- **Validação:** 566 e2e e 345 unitários, 27 mutações (26 apanhadas, 1 equivalente), migração ensaiada e revertida. Detalhes no plano, em «Execução do E1.2».

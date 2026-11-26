@@ -1,5 +1,5 @@
 import { Injectable, Logger } from "@nestjs/common";
-import { Cron } from "@nestjs/schedule";
+import { JobsService } from "../jobs/jobs.service";
 import { Prisma } from "@prisma/client";
 import axios from "axios";
 import { PrismaService } from "../prisma/prisma.service";
@@ -32,7 +32,14 @@ export class WebhookDispatcher {
     private readonly prisma: PrismaService,
     private readonly secrets: SecretsService,
     private readonly audit: AuditService,
-  ) {}
+    jobs: JobsService,
+  ) {
+    // Tarefa agendada do núcleo (Fase E1.2): o agendador e o registo são do núcleo.
+    jobs.handle("webhooks.deliver", async () => {
+      const n = await this.processDue();
+      return { summary: `${n} ${n === 1 ? "entrega" : "entregas"}`, idle: n === 0 };
+    });
+  }
 
   /** Cria uma entrega por cada subscrição ativa que quer este evento e tenta enviá-las já. Devolve os ids. */
   async enqueue(type: string, data: unknown): Promise<string[]> {
@@ -63,8 +70,10 @@ export class WebhookDispatcher {
     return ids;
   }
 
-  /** Agendador: pega nas entregas pendentes cuja hora chegou. */
-  @Cron("*/30 * * * * *")
+  /**
+   * Pega nas entregas pendentes cuja hora chegou (tarefa «webhooks.deliver»). Uma falha da fila (p. ex. da base de
+   * dados) lança, para ficar no registo das tarefas; as falhas de cada entrega ficam na própria entrega.
+   */
   async processDue(): Promise<number> {
     if (this.sweeping) return 0; // uma só passagem de cada vez
     this.sweeping = true;
@@ -80,7 +89,7 @@ export class WebhookDispatcher {
       return due.length;
     } catch (err) {
       this.logger.error(`Falha ao processar a fila de webhooks: ${(err as Error).message}`);
-      return 0;
+      throw err;
     } finally {
       this.sweeping = false;
     }

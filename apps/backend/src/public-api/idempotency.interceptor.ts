@@ -1,10 +1,9 @@
 import { CallHandler, ExecutionContext, HttpStatus, Injectable, NestInterceptor } from "@nestjs/common";
 import { Reflector } from "@nestjs/core";
-import { Cron, CronExpression } from "@nestjs/schedule";
 import { Prisma } from "@prisma/client";
 import { catchError, concatMap, from, Observable, of, throwError } from "rxjs";
 import { PrismaService } from "../prisma/prisma.service";
-import { IDEMPOTENT_KEY, IN_PROGRESS_TTL_MS, isValidIdempotencyKey, RECORD_TTL_MS, requestFingerprint } from "./idempotency";
+import { IDEMPOTENT_KEY, IN_PROGRESS_TTL_MS, isValidIdempotencyKey, requestFingerprint } from "./idempotency";
 import { ApiError } from "./v1-error.filter";
 import { AuthenticatedApiKey } from "./api-key.guard";
 
@@ -104,11 +103,5 @@ export class IdempotencyInterceptor implements NestInterceptor {
 
   private async discard(apiKeyId: string, key: string) {
     await this.prisma.idempotencyRecord.deleteMany({ where: { apiKeyId, key, status: null } });
-  }
-
-  /** Limpeza diária dos registos com mais de 24 h. */
-  @Cron(CronExpression.EVERY_DAY_AT_3AM)
-  async purgeOld() {
-    await this.prisma.idempotencyRecord.deleteMany({ where: { createdAt: { lt: new Date(Date.now() - RECORD_TTL_MS) } } });
   }
 }

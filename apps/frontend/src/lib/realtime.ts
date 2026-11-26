@@ -40,6 +40,8 @@ const KEYS_BY_RESOURCE: Record<string, string[]> = {
   // Um administrador ligou/desligou um módulo: menu, rotas e dashboard de todas as sessões atualizam-se.
   modules: ["modules", "dashboard-summary", "agenda"],
   "api-keys": ["api-keys"],
+  // Tarefas agendadas (E1.2): a página e o aviso de pausa dos Administradores.
+  jobs: ["jobs"],
   webhooks: ["webhooks"],
   // Um administrador mudou permissões: os botões de todas as sessões ajustam-se sem recarregar.
   permissions: ["permissions", "products"],

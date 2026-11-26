@@ -38,6 +38,7 @@ import { ZadarmaModule } from "./zadarma/zadarma.module";
 import { RealtimeModule } from "./realtime/realtime.module";
 import { ModulesModule } from "./modules/modules.module";
 import { ExtensionsModule } from "./extensions/extensions.module";
+import { JobsModule } from "./jobs/jobs.module";
 import { RealtimeInterceptor } from "./realtime/realtime.interceptor";
 
 @Module({
@@ -82,6 +83,7 @@ import { RealtimeInterceptor } from "./realtime/realtime.interceptor";
     RealtimeModule,
     ModulesModule,
     ExtensionsModule,
+    JobsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

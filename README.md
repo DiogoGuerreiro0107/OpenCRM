@@ -167,6 +167,7 @@ Estado atual: **todas as fases do roadmap consolidado e a revisão final conclu�
   - [x] Expedições: transportadoras com link de seguimento, cada envio com transportadora, código, volumes, peso e custo; envio parcial por linha (o resto continua a aguardar stock); «dar por enviada sem o resto»; webhooks `order.created`, `order.status_changed`, `order.shipped` e `order.shipment_updated` (Fase 6d)
   - [x] API de encomendas para a loja online: `POST /api/v1/orders` (cliente por NIF/email, encontrado ou criado; linhas por referência; rascunho ou confirmada com reserva de stock; idempotente e sem duplicados por `external_id`), `GET /api/v1/orders` e `GET /api/v1/products` com o disponível (Fase 6e)
   - [x] Módulos como extensões embutidas: manifesto validado (versões, dependências, permissões declaradas) e página «Módulos e extensões» com o que cada um declara fazer (Fase E1.1)
+  - [x] Tarefas agendadas do núcleo: cada passagem registada, limite de tempo, pausa automática depois de falhas seguidas (com aviso aos Administradores) e a página «Tarefas agendadas» para correr, desligar e retomar (Fase E1.2)
 
 ### Por fazer (backlog)
 

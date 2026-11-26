@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
-import { Cron, CronExpression } from "@nestjs/schedule";
+import { JobsService } from "../jobs/jobs.service";
+import { JobOutcome } from "../jobs/job-catalog";
 import axios from "axios";
 import { CallDirection, ZadarmaAccount } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
@@ -27,7 +28,10 @@ export class ZadarmaService {
     private readonly prisma: PrismaService,
     private readonly modules: ModulesService,
     private readonly secrets: SecretsService,
-  ) {}
+    jobs: JobsService,
+  ) {
+    jobs.handle("zadarma.sync", () => this.syncCallHistory());
+  }
 
   /** Nunca devolve apiKey/apiSecret — só o suficiente para a UI saber se já
    * está configurado e mostrar a extensão/estado. */
@@ -92,12 +96,14 @@ export class ZadarmaService {
     }
   }
 
-  /** Sincroniza o histórico de chamadas da Zadarma (polling periódico). */
-  @Cron(CronExpression.EVERY_10_MINUTES)
-  async syncCallHistory() {
-    if (!this.modules.isEnabled("zadarma")) return;
+  /**
+   * Sincroniza o histórico de chamadas da Zadarma (tarefa «zadarma.sync», de 10 em 10 minutos). Uma falha da Zadarma
+   * lança, para ficar no registo das tarefas (e, repetida, pôr a tarefa em pausa).
+   */
+  async syncCallHistory(): Promise<JobOutcome> {
+    if (!this.modules.isEnabled("zadarma")) return { summary: "Módulo desligado", idle: true };
     const account = await this.prisma.zadarmaAccount.findFirst({ where: { active: true } });
-    if (!account) return;
+    if (!account) return { summary: "Sem conta ativa", idle: true };
 
     const since = account.lastSyncAt ?? new Date(Date.now() - 24 * 60 * 60 * 1000);
     const now = new Date();
@@ -109,22 +115,25 @@ export class ZadarmaService {
       });
 
       const calls = Array.isArray(data?.stats) ? data.stats : [];
+      let created = 0;
       for (const call of calls) {
-        await this.upsertCallRecord(call);
+        if (await this.upsertCallRecord(call)) created++;
       }
 
       await this.prisma.zadarmaAccount.update({ where: { id: account.id }, data: { lastSyncAt: now } });
+      return { summary: `${created} ${created === 1 ? "chamada nova" : "chamadas novas"}`, idle: created === 0 };
     } catch (err) {
       this.logger.warn(`Falha ao sincronizar histórico de chamadas da Zadarma: ${(err as Error).message}`);
+      throw new Error(`Falha ao sincronizar com a Zadarma: ${(err as Error).message}`);
     }
   }
 
   private async upsertCallRecord(call: Record<string, unknown>) {
     const externalId = String(call.pbx_call_id ?? call.call_id_with_rec ?? call.id ?? "");
-    if (!externalId) return;
+    if (!externalId) return false;
 
     const exists = await this.prisma.callRecord.findUnique({ where: { externalId } });
-    if (exists) return;
+    if (exists) return false;
 
     const fromNumber = String(call.from ?? "");
     const toNumber = String(call.to ?? "");
@@ -147,6 +156,7 @@ export class ZadarmaService {
         startedAt: call.call_start ? new Date(String(call.call_start)) : new Date(),
       },
     });
+    return true;
   }
 
   private async matchPhoneNumber(phone: string): Promise<{ contactId?: string; companyId?: string }> {

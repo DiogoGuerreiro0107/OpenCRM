@@ -169,3 +169,41 @@ cópia da base de desenvolvimento, reversão e comparação, como sempre.
 - e2e: as rotas (Administrador; outros 403), «Correr agora» de cada tarefa real, o módulo desligado, a pausa e o
   aviso, a auditoria; os testes que já chamavam as tarefas continuam a passar.
 - Prova por mutação; ensaio da migração; browser na base de testes.
+
+### Execução do E1.2 (2026-11-26)
+**Implementado como planeado**, com estes pormenores:
+- **Código** em `apps/backend/src/jobs/`: `job-catalog.ts` (as seis tarefas), `jobs.service.ts` (registo, saltos,
+  limite de tempo, disjuntor, gestão), `jobs.scheduler.ts` (o único sítio com `@Cron`: um método por tarefa que só a
+  passa ao registo) e `jobs.controller.ts` (`GET /jobs`, `GET /jobs/alerts`, `GET /jobs/:id/runs`,
+  `POST /jobs/:id/run`, `PATCH /jobs/:id`, `POST /jobs/:id/resume`, só Administrador, com auditoria).
+- **Donos do trabalho:** a fila de webhooks, a Zadarma e as automações registam-no no construtor. A limpeza da
+  idempotência saiu do interceptor para um serviço próprio (`IdempotencyCleanupService`): o Nest cria o interceptor
+  uma vez por controller que o usa, e uma tarefa tem um só dono (o arranque recusou-o logo, com «já tem trabalho
+  registado»).
+- **As tarefas passaram a dizer o que fizeram** («3 entregas», «0 chamadas novas», «2 registos apagados») e a falhar
+  de verdade: a Zadarma e a fila de webhooks deixaram de esconder o erro. As automações por tempo continuam a
+  guardar a falha de cada regra no seu histórico, sem parar as outras.
+- **Passagens em pausa só por falhas automáticas ou manuais;** retomar tira da pausa sem correr. Uma passagem
+  automática bem-sucedida nunca encontra a tarefa em pausa (não corre), por isso só a manual tira da pausa.
+- **Aviso** no topo da aplicação, só para Administradores, com o link para a página; atualiza-se em tempo real quando
+  uma tarefa entra em pausa ou é retomada.
+- Configurações → «Tarefas agendadas»: cada tarefa com o estado (ativa, desligada, em pausa, módulo desligado, a
+  correr), o horário, a dona, a última passagem e o último erro, «Correr agora», «Desligar/Ligar», «Retomar» e as
+  últimas 20 passagens.
+
+**Validação:**
+- 9 e2e novos (`jobs.e2e-spec.ts`) e testes estruturais (`jobs-structure.spec.ts`: só o agendador tem `@Cron`, um por
+  tarefa com o horário do catálogo, cada tarefa com trabalho registado uma vez, donas = quem declara
+  `jobs:schedule`). Os testes que já chamavam as tarefas passam sem mudar o que verificam. Bateria completa: 566 e2e
+  e 345 unitários.
+- **Prova por mutação:** 27 mutações, 26 apanhadas e 1 equivalente (uma passagem automática tirar da pausa: em pausa
+  a automática não corre). Duas escaparam na primeira corrida e passaram a ser apanhadas: a limpeza apagar também as
+  recentes e a ordem das passagens.
+- **Migração** ensaiada numa cópia da base de desenvolvimento: as duas tabelas, o CHECK das falhas, a chave
+  estrangeira e os enums recusam valores inválidos; sem desvio; a reversão deixou dados e esquema iguais (impressões
+  digitais 4392755f… e 56b74e29…). Cópia apagada. Base de desenvolvimento migrada depois de uma cópia de segurança.
+- **Browser** (base de testes, Administrador): com a sincronização da Zadarma em pausa (6 falhas), o aviso aparece em
+  todas as páginas; a página mostra o motivo, o último erro e as 6 passagens falhadas; «Retomar» tirou o aviso; a
+  entrega de webhooks passou a correr de 30 em 30 s (11:06:00, 11:06:30…); «Correr agora» na limpeza do registo deu
+  «correu bem · 0 passagens apagadas»; nenhum pedido falhado. Acerto feito: os botões passaram a ficar sempre por
+  baixo da descrição (antes, conforme o tamanho do texto, ficavam ao lado ou por baixo).
