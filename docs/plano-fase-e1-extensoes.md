@@ -121,3 +121,51 @@ interface ExtensionManifest {
 - **Browser** (base de testes, Administrador): a página com os 10 módulos como embutidas; a Telefonia (Zadarma) mostra
   as 4 permissões («Liga-se a api.zadarma.com», «Guarda segredos próprios… cifrados»…); desligar e voltar a ligar
   mantém o detalhe; nenhum pedido falhado.
+
+## Pacote E1.2 — Tarefas agendadas do núcleo
+Detalhado a 2026-11-26, depois do merge do E1.1.
+
+### O que muda
+- **Catálogo de tarefas em código** (`jobs/job-catalog.ts`): id, nome, descrição, a extensão dona (ou o núcleo), o horário
+  (a expressão e o texto em português), o limite de tempo, quantas falhas seguidas a põem em pausa e se as passagens
+  sem trabalho ficam no registo. As seis tarefas:
+
+  | Tarefa | Dona | Horário | Pausa ao fim de |
+  |---|---|---|---|
+  | Entrega de webhooks | núcleo | 30 em 30 s (as passagens sem nada para entregar não ficam no registo) | 20 falhas (10 min) |
+  | Sincronização das chamadas da Zadarma | `zadarma` | 10 em 10 min | 6 falhas (1 h) |
+  | Automações por tempo | `automations` | de hora a hora | 3 falhas |
+  | Limpeza do histórico das automações | `automations` | 3:00 | 3 falhas |
+  | Limpeza da idempotência da API | núcleo | 3:00 | 3 falhas |
+  | Limpeza do registo das tarefas (nova) | núcleo | 3:30 | 3 falhas |
+
+- **Um só caminho de execução** (`JobsService.trigger(id)`): os `@Cron` continuam a marcar a hora, mas só chamam o
+  registo; o trabalho de cada tarefa é registado pelo serviço dono ao arrancar. O registo:
+  - **salta** com a extensão dona desligada, com a tarefa desligada, em pausa, ou com uma passagem anterior ainda a
+    correr (uma só instância do backend);
+  - **regista** cada passagem (`ScheduledJobRun`: início, fim, resultado `SUCCESS`/`FAILED`/`TIMEOUT`, resumo, erro
+    encurtado, automática ou manual e por quem) e o estado (`ScheduledJobState`: ligada, em pausa e porquê, falhas
+    seguidas, última passagem, último sucesso, último erro);
+  - **limite de tempo:** passado o limite, a passagem conta como falha (`TIMEOUT`); o trabalho não se pode
+    interromper, por isso a seguinte só começa quando ele acabar;
+  - **disjuntor:** ao fim de N falhas seguidas a tarefa fica **em pausa**; fica na auditoria (`job.paused`, sem
+    utilizador) e os Administradores veem um aviso no topo da aplicação até a retomarem.
+- **Para isso as tarefas passam a falhar de verdade:** a sincronização da Zadarma e a fila de webhooks deixam de
+  esconder o erro (continua a ir para os logs).
+- **Página Configurações → «Tarefas agendadas»** (Administrador): cada tarefa com a dona, o horário, o estado, a
+  última passagem e o último erro; «Correr agora», «Desligar/Ligar» e «Retomar»; as últimas passagens de cada uma.
+  Correr à mão uma tarefa em pausa e correr bem tira-a da pausa. Tudo na auditoria.
+- **Retenção:** as passagens com mais de 30 dias apagam-se (a tarefa nova).
+- **Teste estrutural:** todo o `@Cron` só chama o registo, toda a tarefa do catálogo tem trabalho registado, e as
+  extensões donas de tarefas declaram `jobs:schedule` (e só elas).
+
+### Migração
+Duas tabelas novas (`ScheduledJobState`, `ScheduledJobRun`) e dois enums; nenhum dado existente é tocado. Ensaio numa
+cópia da base de desenvolvimento, reversão e comparação, como sempre.
+
+### Validação prevista
+- Unitários: o registo com um relógio e tarefas falsas (saltos, sucesso, falha, limite de tempo, disjuntor, retomar,
+  sem sobreposição, passagens sem trabalho), o teste estrutural.
+- e2e: as rotas (Administrador; outros 403), «Correr agora» de cada tarefa real, o módulo desligado, a pausa e o
+  aviso, a auditoria; os testes que já chamavam as tarefas continuam a passar.
+- Prova por mutação; ensaio da migração; browser na base de testes.
