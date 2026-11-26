@@ -56,7 +56,7 @@ scripts/
 
 ## API pública para integrações
 
-O CRM tem uma API pública estável em `/api/v1` (leitura de empresas e contactos, criação de leads a partir de formulários) para lojas online, o n8n e outros sistemas. Cada integração usa uma **chave de API** própria, criada em **Configurações > Chaves de API** (só Administrador), com os âmbitos mínimos e revogável a qualquer momento. Contrato, erros, idempotência e política de versões: [docs/api-publica.md](docs/api-publica.md). **Usa estas chaves só em redes de confiança enquanto o CRM não tiver HTTPS.**
+O CRM tem uma API pública estável em `/api/v1` (leitura de empresas, contactos, produtos e encomendas; criação de leads a partir de formulários e de encomendas a partir de uma loja online) para lojas online, o n8n e outros sistemas. Cada integração usa uma **chave de API** própria, criada em **Configurações > Chaves de API** (só Administrador), com os âmbitos mínimos e revogável a qualquer momento. Contrato, erros, idempotência e política de versões: [docs/api-publica.md](docs/api-publica.md). **Usa estas chaves só em redes de confiança enquanto o CRM não tiver HTTPS.**
 
 No sentido contrário, o CRM avisa outros sistemas com **webhooks** (Configurações > Webhooks): cada aviso vai assinado, é repetido se o destino estiver em baixo e fica num registo de entregas. A variável `N8N_WEBHOOK_URL` continua a funcionar como antes, mas é um modo legado (sem assinatura nem repetição).
 
@@ -166,6 +166,7 @@ Estado atual: **todas as fases do roadmap consolidado e a revisão final conclu�
   - [x] Compras a fornecedor: rascunho com o custo do catálogo, enviada, receção (também em parte) que dá entrada no stock e serve as encomendas à espera, fechar com falta; «O que comprar» a partir das encomendas; tarefa «Preparar encomenda» quando uma encomenda à espera fica completa (Fase 6c)
   - [x] Expedições: transportadoras com link de seguimento, cada envio com transportadora, código, volumes, peso e custo; envio parcial por linha (o resto continua a aguardar stock); «dar por enviada sem o resto»; webhooks `order.created`, `order.status_changed`, `order.shipped` e `order.shipment_updated` (Fase 6d)
   - [x] API de encomendas para a loja online: `POST /api/v1/orders` (cliente por NIF/email, encontrado ou criado; linhas por referência; rascunho ou confirmada com reserva de stock; idempotente e sem duplicados por `external_id`), `GET /api/v1/orders` e `GET /api/v1/products` com o disponível (Fase 6e)
+  - [x] Módulos como extensões embutidas: manifesto validado (versões, dependências, permissões declaradas) e página «Módulos e extensões» com o que cada um declara fazer (Fase E1.1)
 
 ### Por fazer (backlog)
 

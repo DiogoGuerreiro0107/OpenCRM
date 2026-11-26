@@ -34,6 +34,8 @@ const CORE_CONTROLLERS = [
   "AgendaController",
   "DashboardController",
   "ModulesController",
+  // Extensões (E1.1): o registo de todas as extensões, ligadas ou não.
+  "ExtensionsController",
 ];
 
 const SRC = path.resolve(__dirname, "..");

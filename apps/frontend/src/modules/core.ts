@@ -16,7 +16,7 @@ export const coreModule: FrontendModule = {
     { id: "core:work-item-types", label: "Tipos de tarefa", icon: ListChecks, to: "/configuracoes/tipos-de-tarefa", section: "settings", order: 10, roles: ADMIN_ONLY },
     { id: "core:menu", label: "Menu", icon: PanelLeft, to: "/configuracoes/menu", section: "settings", order: 15, roles: ADMIN_ONLY },
     { id: "core:users", label: "Utilizadores", icon: UserCog, to: "/configuracoes/utilizadores", section: "settings", order: 40, roles: ADMIN_ONLY },
-    { id: "core:modules", label: "Módulos", icon: Puzzle, to: "/configuracoes/modulos", section: "settings", order: 60, roles: ADMIN_ONLY },
+    { id: "core:modules", label: "Módulos e extensões", icon: Puzzle, to: "/configuracoes/modulos", section: "settings", order: 60, roles: ADMIN_ONLY },
     { id: "core:permissions", label: "Permissões", icon: ShieldCheck, to: "/configuracoes/permissoes", section: "settings", order: 70, roles: ADMIN_ONLY },
     { id: "core:api-keys", label: "Chaves de API", icon: KeyRound, to: "/configuracoes/chaves-api", section: "settings", order: 80, roles: ADMIN_ONLY },
     { id: "core:webhooks", label: "Webhooks", icon: Webhook, to: "/configuracoes/webhooks", section: "settings", order: 90, roles: ADMIN_ONLY },

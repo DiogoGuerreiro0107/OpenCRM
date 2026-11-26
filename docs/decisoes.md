@@ -732,3 +732,12 @@ Quarto pacote da [Fase 6](plano-fase-6-encomendas.md).
 - **Clientes novos iguais em simultâneo** serializados por NIF e email (trinco da transação), para não nascerem duplicados.
 - **Leitura de encomendas sem o custo das expedições nem notas internas**; o envio parcial e a correção de uma expedição passam a contar como alteração (sincronização por data).
 - **Validação:** 10 e2e novos (556 e2e e 305 unitários), 44 mutações (todas apanhadas), sem migração. Detalhes no plano, em «Execução do 6e».
+
+## Fase E1.1: manifesto das extensões (2026-11-26)
+Primeiro pacote da [Fase E1](plano-fase-e1-extensoes.md) (base de extensões, antes da faturação).
+- **Um só conceito de extensão:** os módulos passam a ser extensões **embutidas** com o manifesto do desenho (id, versão, intervalo do SDK, dependências por versão, contratos, permissões declaradas). `ModuleId`, `@RequireModule` e `ModuleSetting` ficam: são o interruptor de qualquer extensão.
+- **Versão do contrato com as extensões:** `SDK_VERSION = 1.0.0`; as embutidas acompanham-na.
+- **Permissões declaradas de um vocabulário fechado** (`data:<área>:write`, `net:egress:<domínio>` ou `configured`, `secrets:own`, `webhooks:emit`, `jobs:schedule`), mostradas em português. São **declaração e auditoria, não uma barreira** para código que corre no backend; a página di-lo.
+- **Validação escrita à mão** (forma, *semver*, SDK compatível, dependências, ciclos), sem dependências novas; manifestos embutidos inválidos impedem o arranque.
+- Configurações → «Módulos e extensões» mostra origem, versão e permissões de cada um.
+- **Validação:** 557 e2e e 339 unitários, 27 mutações (todas apanhadas), sem migração. Detalhes no plano, em «Execução do E1.1».

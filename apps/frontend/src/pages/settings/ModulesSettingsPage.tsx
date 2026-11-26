@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { listModules, setModuleEnabled, type ModuleId, type ModuleView } from "@/lib/modules-api";
+import { listExtensions, listModules, setModuleEnabled, type ExtensionView, type ModuleId, type ModuleView } from "@/lib/modules-api";
 import { errorMessage } from "@/lib/errors";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -8,6 +8,8 @@ import { LeadModeSetting } from "./LeadModeSetting";
 export function ModulesSettingsPage() {
   const queryClient = useQueryClient();
   const { data: modules, isLoading } = useQuery({ queryKey: ["modules", "manage"], queryFn: listModules });
+  const { data: extensions } = useQuery({ queryKey: ["modules", "extensions"], queryFn: listExtensions });
+  const extensionOf = (id: ModuleId) => extensions?.find((e) => e.id === id);
 
   const toggle = useMutation({
     mutationFn: ({ id, enabled }: { id: ModuleId; enabled: boolean }) => setModuleEnabled(id, enabled),
@@ -29,11 +31,17 @@ export function ModulesSettingsPage() {
   return (
     <div className="mx-auto max-w-2xl space-y-4">
       <div>
-        <h1 className="text-2xl font-semibold">Módulos</h1>
+        <h1 className="text-2xl font-semibold">Módulos e extensões</h1>
         <p className="text-sm text-muted-foreground">
           Liga só o que a tua empresa usa. Desligar um módulo esconde-o e bloqueia-o para toda a gente, mas{" "}
           <strong>nunca apaga dados</strong>: ao voltar a ligar tudo reaparece. As empresas, contactos, tarefas, campos
           personalizados e o dashboard fazem parte do núcleo e estão sempre ativos.
+        </p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Cada módulo é uma <strong>extensão</strong> que vem com o CRM («embutida»). Em cada uma vês o que{" "}
+          <strong>declara</strong> fazer: que dados altera, se se liga a serviços de fora e se guarda segredos. É uma
+          declaração para saberes o que cada uma faz, não uma barreira: o código das extensões embutidas corre dentro do
+          CRM.
         </p>
       </div>
 
@@ -58,6 +66,7 @@ export function ModulesSettingsPage() {
                 </div>
                 <p className="text-sm text-muted-foreground">{module.description}</p>
                 {hint(module) && <p className="text-xs text-muted-foreground">{hint(module)}</p>}
+                {extensionOf(module.id) && <ExtensionDetails extension={extensionOf(module.id)!} />}
                 {module.id === "leads" && module.enabled && <LeadModeSetting />}
               </div>
               <label className="flex shrink-0 items-center gap-2 text-sm">
@@ -76,5 +85,24 @@ export function ModulesSettingsPage() {
         ))}
       </div>
     </div>
+  );
+}
+
+/** Origem, versão e o que a extensão declara (Fase E1.1). */
+function ExtensionDetails({ extension }: { extension: ExtensionView }) {
+  return (
+    <details className="text-xs text-muted-foreground">
+      <summary className="cursor-pointer select-none">
+        {extension.origin === "builtin" ? "Embutida" : "Instalada"} · versão {extension.version} · declara{" "}
+        {extension.permissions.length} {extension.permissions.length === 1 ? "permissão" : "permissões"}
+      </summary>
+      <ul className="mt-1 list-disc space-y-0.5 pl-5">
+        {extension.permissions.map((p) => (
+          <li key={p.permission}>
+            {p.description} <code className="font-mono text-[11px]">{p.permission}</code>
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }

@@ -89,3 +89,35 @@ interface ExtensionManifest {
   válidas e coerentes com `ModuleId`, o grafo de dependências.
 - e2e: `GET /extensions` (Administrador sim, outros papéis 403, conteúdo e estado após ligar/desligar).
 - Prova por mutação; sem migração (nada muda na base); browser na base de testes.
+
+### Execução do E1.1 (2026-11-26)
+**Implementado como planeado**, com estes pormenores:
+- **Código** em `apps/backend/src/extensions/`: `manifest.ts` (formato, `SDK_VERSION = 1.0.0`, validação de um manifesto
+  e de um conjunto), `semver.ts`, `permissions.ts` (vocabulário com a descrição em português), `builtin.ts` (os
+  módulos como embutidas, derivados de `MODULE_MANIFESTS`) e `GET /extensions`. Os manifestos dos módulos ganharam
+  `permissions`.
+- **Permissões declaradas dos módulos:** leads (leads, empresas, contactos, eventos), negócios (negócios, eventos),
+  email (enviar email, modelos, servidores configurados, segredos), Zadarma (ligar, `api.zadarma.com`, segredos,
+  tarefas agendadas), automações (negócios, trabalho do dia-a-dia, servidores configurados, eventos, tarefas
+  agendadas), assistências (trabalho do dia-a-dia), produtos (catálogo), stock (movimentos), encomendas (encomendas,
+  empresas e contactos pela API, eventos), compras (compras). O email não declara tarefas agendadas: a sincronização
+  é do `email-worker`, um serviço à parte.
+- **Validação escrita à mão** em vez do `ajv` (sem dependências novas): mensagens em português com o campo, e as regras
+  de conjunto (ids repetidos, dependências, versões, ciclos) que um esquema JSON não exprime.
+- **Ao arrancar**, um conjunto de embutidas inválido impede o backend de arrancar; o teste unitário verifica o mesmo
+  conjunto no CI.
+- **Página:** Configurações → «Módulos e extensões» (o item do menu mudou de nome; a rota é a mesma), com «Embutida ·
+  versão 1.0.0 · declara N permissões» em cada módulo, a abrir a lista, e a nota de que é uma declaração e não uma
+  barreira.
+
+**Validação:**
+- Unitários novos (`extensions.spec.ts`: *semver*, permissões, manifesto, conjunto, embutidas) e 1 e2e novo
+  (`GET /extensions`: Administrador, 403, 401, conteúdo, estado depois de desligar). Bateria completa: 557 e2e e 339
+  unitários.
+- **Prova por mutação:** 27 mutações, todas apanhadas. Escapou uma na primeira corrida (o id aceitar maiúsculas: o
+  teste só usava «Faturação», recusado pelo «ç»), que passou a ser apanhada com ids só com maiúsculas e hífens.
+  Não coberto por teste: a recusa de arrancar com manifestos inválidos (o teste unitário verifica a mesma lista).
+- **Sem migração** (nada muda na base).
+- **Browser** (base de testes, Administrador): a página com os 10 módulos como embutidas; a Telefonia (Zadarma) mostra
+  as 4 permissões («Liga-se a api.zadarma.com», «Guarda segredos próprios… cifrados»…); desligar e voltar a ligar
+  mantém o detalhe; nenhum pedido falhado.

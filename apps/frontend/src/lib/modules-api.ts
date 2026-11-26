@@ -28,3 +28,20 @@ export async function setModuleEnabled(id: ModuleId, enabled: boolean) {
   const { data } = await api.patch<ModuleView[]>(`/modules/${id}`, { enabled });
   return data;
 }
+
+/** Uma extensão (Fase E1.1): por agora os módulos, como extensões embutidas. */
+export interface ExtensionView {
+  id: string;
+  name: string;
+  version: string;
+  origin: "builtin" | "installed";
+  enabled: boolean;
+  /** O que a extensão DECLARA precisar, com a descrição em português. */
+  permissions: Array<{ permission: string; description: string }>;
+}
+
+/** Extensões com o manifesto e as permissões declaradas — Administrador. */
+export async function listExtensions() {
+  const { data } = await api.get<ExtensionView[]>("/extensions");
+  return data;
+}
