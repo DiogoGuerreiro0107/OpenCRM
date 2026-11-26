@@ -147,7 +147,7 @@ describe("Encomendas (e2e)", () => {
     await api().patch(`/orders/${order.id}`).set("Authorization", comercial).send({ notes: "x" }).expect(409);
 
     expect(await notes(order.id)).toEqual(["Encomenda EN-0001 criada", "Linha acrescentada: 1 × Serviço a 100,00 €", "Encomenda confirmada", "Responsável: Carla Comercial", "Encomenda enviada", "Encomenda entregue"]);
-    const audit = await prisma().auditEvent.findMany({ where: { targetId: order.id }, select: { action: true } });
+    const audit = await prisma().auditEvent.findMany({ where: { targetId: order.id }, orderBy: [{ createdAt: "asc" }, { id: "asc" }], select: { action: true } });
     expect(audit.map((a) => a.action)).toEqual(["order.confirmed", "order.shipped"]);
   });
 

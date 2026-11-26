@@ -31,12 +31,30 @@ export async function createTestApp(): Promise<INestApplication> {
  * como no arranque.
  * Só corre em bases de dados de teste (ver env.ts).
  */
+/**
+ * Esvazia todas as tabelas e recomeça a numeração. Com `DELETE`, não `TRUNCATE`: o `TRUNCATE` reconstrói todos os
+ * índices e grava cada um em disco (`fsync`), o que com ~80 tabelas no Docker do Windows chegou a passar dos 30 s do
+ * `beforeEach` (Fase 6d). Os `DELETE` correm com as chaves estrangeiras e os triggers desligados nesta transação
+ * (`session_replication_role = replica`, que pede um superutilizador — o da base de testes local e do CI). Se não der,
+ * volta ao `TRUNCATE`.
+ */
 export async function resetDatabase(prisma: PrismaClient) {
   const tables = await prisma.$queryRaw<Array<{ tablename: string }>>`
     SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> '_prisma_migrations'`;
   if (tables.length === 0) return;
-  const list = tables.map((t) => `"${t.tablename}"`).join(", ");
-  await prisma.$executeRawUnsafe(`TRUNCATE TABLE ${list} RESTART IDENTITY CASCADE`);
+  const list = tables.map((t) => `"${t.tablename}"`);
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRawUnsafe(`SET LOCAL session_replication_role = replica`);
+      for (const table of list) await tx.$executeRawUnsafe(`DELETE FROM ${table}`);
+      await tx.$executeRawUnsafe(`
+        SELECT setval(c.oid, 1, false) FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE c.relkind = 'S' AND n.nspname = 'public'`);
+    }, { timeout: 60_000 });
+  } catch (err) {
+    if (!/permission denied|must be superuser/i.test(String(err))) throw err;
+    await prisma.$executeRawUnsafe(`TRUNCATE TABLE ${list.join(", ")} RESTART IDENTITY CASCADE`);
+  }
   await ensureSystemWorkItemTypes(prisma);
   await ensureSystemAutomationRules(prisma);
 }

@@ -7,7 +7,20 @@ import { Audit } from "../audit/audit.decorator";
 import { ModuleGuard } from "../modules/module.guard";
 import { RequireModule } from "../modules/require-module.decorator";
 import { OrdersService } from "./orders.service";
-import { CancelOrderDto, CreateOrderDto, CreateOrderLineDto, QueryOrdersDto, ShipOrderDto, UpdateOrderDto, UpdateOrderLineDto } from "./dto/order.dto";
+import { CarriersService } from "./carriers.service";
+import {
+  CancelOrderDto,
+  CreateCarrierDto,
+  CreateOrderDto,
+  CreateOrderLineDto,
+  FinishOrderDto,
+  QueryOrdersDto,
+  ShipOrderDto,
+  UpdateCarrierDto,
+  UpdateOrderDto,
+  UpdateOrderLineDto,
+  UpdateShipmentDto,
+} from "./dto/order.dto";
 
 type Actor = { userId: string };
 
@@ -78,12 +91,29 @@ export class OrdersController {
     return this.orders.reserve(id, user.userId);
   }
 
-  /** Lança as saídas de stock e liberta as reservas (Fase 6b). Enviar sem stock reservado fica na auditoria. */
+  /**
+   * Regista uma expedição (Fase 6d): tudo o que falta enviar ou só parte (`lines`). Lança as saídas de stock e
+   * liberta as reservas do que sai (Fase 6b). Enviar sem stock reservado fica na auditoria.
+   */
   @Post(":id/ship")
   @HttpCode(HttpStatus.OK)
-  @Audit("order.shipped", { target: "order", fields: ["allowShortage"] })
+  @Audit("order.shipped", { target: "order", fields: ["allowShortage", "lines", "carrierId", "trackingCode"] })
   ship(@Param("id") id: string, @Body() dto: ShipOrderDto, @CurrentUser() user: Actor) {
     return this.orders.ship(id, dto, user.userId);
+  }
+
+  /** Corrige os dados do transporte de uma expedição (Fase 6d); as quantidades não mudam. */
+  @Patch(":id/shipments/:shipmentId")
+  updateShipment(@Param("id") id: string, @Param("shipmentId") shipmentId: string, @Body() dto: UpdateShipmentDto, @CurrentUser() user: Actor) {
+    return this.orders.updateShipment(id, shipmentId, dto, user.userId);
+  }
+
+  /** «Dar por enviada sem o resto» (Fase 6d): com parte enviada, o que falta não vai. */
+  @Post(":id/finish")
+  @HttpCode(HttpStatus.OK)
+  @Audit("order.finished", { target: "order", fields: ["reason"] })
+  finish(@Param("id") id: string, @Body() dto: FinishOrderDto, @CurrentUser() user: Actor) {
+    return this.orders.finish(id, dto, user.userId);
   }
 
   @Post(":id/deliver")
@@ -97,5 +127,35 @@ export class OrdersController {
   @Audit("order.cancelled", { target: "order", fields: ["reason"] })
   cancel(@Param("id") id: string, @Body() dto: CancelOrderDto, @CurrentUser() user: Actor) {
     return this.orders.cancel(id, dto, user.userId);
+  }
+}
+
+/** Transportadoras (Fase 6d): configuração das expedições, com a área «Encomendas». */
+@UseGuards(JwtAuthGuard, RolesGuard, ModuleGuard)
+@RequireModule("encomendas")
+@WriteArea("orders")
+@Controller("carriers")
+export class CarriersController {
+  constructor(private readonly carriers: CarriersService) {}
+
+  @Get()
+  list() {
+    return this.carriers.list();
+  }
+
+  @Post()
+  create(@Body() dto: CreateCarrierDto) {
+    return this.carriers.create(dto);
+  }
+
+  @Patch(":id")
+  update(@Param("id") id: string, @Body() dto: UpdateCarrierDto) {
+    return this.carriers.update(id, dto);
+  }
+
+  @Delete(":id")
+  @HttpCode(HttpStatus.NO_CONTENT)
+  remove(@Param("id") id: string) {
+    return this.carriers.remove(id);
   }
 }

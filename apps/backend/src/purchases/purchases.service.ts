@@ -96,12 +96,12 @@ type Need = {
 async function computeNeeds(db: Db, only?: string[]): Promise<Need[]> {
   const filter = only ? Prisma.sql`AND p."id" IN (${Prisma.join(only.length ? only : [""])})` : Prisma.empty;
   const waiting = await db.$queryRaw<Array<{ productId: string; waiting: Prisma.Decimal; orders: Array<{ id: string; number: number }> }>>`
-    SELECT l."productId", SUM(l."quantity" - l."reservedQuantity") AS "waiting",
+    SELECT l."productId", SUM(l."unshippedQuantity" - l."reservedQuantity") AS "waiting",
            json_agg(DISTINCT jsonb_build_object('id', o."id", 'number', o."number")) AS "orders"
     FROM "SalesOrderLine" l
     JOIN "SalesOrder" o ON o."id" = l."orderId"
     JOIN "Product" p ON p."id" = l."productId"
-    WHERE o."status" = 'CONFIRMED' AND p."tracksStock" AND l."reservedQuantity" < l."quantity" ${filter}
+    WHERE o."status" = 'CONFIRMED' AND p."tracksStock" AND l."reservedQuantity" < l."unshippedQuantity" ${filter}
     GROUP BY l."productId"`;
   const over = await db.$queryRaw<Array<{ id: string; over: Prisma.Decimal }>>`
     SELECT p."id", p."reserved" - p."stockOnHand" AS "over" FROM "Product" p

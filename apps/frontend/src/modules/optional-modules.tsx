@@ -1,5 +1,5 @@
 import { lazy } from "react";
-import { FileText, KanbanSquare, Mail, Package, Phone, ShoppingCart, Tags, Truck, UserPlus, Wrench, Zap } from "lucide-react";
+import { FileText, KanbanSquare, Mail, Package, PackageCheck, Phone, ShoppingCart, Tags, Truck, UserPlus, Wrench, Zap } from "lucide-react";
 import { ADMIN_ONLY } from "@/lib/permissions";
 import type { FrontendModule, RecordPanelProps } from "./types";
 
@@ -123,10 +123,15 @@ export const productsModule: FrontendModule = {
 /** Encomendas de cliente (Fase 6a): menu, lista, ficha e o cartão nas fichas de empresa e contacto. */
 export const ordersModule: FrontendModule = {
   id: "encomendas",
-  nav: [{ id: "encomendas:list", label: "Encomendas", icon: ShoppingCart, to: "/encomendas", section: "main", order: 39 }],
+  nav: [
+    { id: "encomendas:list", label: "Encomendas", icon: ShoppingCart, to: "/encomendas", section: "main", order: 39 },
+    // Transportadoras (Fase 6d), para as expedições.
+    { id: "encomendas:carriers", label: "Transportadoras", icon: PackageCheck, to: "/configuracoes/transportadoras", section: "settings", order: 26, writeArea: "orders" },
+  ],
   routes: [
     { path: "/encomendas", page: lazy(() => import("@/pages/orders/OrdersListPage").then((m) => ({ default: m.OrdersListPage }))) },
     { path: "/encomendas/:id", page: lazy(() => import("@/pages/orders/OrderDetailPage").then((m) => ({ default: m.OrderDetailPage }))) },
+    { path: "/configuracoes/transportadoras", writeArea: "orders", page: lazy(() => import("@/pages/orders/CarriersSettingsPage").then((m) => ({ default: m.CarriersSettingsPage }))) },
   ],
   recordPanels: [
     {

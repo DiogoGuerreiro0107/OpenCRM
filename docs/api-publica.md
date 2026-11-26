@@ -119,6 +119,10 @@ Cabeçalhos: `X-OpenCRM-Event` (o tipo), `X-OpenCRM-Delivery` (id desta entrega)
 | `deal.created` | negócio criado | `deal_id`, `title`, `value`, `pipeline_id`, `stage_id`, `stage_name` |
 | `deal.stage_changed` | negócio mudou de fase | `deal_id`, `title`, `pipeline_id`, `from_stage_id`, `from_stage_name`, `to_stage_id`, `to_stage_name`, `to_stage_type` |
 | `deal.proposal_sent` | negócio entrou em «Proposta enviada» | `deal_id`, `title`, `pipeline_id`, `stage_id` |
+| `order.created` | encomenda criada | `order_id`, `code`, `status`, `company_id`, `contact_id`, `customer_reference`, `total` |
+| `order.status_changed` | encomenda confirmada, enviada (por inteiro ou dada por enviada sem o resto), entregue ou cancelada | os de `order.created` + `from`, `to` e, quando há, `reason` |
+| `order.shipped` | expedição registada (também os envios parciais) | os de `order.created` + `partial` e `shipment` (`id`, `shipped_at`, `carrier`, `tracking_code`, `tracking_url`, `packages`, `weight_kg`, `lines` com `order_line_id`, `product_id`, `sku`, `description`, `quantity`); sem o custo |
+| `order.shipment_updated` | expedição corrigida (ex.: o código de seguimento chegou depois) | os de `order.created` + `shipment` (como em `order.shipped`) |
 | `automation.deal_moved` | uma automação moveu um negócio | `deal_id`, `rule_id`, `rule_name`, `to_stage_id`, `to_pipeline_id` |
 | `automation.triggered` (ou o nome que deres na regra) | uma automação disparou um webhook | `deal_id`, `rule_id`, `rule_name` |
 | `webhook.test` | botão «Enviar teste» | `message`, `subscription_name` |

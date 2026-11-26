@@ -53,6 +53,8 @@ const KEYS_BY_RESOURCE: Record<string, string[]> = {
   // Encomendas (Fase 6a); reservam e gastam stock (6b).
   orders: ["orders", "timeline", "products", "stock", "tasks", "agenda", "purchase-suggestions"],
   // Compras a fornecedor (Fase 6c): as receções dão entrada no stock e servem as encomendas à espera.
+  // Transportadoras (Fase 6d): o seletor das expedições e a página de Configurações.
+  carriers: ["carriers", "orders"],
   "purchase-orders": ["purchase-orders", "purchase-suggestions", "timeline", "products", "stock", "orders", "tasks", "agenda"],
 };
 

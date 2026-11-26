@@ -1,12 +1,13 @@
 import { SalesOrderStatus } from "@prisma/client";
 import { Type } from "class-transformer";
-import { IsBoolean, IsEnum, IsIn, IsNumber, IsOptional, IsString, Matches, Max, MaxLength, Min, ValidateIf } from "class-validator";
+import { ArrayMaxSize, ArrayMinSize, IsArray, IsBoolean, IsEnum, IsIn, IsInt, IsNumber, IsOptional, IsString, Matches, Max, MaxLength, Min, ValidateIf, ValidateNested } from "class-validator";
 import { PageQueryDto } from "../../common/pagination";
 
 /** Encomendas de cliente (Fase 6a). Nos campos opcionais, `null` apaga. */
 
 const MAX_MONEY = 999_999_999;
 const MAX_QUANTITY = 99_999_999;
+const MAX_WEIGHT = 9_999_999;
 
 export class CreateOrderDto {
   /** Empresa e/ou contacto: pelo menos um (validado no serviço e por CHECK). */
@@ -106,6 +107,11 @@ export class QueryOrdersDto extends PageQueryDto {
   @IsOptional()
   @IsIn(["true"])
   ready?: "true";
+
+  /** «Parcialmente enviada» (Fase 6d): confirmadas com alguma coisa já enviada. */
+  @IsOptional()
+  @IsIn(["true"])
+  partiallyShipped?: "true";
 
   /** Encomendas com este produto nas linhas. */
   @IsOptional()
@@ -212,9 +218,132 @@ export class CancelOrderDto {
   reason!: string;
 }
 
-export class ShipOrderDto {
-  /** Enviar mesmo com linhas à espera de stock (o stock fica negativo). */
+/** Uma linha de um envio parcial (Fase 6d). */
+export class ShipLineDto {
+  @IsString()
+  lineId!: string;
+
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 }, { message: "A quantidade tem no máximo duas casas decimais" })
+  @Min(0.01, { message: "A quantidade a enviar tem de ser positiva" })
+  @Max(MAX_QUANTITY)
+  quantity!: number;
+}
+
+/** Dados do transporte de uma expedição (Fase 6d). Na correção, `null` apaga. */
+export class ShipmentDetailsDto {
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsString()
+  carrierId?: string | null;
+
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsString()
+  @MaxLength(100)
+  trackingCode?: string | null;
+
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @Type(() => Number)
+  @IsInt({ message: "Os volumes são um número inteiro" })
+  @Min(1, { message: "Pelo menos 1 volume" })
+  @Max(10_000)
+  packages?: number | null;
+
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 }, { message: "O peso tem no máximo duas casas decimais" })
+  @Min(0)
+  @Max(MAX_WEIGHT)
+  weightKg?: number | null;
+
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @Type(() => Number)
+  @IsNumber({ maxDecimalPlaces: 2 }, { message: "O custo tem no máximo duas casas decimais" })
+  @Min(0)
+  @Max(MAX_MONEY)
+  cost?: number | null;
+
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsString()
+  @MaxLength(1000)
+  notes?: string | null;
+}
+
+export class ShipOrderDto extends ShipmentDetailsDto {
+  /** Enviar mesmo sem o stock reservado para o que se envia (o stock fica negativo). */
   @IsOptional()
   @IsBoolean()
   allowShortage?: boolean;
+
+  /** Envio parcial (Fase 6d): o que sai de cada linha. Sem isto, sai tudo o que falta enviar. */
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1, { message: "Indica o que vai neste envio" })
+  @ArrayMaxSize(200)
+  @ValidateNested({ each: true })
+  @Type(() => ShipLineDto)
+  lines?: ShipLineDto[];
+}
+
+export class UpdateShipmentDto extends ShipmentDetailsDto {}
+
+/** «Dar por enviada sem o resto» (Fase 6d). */
+export class FinishOrderDto {
+  @IsString()
+  @Matches(/\S/, { message: "Indica porque não vai o resto" })
+  @MaxLength(500)
+  reason!: string;
+}
+
+export class CreateCarrierDto {
+  @IsString()
+  @Matches(/\S/, { message: "Indica o nome" })
+  @MaxLength(80)
+  name!: string;
+
+  /** Link de seguimento com `{codigo}` (ex.: https://transportadora.pt/seguir?n={codigo}). */
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsString()
+  @MaxLength(500)
+  trackingUrlTemplate?: string | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(10_000)
+  sortOrder?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  active?: boolean;
+}
+
+export class UpdateCarrierDto {
+  @IsOptional()
+  @IsString()
+  @Matches(/\S/, { message: "Indica o nome" })
+  @MaxLength(80)
+  name?: string;
+
+  @IsOptional()
+  @ValidateIf((_, v) => v !== null)
+  @IsString()
+  @MaxLength(500)
+  trackingUrlTemplate?: string | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(10_000)
+  sortOrder?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  active?: boolean;
 }

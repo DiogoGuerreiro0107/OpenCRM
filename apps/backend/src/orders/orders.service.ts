@@ -11,7 +11,9 @@ import { OrderPreparationService } from "./order-preparation.service";
 import { onOrderByProduct } from "../purchases/purchases.service";
 import { recordMovement } from "../stock/stock.service";
 import { allocateWaiting, lockProducts, reservationText, SALES_ORDER_SOURCE, waitingLines } from "../stock/reservations";
-import { CancelOrderDto, CreateOrderDto, CreateOrderLineDto, QueryOrdersDto, ShipOrderDto, UpdateOrderDto, UpdateOrderLineDto } from "./dto/order.dto";
+import { WebhooksService } from "../webhooks/webhooks.service";
+import { trackingUrl } from "./carriers.service";
+import { CancelOrderDto, CreateOrderDto, CreateOrderLineDto, FinishOrderDto, QueryOrdersDto, ShipOrderDto, UpdateOrderDto, UpdateOrderLineDto, UpdateShipmentDto } from "./dto/order.dto";
 
 /** No máximo isto por encomenda: as linhas vêm sempre todas com a encomenda. */
 export const MAX_LINES_PER_ORDER = 200;
@@ -56,6 +58,19 @@ const STATUS_LABEL: Record<SalesOrderStatus, string> = {
   CANCELLED: "cancelada",
 };
 
+const pt = (n: number, digits = 2) => n.toLocaleString("pt-PT", { minimumFractionDigits: 0, maximumFractionDigits: digits });
+
+/** «CTT · código AB123 · 2 volumes · 3,5 kg · 7,90 €»: o transporte de uma expedição, para a timeline (Fase 6d). */
+export function transportText(s: { carrierName?: string | null; trackingCode?: string | null; packages?: number | null; weightKg?: number | null; cost?: number | null }) {
+  const parts: string[] = [];
+  if (s.carrierName) parts.push(s.carrierName);
+  if (s.trackingCode) parts.push(`código ${s.trackingCode}`);
+  if (s.packages != null) parts.push(`${s.packages} ${s.packages === 1 ? "volume" : "volumes"}`);
+  if (s.weightKg != null) parts.push(`${pt(s.weightKg)} kg`);
+  if (s.cost != null) parts.push(`${s.cost.toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`);
+  return parts.join(" · ");
+}
+
 const PARTY = {
   company: { select: { id: true, name: true, taxId: true } },
   contact: { select: { id: true, name: true, email: true } },
@@ -63,12 +78,25 @@ const PARTY = {
 } as const;
 const LINE_ORDER: Prisma.SalesOrderLineOrderByWithRelationInput[] = [{ position: "asc" }, { id: "asc" }];
 const LINE_PRODUCT = { product: { select: { id: true, tracksStock: true, stockOnHand: true, reserved: true } } } as const;
-const DETAIL = { ...PARTY, createdBy: { select: { id: true, name: true } }, lines: { orderBy: LINE_ORDER, include: LINE_PRODUCT } } satisfies Prisma.SalesOrderInclude;
-const LIST = { ...PARTY, _count: { select: { lines: true } } } as const;
+/** Expedição com a transportadora e as linhas (Fase 6d). */
+const SHIPMENT = {
+  carrier: { select: { id: true, name: true, trackingUrlTemplate: true } },
+  createdBy: { select: { id: true, name: true } },
+  lines: { include: { orderLine: { select: { id: true, position: true, productId: true, sku: true, description: true } } } },
+} satisfies Prisma.ShipmentInclude;
+const SHIPMENT_ORDER: Prisma.ShipmentOrderByWithRelationInput[] = [{ shippedAt: "asc" }, { createdAt: "asc" }, { id: "asc" }];
+const DETAIL = {
+  ...PARTY,
+  createdBy: { select: { id: true, name: true } },
+  lines: { orderBy: LINE_ORDER, include: LINE_PRODUCT },
+  shipments: { orderBy: SHIPMENT_ORDER, include: SHIPMENT },
+} satisfies Prisma.SalesOrderInclude;
+const LIST = { ...PARTY, _count: { select: { lines: true, shipments: true } } } as const;
 
 type DetailRow = Prisma.SalesOrderGetPayload<{ include: typeof DETAIL }>;
 type ListRow = Prisma.SalesOrderGetPayload<{ include: typeof LIST }>;
 type LineRow = DetailRow["lines"][number];
+type ShipmentRow = Prisma.ShipmentGetPayload<{ include: typeof SHIPMENT }>;
 type Tx = Prisma.TransactionClient;
 
 /** Mais recentes primeiro. */
@@ -87,6 +115,7 @@ export class OrdersService {
     private readonly prisma: PrismaService,
     private readonly modules: ModulesService,
     private readonly preparation: OrderPreparationService,
+    private readonly webhooks: WebhooksService,
   ) {}
 
   /** As encomendas reservam e gastam stock (Fase 6b) com o módulo «Stock» ligado (as encomendas estão, se cá chegou). */
@@ -94,9 +123,12 @@ export class OrdersService {
     return this.modules.isEnabled("stock") && this.modules.isEnabled("encomendas");
   }
 
-  /** Linha que aguarda stock: produto que controla stock e reserva abaixo da quantidade (numa encomenda confirmada). */
+  /**
+   * Linha que aguarda stock: produto que controla stock e reserva abaixo do que falta enviar (numa encomenda
+   * confirmada; Fase 6d: depois de um envio parcial, só o resto).
+   */
   private waitingLineWhere(): Prisma.SalesOrderLineWhereInput {
-    return { product: { tracksStock: true }, reservedQuantity: { lt: this.prisma.salesOrderLine.fields.quantity } };
+    return { product: { tracksStock: true }, reservedQuantity: { lt: this.prisma.salesOrderLine.fields.unshippedQuantity } };
   }
 
   private lineView(line: LineRow, status: SalesOrderStatus) {
@@ -104,6 +136,7 @@ export class OrdersService {
     const { product, ...rest } = line;
     const quantity = Number(line.quantity);
     const reserved = Number(line.reservedQuantity);
+    const unshipped = Number(line.unshippedQuantity);
     return {
       ...rest,
       quantity,
@@ -113,7 +146,9 @@ export class OrdersService {
       lineTotal: Number(line.lineTotal),
       vatAmount: Number(vat),
       reservedQuantity: reserved,
-      waitingQuantity: status === "CONFIRMED" && product?.tracksStock ? round2(quantity - reserved) : 0,
+      shippedQuantity: Number(line.shippedQuantity),
+      unshippedQuantity: unshipped,
+      waitingQuantity: status === "CONFIRMED" && product?.tracksStock ? round2(unshipped - reserved) : 0,
       product: product
         ? { id: product.id, tracksStock: product.tracksStock, stockOnHand: Number(product.stockOnHand), reserved: Number(product.reserved), available: round2(Number(product.stockOnHand) - Number(product.reserved)) }
         : null,
@@ -124,14 +159,63 @@ export class OrdersService {
     return { ...o, code: orderCode(o.number), subtotal: Number(o.subtotal), vatTotal: Number(o.vatTotal), total: Number(o.total) };
   }
 
+  private shipmentView(s: ShipmentRow) {
+    const { carrier, lines, ...rest } = s;
+    return {
+      ...rest,
+      weightKg: s.weightKg === null ? null : Number(s.weightKg),
+      cost: s.cost === null ? null : Number(s.cost),
+      carrier: carrier ? { id: carrier.id, name: carrier.name } : null,
+      trackingUrl: trackingUrl(carrier?.trackingUrlTemplate, s.trackingCode),
+      lines: [...lines]
+        .sort((a, b) => a.orderLine.position - b.orderLine.position || a.orderLine.id.localeCompare(b.orderLine.id))
+        .map((l) => ({ id: l.id, orderLineId: l.orderLineId, productId: l.orderLine.productId, sku: l.orderLine.sku, description: l.orderLine.description, quantity: Number(l.quantity) })),
+    };
+  }
+
   private detailView(o: DetailRow) {
+    const { shipments, ...rest } = o;
     const lines = o.lines.map((l) => this.lineView(l, o.status));
-    return { ...this.money(o), lines, waitingLines: lines.filter((l) => l.waitingQuantity > 0).length };
+    return {
+      ...this.money(rest),
+      lines,
+      waitingLines: lines.filter((l) => l.waitingQuantity > 0).length,
+      shipments: shipments.map((s) => this.shipmentView(s)),
+      partiallyShipped: o.status === "CONFIRMED" && shipments.length > 0,
+    };
   }
 
   private listView(o: ListRow, waiting: Map<string, number>) {
     const { _count, ...rest } = o;
-    return { ...this.money(rest), lineCount: _count.lines, waitingLines: o.status === "CONFIRMED" ? (waiting.get(o.id) ?? 0) : 0 };
+    return {
+      ...this.money(rest),
+      lineCount: _count.lines,
+      waitingLines: o.status === "CONFIRMED" ? (waiting.get(o.id) ?? 0) : 0,
+      partiallyShipped: o.status === "CONFIRMED" && _count.shipments > 0,
+    };
+  }
+
+  /** O essencial da encomenda para os webhooks (Fase 6d). */
+  private eventBase(o: { id: string; code: string; status: SalesOrderStatus; companyId: string | null; contactId: string | null; customerReference: string | null; total: number }) {
+    return { orderId: o.id, code: o.code, status: o.status, companyId: o.companyId, contactId: o.contactId, customerReference: o.customerReference, total: o.total };
+  }
+
+  private statusChanged(order: Parameters<OrdersService["eventBase"]>[0], from: SalesOrderStatus, reason?: string) {
+    this.webhooks.trigger("order.status_changed", { ...this.eventBase(order), from, to: order.status, ...(reason ? { reason } : {}) });
+  }
+
+  /** Para os webhooks: a expedição sem o custo (é interno). */
+  private shipmentEvent(s: ReturnType<OrdersService["shipmentView"]>) {
+    return {
+      id: s.id,
+      shippedAt: s.shippedAt,
+      carrier: s.carrier?.name ?? null,
+      trackingCode: s.trackingCode,
+      trackingUrl: s.trackingUrl,
+      packages: s.packages,
+      weightKg: s.weightKg,
+      lines: s.lines.map((l) => ({ orderLineId: l.orderLineId, productId: l.productId, sku: l.sku, description: l.description, quantity: l.quantity })),
+    };
   }
 
   async findPage(query: QueryOrdersDto) {
@@ -156,6 +240,8 @@ export class OrdersService {
     if (query.waiting === "true") and.push({ status: "CONFIRMED", lines: { some: this.waitingLineWhere() } });
     // «Pronta a preparar» (Fase 6c): confirmadas sem nenhuma linha à espera.
     if (query.ready === "true") and.push({ status: "CONFIRMED", lines: { none: this.waitingLineWhere() } });
+    // «Parcialmente enviada» (Fase 6d): confirmadas com alguma expedição.
+    if (query.partiallyShipped === "true") and.push({ status: "CONFIRMED", shipments: { some: {} } });
     if (query.productId) and.push({ lines: { some: { productId: query.productId } } });
     if (and.length) where.AND = and;
     const page = await readPage(LIST_KEY, query, (after, take) =>
@@ -234,7 +320,9 @@ export class OrdersService {
       await this.note(tx, created.id, `Encomenda ${orderCode(created.number)} criada`, userId);
       return created;
     });
-    return this.findOne(order.id);
+    const view = await this.findOne(order.id);
+    this.webhooks.trigger("order.created", this.eventBase(view));
+    return view;
   }
 
   async update(id: string, dto: UpdateOrderDto, userId: string) {
@@ -423,7 +511,9 @@ export class OrdersService {
     // Completa logo ao confirmar não pede tarefa (quem confirma já sabe); outras que fiquem completas, sim.
     served.delete(id);
     await this.preparation.afterAllocation(served, userId);
-    return this.findOne(id);
+    const view = await this.findOne(id);
+    this.statusChanged(view, "DRAFT");
+    return view;
   }
 
   /** «Reservar stock»: para encomendas confirmadas sem as reservas todas (antes do 6b, ou com o stock desligado). */
@@ -441,47 +531,160 @@ export class OrdersService {
   }
 
   /**
-   * Enviar: lança as saídas de stock das linhas de produtos que controlam stock (com o módulo «Stock» ligado) e
-   * liberta as reservas. Com linhas à espera de stock, só com `allowShortage` (o stock fica negativo).
+   * Enviar (Fase 6d): regista uma expedição com tudo o que falta enviar ou só parte (`lines`). Por linha de produto
+   * que controla stock (com o módulo «Stock» ligado) lança a saída da quantidade enviada; o reservado desce o que sai
+   * (primeiro sai o reservado). Enviar mais do que o reservado só com `allowShortage` (o stock fica negativo). Com tudo
+   * enviado, a encomenda passa a enviada; senão continua confirmada e o resto continua a aguardar.
    */
   async ship(id: string, dto: ShipOrderDto, userId: string) {
-    const served = await lockedTransaction(this.prisma, async (tx) => {
+    const result = await lockedTransaction(this.prisma, async (tx) => {
       const order = await this.lock(tx, id);
       this.assertFrom(order, "ship");
+      const carrier = await this.carrierFor(tx, dto.carrierId, null);
       const productIds = await this.lineProducts(tx, id);
       const products = await lockProducts(tx, productIds);
       const reserves = this.reservationsApply();
-      const waiting = reserves ? await waitingLines(tx, id) : [];
-      const shortage = waiting.map((l) => reservationText(round2(Number(l.quantity) - Number(l.reservedQuantity)), l)).join("; ");
-      if (waiting.length && !dto.allowShortage) {
+      // Relê as linhas só depois de bloquear os produtos: as reservas mudam com o produto bloqueado (6b).
+      const all = await tx.salesOrderLine.findMany({ where: { orderId: id }, orderBy: LINE_ORDER });
+      const picks = this.pickLines(all, dto.lines);
+      if (!picks.length) throw new BadRequestException("Não há nada por enviar");
+      const partial = picks.length !== all.filter((l) => Number(l.unshippedQuantity) > 0).length || picks.some((p) => p.quantity < Number(p.line.unshippedQuantity));
+
+      const tracked = (line: (typeof all)[number]) => reserves && !!line.productId && !!products.get(line.productId)?.tracksStock;
+      const short = picks.filter((p) => tracked(p.line) && p.quantity > Number(p.line.reservedQuantity));
+      const shortage = short.map((p) => reservationText(round2(p.quantity - Number(p.line.reservedQuantity)), p.line)).join("; ");
+      if (short.length && !dto.allowShortage) {
         throw new ConflictException(`Há linhas a aguardar stock (${shortage}): confirma o envio sem stock reservado`);
       }
-      const lines = await tx.salesOrderLine.findMany({ where: { orderId: id, productId: { not: null } }, orderBy: LINE_ORDER });
+
+      const code = orderCode(order.number);
       const out: string[] = [];
-      if (reserves) {
-        for (const line of lines) {
-          if (!products.get(line.productId!)?.tracksStock) continue;
+      for (const { line, quantity } of picks) {
+        if (tracked(line)) {
           await recordMovement(tx, {
             productId: line.productId!,
             type: "SALE_OUT",
-            quantity: -Number(line.quantity),
-            reason: `${orderCode(order.number)}: encomenda enviada`,
+            quantity: -quantity,
+            reason: partial ? `${code}: envio parcial` : `${code}: encomenda enviada`,
             sourceType: SALES_ORDER_SOURCE,
             sourceId: id,
             userId,
           });
-          out.push(reservationText(Number(line.quantity), line));
+          out.push(reservationText(quantity, line));
         }
+        await tx.salesOrderLine.update({
+          where: { id: line.id },
+          data: { shippedQuantity: { increment: quantity }, reservedQuantity: Math.max(0, round2(Number(line.reservedQuantity) - quantity)) },
+        });
       }
-      await tx.salesOrderLine.updateMany({ where: { orderId: id, reservedQuantity: { not: 0 } }, data: { reservedQuantity: 0 } });
-      await tx.salesOrder.update({ where: { id }, data: { status: "SHIPPED", shippedAt: new Date() } });
-      await this.note(tx, id, "Encomenda enviada", userId);
+      const details = this.shipmentData(dto);
+      const shipment = await tx.shipment.create({
+        data: { orderId: id, carrierId: carrier?.id ?? null, ...details, shippedAt: new Date(), createdById: userId, lines: { create: picks.map((p) => ({ orderLineId: p.line.id, quantity: p.quantity })) } },
+        select: { id: true },
+      });
+      if (!partial) await tx.salesOrder.update({ where: { id }, data: { status: "SHIPPED", shippedAt: new Date() } });
+      await this.note(tx, id, partial ? `Envio parcial: ${picks.map((p) => reservationText(p.quantity, p.line)).join("; ")}` : "Encomenda enviada", userId);
+      const transport = transportText({ carrierName: carrier?.name, ...details, weightKg: details.weightKg ?? null, cost: details.cost ?? null });
+      if (transport) await this.note(tx, id, `Expedição: ${transport}`, userId);
       if (out.length) await this.note(tx, id, `Saída de stock: ${out.join("; ")}`, userId);
-      if (waiting.length) await this.note(tx, id, `Enviada sem stock reservado para: ${shortage}`, userId);
-      return reserves ? this.allocate(tx, productIds, userId) : new Set<string>();
+      if (short.length) await this.note(tx, id, `Enviada sem stock reservado para: ${shortage}`, userId);
+      const served = reserves ? await this.allocate(tx, productIds, userId) : new Set<string>();
+      return { served, shipmentId: shipment.id, partial };
+    });
+    await this.preparation.afterAllocation(result.served, userId);
+    const view = await this.findOne(id);
+    const shipment = view.shipments.find((s) => s.id === result.shipmentId)!;
+    this.webhooks.trigger("order.shipped", { ...this.eventBase(view), partial: result.partial, shipment: this.shipmentEvent(shipment) });
+    if (!result.partial) this.statusChanged(view, "CONFIRMED");
+    return view;
+  }
+
+  /** O que sai em cada linha: o pedido (envio parcial) ou tudo o que falta enviar. Pela ordem das linhas. */
+  private pickLines<L extends { id: string; description: string; unshippedQuantity: Prisma.Decimal }>(all: L[], requested: ShipOrderDto["lines"]) {
+    if (!requested) return all.filter((l) => Number(l.unshippedQuantity) > 0).map((line) => ({ line, quantity: Number(line.unshippedQuantity) }));
+    const index = new Map(all.map((l, i) => [l.id, i]));
+    const seen = new Set<string>();
+    const picks = requested.map((r) => {
+      const i = index.get(r.lineId);
+      if (i === undefined) throw new BadRequestException("Essa linha não é desta encomenda");
+      if (seen.has(r.lineId)) throw new BadRequestException("Cada linha só aparece uma vez no envio");
+      seen.add(r.lineId);
+      const line = all[i];
+      const left = Number(line.unshippedQuantity);
+      if (r.quantity > left) throw new BadRequestException(left > 0 ? `${line.description}: só falta enviar ${pt(left)}` : `${line.description}: já foi enviada toda`);
+      return { line, quantity: r.quantity, i };
+    });
+    return picks.sort((a, b) => a.i - b.i).map(({ line, quantity }) => ({ line, quantity }));
+  }
+
+  /** A transportadora pedida: `undefined` não mexe, `null`/vazio tira; tem de existir e estar ativa (exceto a atual). */
+  private async carrierFor(tx: Tx, carrierId: string | null | undefined, current: string | null) {
+    if (carrierId === undefined) return undefined;
+    if (!carrierId) return null;
+    const carrier = await tx.carrier.findUnique({ where: { id: carrierId }, select: { id: true, name: true, active: true } });
+    if (!carrier) throw new BadRequestException("Transportadora não encontrada");
+    if (!carrier.active && carrier.id !== current) throw new BadRequestException("Essa transportadora está desativada");
+    return carrier;
+  }
+
+  /** Os dados do transporte do pedido; texto vazio = sem valor. Só os que vêm no pedido (na correção, o resto fica). */
+  private shipmentData(dto: UpdateShipmentDto) {
+    const text = (v: string | null | undefined) => (v === undefined ? undefined : v?.trim() || null);
+    return {
+      trackingCode: text(dto.trackingCode),
+      packages: dto.packages,
+      weightKg: dto.weightKg,
+      cost: dto.cost,
+      notes: text(dto.notes),
+    };
+  }
+
+  /** Corrige os dados do transporte de uma expedição (Fase 6d), em qualquer estado da encomenda. */
+  async updateShipment(id: string, shipmentId: string, dto: UpdateShipmentDto, userId: string) {
+    const changed = await lockedTransaction(this.prisma, async (tx) => {
+      await this.lock(tx, id);
+      const existing = await tx.shipment.findFirst({ where: { id: shipmentId, orderId: id }, include: { carrier: { select: { name: true } } } });
+      if (!existing) throw new NotFoundException("Expedição não encontrada");
+      const carrier = await this.carrierFor(tx, dto.carrierId, existing.carrierId);
+      const data = this.shipmentData(dto);
+      const updated = await tx.shipment.update({ where: { id: shipmentId }, data: { ...data, carrierId: carrier === undefined ? undefined : (carrier?.id ?? null) }, include: { carrier: { select: { name: true } } } });
+      const describe = (s: typeof updated) =>
+        transportText({ carrierName: s.carrier?.name, trackingCode: s.trackingCode, packages: s.packages, weightKg: s.weightKg === null ? null : Number(s.weightKg), cost: s.cost === null ? null : Number(s.cost) }) + `|${s.notes ?? ""}`;
+      if (describe(updated) === describe(existing)) return false;
+      const transport = describe(updated).split("|")[0];
+      await this.note(tx, id, `Expedição corrigida${transport ? `: ${transport}` : " (sem dados do transporte)"}`, userId);
+      return true;
+    });
+    const view = await this.findOne(id);
+    if (changed) this.webhooks.trigger("order.shipment_updated", { ...this.eventBase(view), shipment: this.shipmentEvent(view.shipments.find((s) => s.id === shipmentId)!) });
+    return view;
+  }
+
+  /**
+   * «Dar por enviada sem o resto» (Fase 6d): com parte já enviada, o que falta não vai. Liberta as reservas do resto e
+   * o disponível vai para as encomendas à espera.
+   */
+  async finish(id: string, dto: FinishOrderDto, userId: string) {
+    const reason = dto.reason.trim();
+    const served = await lockedTransaction(this.prisma, async (tx) => {
+      const order = await this.lock(tx, id);
+      if (order.status !== "CONFIRMED") throw new ConflictException(`A encomenda está ${STATUS_LABEL[order.status]}: não se dá por enviada`);
+      if ((await tx.shipment.count({ where: { orderId: id } })) === 0) throw new ConflictException("Ainda não foi enviado nada: cancela a encomenda");
+      const productIds = await this.lineProducts(tx, id);
+      await lockProducts(tx, productIds);
+      const left = await tx.salesOrderLine.findMany({ where: { orderId: id, unshippedQuantity: { gt: 0 } }, orderBy: LINE_ORDER });
+      const reserved = left.filter((l) => Number(l.reservedQuantity) > 0);
+      if (reserved.length) await tx.salesOrderLine.updateMany({ where: { orderId: id, reservedQuantity: { gt: 0 } }, data: { reservedQuantity: 0 } });
+      await tx.salesOrder.update({ where: { id }, data: { status: "SHIPPED", shippedAt: new Date() } });
+      await this.note(tx, id, `Dada por enviada sem o resto: ${reason}`, userId);
+      if (left.length) await this.note(tx, id, `Não vai: ${left.map((l) => reservationText(Number(l.unshippedQuantity), l)).join("; ")}`, userId);
+      if (reserved.length) await this.note(tx, id, `Reservas libertadas: ${reserved.map((l) => reservationText(Number(l.reservedQuantity), l)).join("; ")}`, userId);
+      return this.reservationsApply() ? this.allocate(tx, [...new Set(reserved.map((l) => l.productId!))].sort(), userId) : new Set<string>();
     });
     await this.preparation.afterAllocation(served, userId);
-    return this.findOne(id);
+    const view = await this.findOne(id);
+    this.statusChanged(view, "CONFIRMED", reason);
+    return view;
   }
 
   async deliver(id: string, userId: string) {
@@ -491,16 +694,21 @@ export class OrdersService {
       await tx.salesOrder.update({ where: { id }, data: { status: "DELIVERED", deliveredAt: new Date() } });
       await this.note(tx, id, "Encomenda entregue", userId);
     });
-    return this.findOne(id);
+    const view = await this.findOne(id);
+    this.statusChanged(view, "SHIPPED");
+    return view;
   }
 
   /** Cancelar liberta as reservas, e o que fica disponível vai para as encomendas à espera (Fase 6b). */
   async cancel(id: string, dto: CancelOrderDto, userId: string) {
     const reason = dto.reason.trim();
-    const served = await lockedTransaction(this.prisma, async (tx) => {
+    const { served, from } = await lockedTransaction(this.prisma, async (tx) => {
       const order = await this.lock(tx, id);
       if (order.status !== "DRAFT" && order.status !== "CONFIRMED") {
         throw new ConflictException(`A encomenda está ${STATUS_LABEL[order.status]}: já não se cancela`);
+      }
+      if ((await tx.shipment.count({ where: { orderId: id } })) > 0) {
+        throw new ConflictException("Já saiu parte da encomenda: dá-a por enviada sem o resto");
       }
       const productIds = order.status === "CONFIRMED" ? await this.lineProducts(tx, id) : [];
       await lockProducts(tx, productIds);
@@ -509,16 +717,18 @@ export class OrdersService {
       await tx.salesOrder.update({ where: { id }, data: { status: "CANCELLED", cancelledAt: new Date(), cancelReason: reason } });
       await this.note(tx, id, `Encomenda cancelada: ${reason}`, userId);
       if (reserved.length) await this.note(tx, id, `Reservas libertadas: ${reserved.map((l) => reservationText(Number(l.reservedQuantity), l)).join("; ")}`, userId);
-      return this.reservationsApply() ? this.allocate(tx, [...new Set(reserved.map((l) => l.productId!))].sort(), userId) : new Set<string>();
+      const served = this.reservationsApply() ? await this.allocate(tx, [...new Set(reserved.map((l) => l.productId!))].sort(), userId) : new Set<string>();
+      return { served, from: order.status };
     });
     await this.preparation.afterAllocation(served, userId);
-    return this.findOne(id);
+    const view = await this.findOne(id);
+    this.statusChanged(view, from, reason);
+    return view;
   }
 }
 
 /** «2 × Toner (TN-2420) a 45,90 € −10%»: para a timeline. */
 export function lineText(line: { quantity: Prisma.Decimal | number; description: string; sku: string | null; unitPrice: Prisma.Decimal | number; discountPct: Prisma.Decimal | number }) {
-  const pt = (n: number, digits = 2) => n.toLocaleString("pt-PT", { minimumFractionDigits: 0, maximumFractionDigits: digits });
   const discount = Number(line.discountPct);
   return `${pt(Number(line.quantity))} × ${line.description}${line.sku ? ` (${line.sku})` : ""} a ${Number(line.unitPrice).toLocaleString("pt-PT", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €${discount ? ` −${pt(discount)}%` : ""}`;
 }

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { Product, SalesOrder, SalesOrderLine, Task } from "@opencrm/shared-types";
+import type { Product, SalesOrder, SalesOrderLine, Shipment, Task } from "@opencrm/shared-types";
 import { listTasks } from "@/lib/tasks-api";
 import { TaskDialog } from "@/pages/tasks/TaskDialog";
 import { TASK_STATUS_LABELS } from "@/pages/tasks/task-labels";
@@ -12,18 +12,22 @@ import {
   customerName,
   deleteOrder,
   deleteOrderLine,
+  finishOrder,
   getOrder,
   NEXT_STEP,
   type OrderLineInput,
   reserveOrderStock,
+  shipOrder,
+  type ShipmentDetailsInput,
   updateOrder,
   updateOrderLine,
+  updateShipment,
 } from "@/lib/orders-api";
 import { decimalInput, formatMoney, parseDecimal } from "@/lib/products-api";
 import { errorMessage } from "@/lib/errors";
 import { useCanWrite } from "@/lib/useCanWrite";
 import { useModuleEnabled } from "@/lib/useModules";
-import { CompanyPicker, ContactPicker, ProductPicker, UserPicker } from "@/components/pickers";
+import { CarrierPicker, CompanyPicker, ContactPicker, ProductPicker, UserPicker } from "@/components/pickers";
 import { CustomFieldsSection } from "@/components/CustomFieldsSection";
 import { TimelineSection } from "@/components/TimelineSection";
 import { ReadOnlyFieldset } from "@/components/ReadOnly";
@@ -33,7 +37,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { OrderStatusBadge } from "./OrdersListPage";
+import { OrderStatusBadge, PartiallyShippedBadge } from "./OrdersListPage";
 
 const pct = (n: number) => `${n.toLocaleString("pt-PT", { maximumFractionDigits: 2 })}%`;
 const qty = (n: number) => n.toLocaleString("pt-PT", { maximumFractionDigits: 2 });
@@ -48,7 +52,7 @@ function LineStock({ line, status }: { line: SalesOrderLine; status: SalesOrder[
     const short = p.available < line.quantity;
     return <div className={`text-xs ${short ? "text-amber-700" : "text-muted-foreground"}`}>Disponível: {qty(p.available)}</div>;
   }
-  if (status !== "CONFIRMED") return null;
+  if (status !== "CONFIRMED" || line.unshippedQuantity <= 0) return null;
   if (line.waitingQuantity > 0) {
     return (
       <div className="text-xs font-medium text-amber-700">
@@ -334,6 +338,13 @@ function LinesCard({ order, canEdit, onChanged }: { order: SalesOrder; canEdit: 
                         ) : (
                           <span className="ml-2 font-mono text-xs text-muted-foreground">{l.sku}</span>
                         ))}
+                      {l.shippedQuantity > 0 && l.shippedQuantity < l.quantity && (
+                        <div className="text-xs text-muted-foreground">
+                          Enviado {qty(l.shippedQuantity)} de {qty(l.quantity)}
+                          {order.status !== "CONFIRMED" && ` · não foi: ${qty(l.unshippedQuantity)}`}
+                        </div>
+                      )}
+                      {order.status === "CONFIRMED" && order.partiallyShipped && l.unshippedQuantity <= 0 && <div className="text-xs text-muted-foreground">Enviada</div>}
                       {stockOn && <LineStock line={l} status={order.status} />}
                     </td>
                     <td className="py-1.5 text-right tabular-nums">{qty(l.quantity)}</td>
@@ -426,6 +437,326 @@ function CancelDialog({ order, onClose, onDone }: { order: SalesOrder; onClose: 
   );
 }
 
+// ---- Expedições (Fase 6d) ----
+
+interface TransportForm {
+  carrierId: string;
+  carrierName: string | null;
+  trackingCode: string;
+  packages: string;
+  weightKg: string;
+  cost: string;
+  notes: string;
+}
+
+const emptyTransport: TransportForm = { carrierId: "", carrierName: null, trackingCode: "", packages: "", weightKg: "", cost: "", notes: "" };
+const transportOf = (s: Shipment): TransportForm => ({
+  carrierId: s.carrier?.id ?? "",
+  carrierName: s.carrier?.name ?? null,
+  trackingCode: s.trackingCode ?? "",
+  packages: s.packages === null ? "" : String(s.packages),
+  weightKg: decimalInput(s.weightKg),
+  cost: s.cost === null ? "" : s.cost.toFixed(2).replace(".", ","),
+  notes: s.notes ?? "",
+});
+
+/** Números do formulário: vazio = sem valor; texto que não é número = erro (antes de enviar). */
+function transportInput(f: TransportForm): { input: ShipmentDetailsInput; problem: string | null } {
+  const num = (v: string) => parseDecimal(v);
+  const packages = num(f.packages);
+  const weightKg = num(f.weightKg);
+  const cost = num(f.cost);
+  let problem: string | null = null;
+  if (packages !== null && (!Number.isInteger(packages) || packages < 1)) problem = "Os volumes são um número inteiro, pelo menos 1.";
+  else if (weightKg !== null && (Number.isNaN(weightKg) || weightKg < 0)) problem = "O peso não é válido.";
+  else if (cost !== null && (Number.isNaN(cost) || cost < 0)) problem = "O custo não é válido.";
+  return {
+    input: { carrierId: f.carrierId || null, trackingCode: f.trackingCode.trim() || null, packages, weightKg, cost, notes: f.notes.trim() || null },
+    problem,
+  };
+}
+
+function TransportFields({ form, onChange }: { form: TransportForm; onChange: (f: TransportForm) => void }) {
+  const set = (patch: Partial<TransportForm>) => onChange({ ...form, ...patch });
+  return (
+    <div className="grid gap-3 sm:grid-cols-2">
+      <div className="space-y-1">
+        <Label htmlFor="ship-carrier">Transportadora</Label>
+        <CarrierPicker id="ship-carrier" value={form.carrierId} selectedLabel={form.carrierName} allowEmpty onChange={(carrierId, c) => set({ carrierId, carrierName: c?.name ?? null })} />
+      </div>
+      <div className="space-y-1">
+        <Label htmlFor="ship-code">Código de seguimento</Label>
+        <Input id="ship-code" value={form.trackingCode} maxLength={100} onChange={(e) => set({ trackingCode: e.target.value })} />
+      </div>
+      <div className="grid grid-cols-3 gap-2 sm:col-span-2">
+        <div className="space-y-1">
+          <Label htmlFor="ship-packages">Volumes</Label>
+          <Input id="ship-packages" inputMode="numeric" value={form.packages} onChange={(e) => set({ packages: e.target.value })} />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="ship-weight">Peso (kg)</Label>
+          <Input id="ship-weight" inputMode="decimal" value={form.weightKg} onChange={(e) => set({ weightKg: e.target.value })} />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor="ship-cost">Custo (€)</Label>
+          <Input id="ship-cost" inputMode="decimal" value={form.cost} onChange={(e) => set({ cost: e.target.value })} />
+        </div>
+      </div>
+      <div className="space-y-1 sm:col-span-2">
+        <Label htmlFor="ship-notes">Notas</Label>
+        <Input id="ship-notes" value={form.notes} maxLength={1000} onChange={(e) => set({ notes: e.target.value })} />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * «Marcar como enviada» (Fase 6d): uma expedição com tudo o que falta enviar ou, com «Enviar só parte», as quantidades
+ * de cada linha (por omissão, o reservado nas linhas de stock e o que falta nas outras). Enviar sem o stock reservado
+ * pede «Enviar mesmo assim» (o stock fica negativo).
+ */
+function ShipDialog({ order, stockOn, onClose, onDone }: { order: SalesOrder; stockOn: boolean; onClose: () => void; onDone: (o: SalesOrder) => void }) {
+  const open = order.lines.filter((l) => l.unshippedQuantity > 0);
+  const tracked = (l: SalesOrderLine) => stockOn && !!l.product?.tracksStock;
+  const [form, setForm] = useState<TransportForm>(emptyTransport);
+  const [partial, setPartial] = useState(false);
+  const [quantities, setQuantities] = useState<Record<string, string>>(() =>
+    Object.fromEntries(open.map((l) => [l.id, decimalInput(tracked(l) ? Math.min(l.unshippedQuantity, l.reservedQuantity) : l.unshippedQuantity)])),
+  );
+  const [allowShortage, setAllowShortage] = useState(false);
+
+  const picks = partial
+    ? open.map((l) => ({ line: l, quantity: parseDecimal(quantities[l.id] ?? "") ?? 0 })).filter((p) => p.quantity !== 0)
+    : open.map((l) => ({ line: l, quantity: l.unshippedQuantity }));
+  const badQuantity = picks.find((p) => Number.isNaN(p.quantity) || p.quantity < 0 || p.quantity > p.line.unshippedQuantity || Math.round(p.quantity * 100) !== p.quantity * 100);
+  const short = picks.filter((p) => tracked(p.line) && p.quantity > p.line.reservedQuantity);
+  const { input, problem } = transportInput(form);
+  const blocked = problem ?? (badQuantity ? `${badQuantity.line.description}: só falta enviar ${qty(badQuantity.line.unshippedQuantity)}.` : picks.length === 0 ? "Indica o que vai neste envio." : null);
+
+  const ship = useMutation({
+    mutationFn: () =>
+      shipOrder(order.id, {
+        ...input,
+        carrierId: input.carrierId ?? undefined,
+        allowShortage: short.length > 0 ? allowShortage : undefined,
+        lines: partial ? picks.map((p) => ({ lineId: p.line.id, quantity: p.quantity })) : undefined,
+      }),
+    onSuccess: onDone,
+  });
+  return (
+    <Dialog open onClose={onClose} className="max-w-2xl">
+      <DialogHeader>
+        <DialogTitle>Enviar {order.code}</DialogTitle>
+      </DialogHeader>
+      <form
+        className="space-y-4"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!blocked && (short.length === 0 || allowShortage)) ship.mutate();
+        }}
+      >
+        <TransportFields form={form} onChange={setForm} />
+        <div className="space-y-2">
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" checked={partial} onChange={(e) => setPartial(e.target.checked)} />
+            Enviar só parte
+          </label>
+          {partial ? (
+            <table className="w-full text-sm">
+              <thead className="text-left text-xs text-muted-foreground">
+                <tr>
+                  <th className="pb-1 font-medium">Linha</th>
+                  <th className="pb-1 text-right font-medium">Por enviar</th>
+                  <th className="pb-1 text-right font-medium">A enviar</th>
+                </tr>
+              </thead>
+              <tbody>
+                {open.map((l) => (
+                  <tr key={l.id} className="border-t border-border">
+                    <td className="py-1 pr-2">
+                      {l.description}
+                      {tracked(l) && <div className="text-xs text-muted-foreground">Reservado {qty(l.reservedQuantity)}</div>}
+                    </td>
+                    <td className="py-1 text-right tabular-nums">{qty(l.unshippedQuantity)}</td>
+                    <td className="w-28 py-1 pl-2">
+                      <Input
+                        aria-label={`Quantidade a enviar de ${l.description}`}
+                        inputMode="decimal"
+                        className="h-8 text-right"
+                        value={quantities[l.id] ?? ""}
+                        onChange={(e) => setQuantities({ ...quantities, [l.id]: e.target.value })}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <p className="text-xs text-muted-foreground">Vai tudo o que falta enviar ({open.length === 1 ? "1 linha" : `${open.length} linhas`}).</p>
+          )}
+        </div>
+        {short.length > 0 && (
+          <div role="alert" className="space-y-1 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            <p>Sem stock reservado para: {short.map((p) => `${qty(p.quantity - p.line.reservedQuantity)} × ${p.line.description}`).join("; ")}. O stock fica negativo.</p>
+            <label className="flex items-center gap-2">
+              <input type="checkbox" checked={allowShortage} onChange={(e) => setAllowShortage(e.target.checked)} />
+              Enviar mesmo assim
+            </label>
+          </div>
+        )}
+        {blocked && <p className="text-sm text-amber-700">{blocked}</p>}
+        {ship.isError && <p className="text-sm text-red-600">{errorMessage(ship.error, "Não foi possível registar o envio.")}</p>}
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="outline" onClick={onClose}>
+            Voltar
+          </Button>
+          <Button type="submit" disabled={ship.isPending || !!blocked || (short.length > 0 && !allowShortage)}>
+            {ship.isPending ? "A registar..." : partial ? "Registar envio parcial" : "Marcar como enviada"}
+          </Button>
+        </div>
+      </form>
+    </Dialog>
+  );
+}
+
+/** Corrigir os dados do transporte de uma expedição (Fase 6d); as quantidades não mudam. */
+function ShipmentEditDialog({ order, shipment, onClose, onDone }: { order: SalesOrder; shipment: Shipment; onClose: () => void; onDone: (o: SalesOrder) => void }) {
+  const [form, setForm] = useState<TransportForm>(() => transportOf(shipment));
+  const { input, problem } = transportInput(form);
+  const save = useMutation({ mutationFn: () => updateShipment(order.id, shipment.id, input), onSuccess: onDone });
+  return (
+    <Dialog open onClose={onClose} className="max-w-2xl">
+      <DialogHeader>
+        <DialogTitle>Corrigir a expedição de {when(shipment.shippedAt)}</DialogTitle>
+      </DialogHeader>
+      <form
+        className="space-y-4"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (!problem) save.mutate();
+        }}
+      >
+        <TransportFields form={form} onChange={setForm} />
+        <p className="text-xs text-muted-foreground">As quantidades não se corrigem: o stock já saiu. Para acertar o stock, lança um movimento de stock.</p>
+        {problem && <p className="text-sm text-amber-700">{problem}</p>}
+        {save.isError && <p className="text-sm text-red-600">{errorMessage(save.error, "Não foi possível guardar.")}</p>}
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="outline" onClick={onClose}>
+            Voltar
+          </Button>
+          <Button type="submit" disabled={save.isPending || !!problem}>
+            {save.isPending ? "A guardar..." : "Guardar"}
+          </Button>
+        </div>
+      </form>
+    </Dialog>
+  );
+}
+
+/** Cartão «Expedições» (Fase 6d): cada envio com o transporte, o link de seguimento e as linhas. */
+function ShipmentsCard({ order, canEdit, onChanged }: { order: SalesOrder; canEdit: boolean; onChanged: (o: SalesOrder) => void }) {
+  const [editing, setEditing] = useState<Shipment | null>(null);
+  if (order.shipments.length === 0) return null;
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Expedições</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ul className="divide-y divide-border text-sm">
+          {order.shipments.map((s, i) => (
+            <li key={s.id} className="space-y-1 py-2 first:pt-0 last:pb-0">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="font-medium">
+                  {order.shipments.length > 1 ? `${i + 1}.ª expedição` : "Expedição"} · {when(s.shippedAt)}
+                  {s.createdBy && <span className="font-normal text-muted-foreground"> · por {s.createdBy.name}</span>}
+                </span>
+                {canEdit && (
+                  <Button size="sm" variant="outline" onClick={() => setEditing(s)}>
+                    Corrigir
+                  </Button>
+                )}
+              </div>
+              <div className="text-muted-foreground">
+                {[
+                  s.carrier?.name ?? "Sem transportadora",
+                  s.packages !== null ? `${s.packages} ${s.packages === 1 ? "volume" : "volumes"}` : null,
+                  s.weightKg !== null ? `${qty(s.weightKg)} kg` : null,
+                  s.cost !== null ? formatMoney(s.cost) : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </div>
+              {s.trackingCode && (
+                <div>
+                  Código:{" "}
+                  {s.trackingUrl ? (
+                    <a href={s.trackingUrl} target="_blank" rel="noreferrer noopener" className="font-mono text-primary hover:underline">
+                      {s.trackingCode}
+                    </a>
+                  ) : (
+                    <span className="font-mono">{s.trackingCode}</span>
+                  )}
+                </div>
+              )}
+              <div className="text-xs text-muted-foreground">{s.lines.map((l) => `${qty(l.quantity)} × ${l.description}`).join("; ")}</div>
+              {s.notes && <div className="text-xs">{s.notes}</div>}
+            </li>
+          ))}
+        </ul>
+        {editing && (
+          <ShipmentEditDialog
+            order={order}
+            shipment={editing}
+            onClose={() => setEditing(null)}
+            onDone={(o) => {
+              setEditing(null);
+              onChanged(o);
+            }}
+          />
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/** «Dar por enviada sem o resto» (Fase 6d): com parte enviada, o que falta não vai; as reservas do resto libertam-se. */
+function FinishDialog({ order, onClose, onDone }: { order: SalesOrder; onClose: () => void; onDone: (o: SalesOrder) => void }) {
+  const [reason, setReason] = useState("");
+  const finish = useMutation({ mutationFn: () => finishOrder(order.id, reason.trim()), onSuccess: onDone });
+  const left = order.lines.filter((l) => l.unshippedQuantity > 0);
+  return (
+    <Dialog open onClose={onClose} className="max-w-md">
+      <DialogHeader>
+        <DialogTitle>Dar {order.code} por enviada</DialogTitle>
+      </DialogHeader>
+      <form
+        className="space-y-3"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (reason.trim()) finish.mutate();
+        }}
+      >
+        <p className="text-sm">Não vai: {left.map((l) => `${qty(l.unshippedQuantity)} × ${l.description}`).join("; ")}.</p>
+        <div className="space-y-1">
+          <Label htmlFor="finish-reason">Motivo *</Label>
+          <Input id="finish-reason" value={reason} maxLength={500} autoFocus onChange={(e) => setReason(e.target.value)} placeholder="Ex.: o cliente já não precisa do resto" />
+        </div>
+        <p className="text-xs text-muted-foreground">O stock reservado para o resto fica livre para as outras encomendas.</p>
+        {finish.isError && <p className="text-sm text-red-600">{errorMessage(finish.error, "Não foi possível concluir.")}</p>}
+        <div className="flex justify-end gap-2">
+          <Button type="button" variant="outline" onClick={onClose}>
+            Voltar
+          </Button>
+          <Button type="submit" disabled={finish.isPending || !reason.trim()}>
+            {finish.isPending ? "A guardar..." : "Dar por enviada"}
+          </Button>
+        </div>
+      </form>
+    </Dialog>
+  );
+}
+
 /** Tarefas «Preparar encomenda» (Fase 6c): criadas quando a encomenda que aguardava stock fica com tudo reservado. */
 function PreparationTasksCard({ orderId }: { orderId: string }) {
   const { data } = useQuery({ queryKey: ["tasks", "order", orderId], queryFn: () => listTasks({ salesOrderId: orderId, limit: 10 }) });
@@ -467,7 +798,8 @@ export function OrderDetailPage() {
   const { data: order, isLoading, isError } = useQuery({ queryKey: ["orders", "one", id], queryFn: () => getOrder(id) });
   const [cancelling, setCancelling] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [confirmShortage, setConfirmShortage] = useState(false);
+  const [shipping, setShipping] = useState(false);
+  const [finishing, setFinishing] = useState(false);
   const stockOn = useModuleEnabled("stock");
   const ordersOn = useModuleEnabled("encomendas");
   const purchasesOn = useModuleEnabled("compras");
@@ -477,13 +809,7 @@ export function OrderDetailPage() {
     queryClient.invalidateQueries({ queryKey: ["orders", "list"] });
     queryClient.invalidateQueries({ queryKey: ["timeline"] });
   };
-  const advance = useMutation({
-    mutationFn: ({ step, allowShortage }: { step: Parameters<typeof advanceOrder>[1]; allowShortage?: boolean }) => advanceOrder(id, step, allowShortage ? { allowShortage } : {}),
-    onSuccess: (o) => {
-      setConfirmShortage(false);
-      changed(o);
-    },
-  });
+  const advance = useMutation({ mutationFn: (step: Parameters<typeof advanceOrder>[1]) => advanceOrder(id, step), onSuccess: changed });
   const reserve = useMutation({ mutationFn: () => reserveOrderStock(id), onSuccess: changed });
   const remove = useMutation({
     mutationFn: () => deleteOrder(id),
@@ -505,9 +831,9 @@ export function OrderDetailPage() {
     );
   }
   const next = NEXT_STEP[order.status];
-  // Enviar com linhas à espera de stock pede confirmação: o stock fica negativo (Fase 6b).
   const waiting = stockOn && order.status === "CONFIRMED" ? order.waitingLines : 0;
-  const canCancel = order.status === "DRAFT" || order.status === "CONFIRMED";
+  // Com parte enviada já não se cancela: dá-se por enviada sem o resto (Fase 6d).
+  const canCancel = (order.status === "DRAFT" || order.status === "CONFIRMED") && !order.partiallyShipped;
   const dates = [
     ["Criada", when(order.createdAt)],
     ["Confirmada", when(order.confirmedAt)],
@@ -527,6 +853,7 @@ export function OrderDetailPage() {
             <span className="font-mono text-base text-muted-foreground">{order.code}</span>
             {customerName(order)}
             <OrderStatusBadge status={order.status} />
+            {order.partiallyShipped && <PartiallyShippedBadge />}
           </h1>
           <p className="text-sm text-muted-foreground">
             {dates.map(([label, value]) => `${label} ${value}`).join(" · ")}
@@ -536,22 +863,16 @@ export function OrderDetailPage() {
         </div>
         {canEdit && (
           <div className="flex flex-wrap items-center gap-2">
-            {next &&
-              (confirmShortage ? (
-                <span className="flex flex-wrap items-center gap-1 text-sm">
-                  Enviar sem o stock todo? O stock fica negativo.
-                  <Button disabled={advance.isPending} onClick={() => advance.mutate({ step: "ship", allowShortage: true })}>
-                    Enviar mesmo assim
-                  </Button>
-                  <Button variant="outline" onClick={() => setConfirmShortage(false)}>
-                    Não
-                  </Button>
-                </span>
-              ) : (
-                <Button disabled={advance.isPending} onClick={() => (next.step === "ship" && waiting > 0 ? setConfirmShortage(true) : advance.mutate({ step: next.step }))}>
-                  {next.label}
-                </Button>
-              ))}
+            {next && (
+              <Button disabled={advance.isPending} onClick={() => (next.step === "ship" ? setShipping(true) : advance.mutate(next.step))}>
+                {next.step === "ship" && order.partiallyShipped ? "Enviar mais" : next.label}
+              </Button>
+            )}
+            {order.partiallyShipped && (
+              <Button variant="outline" onClick={() => setFinishing(true)}>
+                Dar por enviada sem o resto
+              </Button>
+            )}
             {canCancel && (
               <Button variant="outline" className="text-red-700" onClick={() => setCancelling(true)}>
                 Cancelar encomenda
@@ -600,6 +921,7 @@ export function OrderDetailPage() {
       {reserve.isError && <p className="text-sm text-red-600">{errorMessage(reserve.error, "Não foi possível reservar.")}</p>}
 
       <LinesCard order={order} canEdit={canEdit} onChanged={changed} />
+      <ShipmentsCard order={order} canEdit={canEdit} onChanged={changed} />
       <div className="grid gap-4 lg:grid-cols-2">
         <HeaderCard order={order} canEdit={canEdit} onSaved={changed} />
         <div className="space-y-4">
@@ -622,6 +944,27 @@ export function OrderDetailPage() {
           </Card>
         </div>
       </div>
+      {shipping && (
+        <ShipDialog
+          order={order}
+          stockOn={stockOn}
+          onClose={() => setShipping(false)}
+          onDone={(o) => {
+            setShipping(false);
+            changed(o);
+          }}
+        />
+      )}
+      {finishing && (
+        <FinishDialog
+          order={order}
+          onClose={() => setFinishing(false)}
+          onDone={(o) => {
+            setFinishing(false);
+            changed(o);
+          }}
+        />
+      )}
       {cancelling && (
         <CancelDialog
           order={order}

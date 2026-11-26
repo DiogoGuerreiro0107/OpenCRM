@@ -857,7 +857,10 @@ export interface SalesOrderLine {
   vatAmount: number;
   /** Stock reservado para a linha (Fase 6b). */
   reservedQuantity: number;
-  /** O que falta reservar, numa encomenda confirmada com produto que controla stock. */
+  /** Já enviado em expedições e o que falta enviar (Fase 6d). */
+  shippedQuantity: number;
+  unshippedQuantity: number;
+  /** O que falta enviar e não está reservado, numa encomenda confirmada com produto que controla stock. */
   waitingQuantity: number;
   /** `onOrder` (Fase 6c): em compra, só nas linhas à espera e com o módulo «Compras» ligado. */
   product: { id: string; tracksStock: boolean; stockOnHand: number; reserved: number; available: number; onOrder?: number } | null;
@@ -894,12 +897,42 @@ export interface SalesOrderSummary extends SalesOrderBase {
   lineCount: number;
   /** Linhas a aguardar stock (Fase 6b; só nas confirmadas). */
   waitingLines: number;
+  /** Confirmada com parte já enviada (Fase 6d). */
+  partiallyShipped: boolean;
+}
+
+/** Transportadora (Fase 6d). O link de seguimento tem `{codigo}` no sítio do código. */
+export interface Carrier {
+  id: string;
+  name: string;
+  trackingUrlTemplate: string | null;
+  active: boolean;
+  sortOrder: number;
+  shipmentCount: number;
+}
+
+/** Expedição de uma encomenda (Fase 6d): um envio, total ou parcial. */
+export interface Shipment {
+  id: string;
+  carrier: { id: string; name: string } | null;
+  trackingCode: string | null;
+  /** O link da transportadora com o código; sem um dos dois, null. */
+  trackingUrl: string | null;
+  packages: number | null;
+  weightKg: number | null;
+  cost: number | null;
+  notes: string | null;
+  shippedAt: string;
+  createdBy: { id: string; name: string } | null;
+  lines: Array<{ id: string; orderLineId: string; productId: string | null; sku: string | null; description: string; quantity: number }>;
 }
 
 export interface SalesOrder extends SalesOrderBase {
   createdBy: { id: string; name: string } | null;
   lines: SalesOrderLine[];
   waitingLines: number;
+  shipments: Shipment[];
+  partiallyShipped: boolean;
 }
 
 /** Compras a fornecedor (Fase 6c). Os custos e totais só vêm a quem tem a área «Catálogo de produtos». */
