@@ -24,7 +24,7 @@ indicativos, para a equipa; a fatura sai do programa de faturação (Fase 7), qu
 | **6b — Reservas e saída de stock** | Com o `stock` ligado: confirmar reserva o que há, por linha; disponível = em stock − reservado; linhas «a aguardar stock»; enviar lança as saídas e liberta as reservas; cancelar liberta | Alto |
 | **6c — Compras a fornecedor** | Compra a fornecedor com linhas de produto (custo do catálogo); sugestões do que comprar para as encomendas à espera; receção (parcial) lança as entradas e reserva para as encomendas à espera; tarefa «Preparar encomenda» quando uma encomenda à espera fica completa | Alto |
 | **6d — Expedições** | Transportadoras configuráveis (link de seguimento com `{codigo}`); cada envio é uma expedição com transportadora, código, volumes, peso e custo; envio parcial (por linha e quantidade); eventos de webhook da encomenda | Alto |
-| **6e — API de encomendas** | `POST /api/v1/orders` (âmbito `orders:write`, idempotente por origem + id externo), produtos por referência, cliente por NIF ou email; `GET /api/v1/products` (`products:read`); estado de volta à loja por webhook | Médio |
+| **6e — API de encomendas** | `POST /api/v1/orders` (âmbito `orders:write`, idempotente, id externo da loja), produtos por referência, cliente por NIF ou email (liga ou cria), nasce em rascunho ou confirmada; `GET /api/v1/products` (`products:read`) com o disponível; `GET /api/v1/orders` (`orders:read`); estado de volta à loja pelos webhooks do 6d | Médio |
 
 Fora desta fase: faturação e reconciliação com o programa de faturação (Fase 7); integrações com cada transportadora
 (o seguimento é um link); preços por cliente, promoções e portes calculados; devoluções de clientes com nota de
@@ -643,11 +643,81 @@ do 6b (o que aguarda stock passa a ser o que falta enviar menos o reservado).
   - acertos feitos na verificação: largura mínima das colunas na página das transportadoras e o custo com duas casas
     no «Corrigir».
 
-## Pacotes seguintes (esboço; cada um terá plano detalhado antes de começar)
+## Pacote 6e — API de encomendas
+Detalhado a 2026-11-25, depois do merge do 6d. Último pacote da fase: a loja online passa a criar encomendas no CRM e a
+saber o que há de cada produto; o estado volta à loja pelos webhooks do 6d.
 
-### 6e — API de encomendas
-- `POST /api/v1/orders` (âmbito `orders:write`, `Idempotency-Key`, e o id externo da loja numa `ExternalLink` para
-  não duplicar), cliente por NIF ou email (cria empresa ou contacto se não existir), linhas por referência do
-  produto; nasce confirmada ou em rascunho conforme a chave.
-- `GET /api/v1/products` (`products:read`) com preço e disponível.
-- OpenAPI atualizada e testes de contrato.
+### Âmbitos novos das chaves de API
+- `products:read` — ler produtos (preço, IVA, stock disponível).
+- `orders:read` — ler encomendas (estado, linhas, expedições com o link de seguimento).
+- `orders:write` — criar encomendas.
+
+### Produtos — `GET /api/v1/products`, `GET /api/v1/products/:id`
+- Lista com a mesma sincronização das empresas e contactos (`updated_since` + `cursor`, por data de alteração) e o
+  filtro `sku` (referência exata, sem distinguir maiúsculas).
+- Campos: `id`, `sku`, `name`, `barcode`, `unit`, `sale_price`, `vat_rate`, `active`, `tracks_stock`, `category`; com
+  o módulo «Stock» ligado, `stock_on_hand`, `reserved` e `available` (null sem controlo de stock). **Nunca os custos
+  nem os fornecedores.**
+- Só com o módulo «Produtos» ligado (404 sem ele, como as outras rotas de módulos).
+- Nota: o stock muda sem mudar a data de alteração do produto; para o stock atual a loja lê o produto (ou a lista
+  completa) — a sincronização por data é para o catálogo.
+
+### Encomendas — `POST /api/v1/orders` (`orders:write`)
+- `Idempotency-Key` obrigatório (como os leads). `external_id` opcional: o número da encomenda na loja, guardado numa
+  `ExternalLink` da chave (`entityType = "order"`); repetido → 409 com o id da encomenda que já existe, mesmo fora da
+  janela de 24 h da idempotência.
+- **Cliente** (`customer`): `tax_id`, `email`, `company_name`, `name` (pessoa), `phone`. Pelo menos um de NIF, email
+  ou nome.
+  - **Empresa:** com NIF, a que tiver o mesmo NIF (normalizado como na conversão de leads: «PT 123 456 789» =
+    «123456789»); senão, com `company_name`, cria-se (com o NIF).
+  - **Contacto:** com email, o que tiver o mesmo email (sem distinguir maiúsculas); senão, com `name` ou email, cria-se
+    (na empresa da encomenda, se houver).
+  - Um contacto encontrado que é de **outra empresa** não entra na encomenda (a encomenda fica com a empresa; o email
+    da loja vai para a timeline). Um contacto sem empresa ganha a da encomenda, como na conversão de leads.
+  - O que foi criado fica na timeline de cada registo («Criada pela API: <chave>»).
+- **Linhas** (`lines`, 1 a 200): por `sku` (produto ativo do catálogo; desconhecido ou desativado → 422 com a linha) ou
+  livres (`description` + `unit_price` + `vat_rate`, ex.: portes). `quantity` > 0; `unit_price` opcional nas linhas
+  de produto (sem ele, o preço do catálogo; com ele, o preço da loja — promoções), `discount_pct` opcional. IVA do
+  produto. Os totais são calculados pelo CRM (como na interface).
+- **Outros campos:** `customer_reference` (por omissão o `external_id`), `delivery_address`, `notes`.
+- **`confirm`** (booleano, por omissão `false`): com `true` a encomenda nasce confirmada e **reserva stock** (regra do
+  6b; o que falta fica a aguardar e entra nas sugestões de compra). Com `false` fica em rascunho para a equipa rever.
+  Uma encomenda paga na loja vem normalmente com `true`. *Desvio ao esboço* («conforme a chave»): pedido a pedido é
+  mais claro e não pede configuração nova.
+- **Quem:** a encomenda fica criada por quem criou a chave (uma chave não é uma pessoa), como nos leads; sem
+  responsável.
+- Faz o mesmo que na interface: timeline, webhooks (`order.created` e, ao confirmar, `order.status_changed`), tempo
+  real; com reservas, a tarefa «Preparar encomenda» segue as regras de sempre.
+- Tudo ou nada: se uma linha falhar, nada fica criado (nem empresa, nem contacto, nem encomenda), e o id externo é
+  libertado.
+- Precisa dos módulos «Encomendas» e «Produtos» (404 sem eles).
+
+### Encomendas — `GET /api/v1/orders`, `GET /api/v1/orders/:id` (`orders:read`)
+- Lista com a sincronização por data de alteração e o filtro `external_id` (o da chave).
+- Campos: `id`, `code`, `status`, `partially_shipped`, `customer` (`company_id`, `contact_id`), `customer_reference`,
+  `delivery_address`, `subtotal`, `vat_total`, `total`, datas (`confirmed_at`, `shipped_at`, `delivered_at`,
+  `cancelled_at`, `cancel_reason`), `external_id`, `lines` (`id`, `sku`, `description`, `quantity`, `unit_price`,
+  `discount_pct`, `vat_rate`, `line_total`, `shipped_quantity`) e `shipments` (`id`, `shipped_at`, `carrier`,
+  `tracking_code`, `tracking_url`, `packages`, `weight_kg`, `lines`). **Sem o custo das expedições** (como nos
+  webhooks) nem as notas internas.
+
+### Contrato
+- OpenAPI (`/api/v1/openapi.json`) com as rotas e os esquemas novos; `docs/api-publica.md` com exemplos.
+- Erros no formato da v1 (`{ error: { code, message, details } }`); 422 para linhas inválidas, com o índice da linha.
+- Testes estruturais: cada rota com `@Scopes`, e os testes de contrato a validar as respostas contra o OpenAPI.
+
+### Validação prevista
+- **e2e** (`public-api-orders.e2e-spec.ts`):
+  - produtos: lista, sincronização, `sku`, stock com e sem o módulo, sem custos, âmbito em falta (403), módulo
+    desligado (404);
+  - criar encomenda: cliente por NIF (normalizado) e por email, cliente novo (empresa + contacto), contacto de outra
+    empresa, linhas por SKU e livres, preço da loja vs catálogo, totais, rascunho vs `confirm` com reservas e linha à
+    espera, SKU desconhecido/desativado (422 e nada criado), `external_id` repetido (409 com o id), idempotência
+    (mesma chave → mesma resposta; corpo diferente → 422), webhooks `order.created`/`order.status_changed`;
+  - ler encomendas: estado, expedições com link e sem custo, `external_id`, sincronização;
+  - concorrência: o mesmo `external_id` em dois pedidos ao mesmo tempo cria uma só encomenda.
+- Testes de contrato com o OpenAPI; prova por mutação.
+- Sem migração prevista (os âmbitos são código; a `ExternalLink` já existe). Se for precisa, ensaio como sempre.
+- **Browser:** criar uma chave com os âmbitos novos; criar encomendas por `curl` (base de testes) e vê-las na lista e
+  na ficha (origem «API»), com a empresa/contacto ligados ou criados.
+
