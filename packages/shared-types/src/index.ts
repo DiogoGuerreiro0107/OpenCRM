@@ -933,6 +933,8 @@ export interface SalesOrder extends SalesOrderBase {
   waitingLines: number;
   shipments: Shipment[];
   partiallyShipped: boolean;
+  /** De onde veio (Fase 6e): a chave de API que a criou e o número da encomenda nessa origem (ex.: a loja online). */
+  externalRefs: Array<{ source: string; externalId: string }>;
 }
 
 /** Compras a fornecedor (Fase 6c). Os custos e totais só vêm a quem tem a área «Catálogo de produtos». */

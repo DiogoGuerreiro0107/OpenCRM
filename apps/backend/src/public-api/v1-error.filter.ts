@@ -10,6 +10,8 @@ export const API_ERROR_CODES = [
   "idempotency_key_reuse",
   "rate_limited",
   "internal_error",
+  /** Pedido bem formado que não se pode cumprir (Fase 6e: referência de produto desconhecida, cliente por criar). */
+  "unprocessable",
 ] as const;
 
 export type ApiErrorCode = (typeof API_ERROR_CODES)[number];

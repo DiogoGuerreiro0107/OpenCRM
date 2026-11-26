@@ -13,6 +13,8 @@ import { recordMovement } from "../stock/stock.service";
 import { allocateWaiting, lockProducts, reservationText, SALES_ORDER_SOURCE, waitingLines } from "../stock/reservations";
 import { WebhooksService } from "../webhooks/webhooks.service";
 import { trackingUrl } from "./carriers.service";
+import { linkExternalId, OrderIntake, resolveCustomer, resolveLines } from "./order-intake";
+import { apiKeyProvider } from "../public-api/external-provider";
 import { CancelOrderDto, CreateOrderDto, CreateOrderLineDto, FinishOrderDto, QueryOrdersDto, ShipOrderDto, UpdateOrderDto, UpdateOrderLineDto, UpdateShipmentDto } from "./dto/order.dto";
 
 /** No máximo isto por encomenda: as linhas vêm sempre todas com a encomenda. */
@@ -258,11 +260,20 @@ export class OrdersService {
 
   /** Nas linhas à espera, o que está em compra do produto (com o módulo «Compras» ligado — Fase 6c). */
   async findOne(id: string) {
-    const view = this.detailView(await this.load(id));
+    const view = { ...this.detailView(await this.load(id)), externalRefs: await this.externalRefs(id) };
     const waitingProducts = [...new Set(view.lines.filter((l) => l.waitingQuantity > 0).map((l) => l.productId!))];
     if (!waitingProducts.length || !this.modules.isEnabled("compras")) return view;
     const onOrder = await onOrderByProduct(this.prisma, waitingProducts);
     return { ...view, lines: view.lines.map((l) => (l.waitingQuantity > 0 && l.product ? { ...l, product: { ...l.product, onOrder: onOrder.get(l.product.id) ?? 0 } } : l)) };
+  }
+
+  /** Ids externos da encomenda (Fase 6e): o número na loja que a enviou pela API, com o nome da chave. */
+  private async externalRefs(id: string) {
+    const links = await this.prisma.externalLink.findMany({ where: { entityType: "order", entityId: id }, orderBy: [{ createdAt: "asc" }, { id: "asc" }] });
+    if (!links.length) return [];
+    const keyIds = links.map((l) => l.provider).filter((p) => p.startsWith("api_key:")).map((p) => p.slice("api_key:".length));
+    const keys = new Map((await this.prisma.apiKey.findMany({ where: { id: { in: keyIds } }, select: { id: true, name: true } })).map((k) => [apiKeyProvider(k.id), k.name]));
+    return links.map((l) => ({ source: keys.get(l.provider) ?? l.provider, externalId: l.externalId }));
   }
 
   private async load(id: string, tx: Tx | PrismaService = this.prisma) {
@@ -358,9 +369,11 @@ export class OrdersService {
   async remove(id: string) {
     const existing = await this.load(id);
     if (existing.status !== "DRAFT") throw new ConflictException("Só se apagam rascunhos: cancela a encomenda");
-    // Os valores dos campos personalizados não têm chave estrangeira (polimórficos): apagam-se juntamente.
+    // Os valores dos campos personalizados e os ids externos (Fase 6e) não têm chave estrangeira (polimórficos):
+    // apagam-se juntamente, e o id externo fica livre para a loja voltar a enviar a encomenda.
     await this.prisma.$transaction([
       this.prisma.customFieldValue.deleteMany({ where: { entityType: "ORDER", entityId: id } }),
+      this.prisma.externalLink.deleteMany({ where: { entityType: "order", entityId: id } }),
       this.prisma.salesOrder.delete({ where: { id } }),
     ]);
   }
@@ -489,30 +502,86 @@ export class OrdersService {
 
   /** Confirmar: reserva o disponível, por linha (Fase 6b); o resto aguarda stock. */
   async confirm(id: string, userId: string) {
-    const served = await lockedTransaction(this.prisma, async (tx) => {
-      const order = await this.lock(tx, id);
-      this.assertFrom(order, "confirm");
-      const full = await tx.salesOrder.findUniqueOrThrow({ where: { id }, select: { companyId: true, contactId: true, _count: { select: { lines: true } } } });
-      if (full._count.lines === 0) throw new BadRequestException("Acrescenta pelo menos uma linha antes de confirmar");
-      if (!full.companyId && !full.contactId) throw new BadRequestException("Indica o cliente antes de confirmar");
-      const reserves = this.reservationsApply();
-      const productIds = reserves ? await this.lineProducts(tx, id) : [];
-      await lockProducts(tx, productIds);
-      await tx.salesOrder.update({ where: { id }, data: { status: "CONFIRMED", confirmedAt: new Date() } });
-      await this.note(tx, id, "Encomenda confirmada", userId);
-      if (!reserves) return new Set<string>();
-      const served = await this.allocate(tx, productIds, userId);
-      const waiting = await waitingLines(tx, id);
-      if (waiting.length) {
-        await this.note(tx, id, `A aguardar stock: ${waiting.map((l) => reservationText(round2(Number(l.quantity) - Number(l.reservedQuantity)), l)).join("; ")}`, userId);
-      }
-      return served;
-    });
+    const served = await lockedTransaction(this.prisma, (tx) => this.confirmLocked(tx, id, userId));
     // Completa logo ao confirmar não pede tarefa (quem confirma já sabe); outras que fiquem completas, sim.
     served.delete(id);
     await this.preparation.afterAllocation(served, userId);
     const view = await this.findOne(id);
     this.statusChanged(view, "DRAFT");
+    return view;
+  }
+
+  /** Confirma dentro da transação (também a das encomendas vindas da API, Fase 6e). Devolve as encomendas servidas. */
+  private async confirmLocked(tx: Tx, id: string, userId: string) {
+    const order = await this.lock(tx, id);
+    this.assertFrom(order, "confirm");
+    const full = await tx.salesOrder.findUniqueOrThrow({ where: { id }, select: { companyId: true, contactId: true, _count: { select: { lines: true } } } });
+    if (full._count.lines === 0) throw new BadRequestException("Acrescenta pelo menos uma linha antes de confirmar");
+    if (!full.companyId && !full.contactId) throw new BadRequestException("Indica o cliente antes de confirmar");
+    const reserves = this.reservationsApply();
+    const productIds = reserves ? await this.lineProducts(tx, id) : [];
+    await lockProducts(tx, productIds);
+    await tx.salesOrder.update({ where: { id }, data: { status: "CONFIRMED", confirmedAt: new Date() } });
+    await this.note(tx, id, "Encomenda confirmada", userId);
+    if (!reserves) return new Set<string>();
+    const served = await this.allocate(tx, productIds, userId);
+    const waiting = await waitingLines(tx, id);
+    if (waiting.length) {
+      await this.note(tx, id, `A aguardar stock: ${waiting.map((l) => reservationText(round2(Number(l.quantity) - Number(l.reservedQuantity)), l)).join("; ")}`, userId);
+    }
+    return served;
+  }
+
+  /**
+   * Encomenda vinda da API pública (Fase 6e): cliente (encontrado ou criado), linhas, e confirmada se pedido — tudo
+   * numa transação. Depois de gravar faz o mesmo que a interface: webhooks e a tarefa «Preparar encomenda».
+   */
+  async createFromIntake(intake: OrderIntake, userId: string) {
+    const { id } = intake;
+    const served = await lockedTransaction(this.prisma, async (tx) => {
+      await linkExternalId(tx, intake.externalLink, id);
+      const customer = await resolveCustomer(tx, intake.customer);
+      const lines = await resolveLines(tx, intake.lines);
+      const totals = computeTotals(lines);
+      const text = (v: string | undefined) => v?.trim() || null;
+      const order = await tx.salesOrder.create({
+        data: {
+          id,
+          companyId: customer.company?.id ?? null,
+          contactId: customer.contact?.id ?? null,
+          customerReference: text(intake.customerReference) ?? text(intake.externalLink?.externalId)?.slice(0, 100) ?? null,
+          deliveryAddress: text(intake.deliveryAddress),
+          notes: text(intake.notes),
+          createdById: userId,
+          ...totals,
+          lines: {
+            create: lines.map((l, position) => ({ ...l, position, lineTotal: computeLine(l).net })),
+          },
+        },
+        select: { number: true },
+      });
+      const code = orderCode(order.number);
+      const external = intake.externalLink ? ` (n.º na origem: ${intake.externalLink.externalId})` : "";
+      await this.note(tx, id, `Encomenda ${code} criada pela ${intake.origin}${external}`, userId);
+      for (const n of customer.notes) await this.note(tx, id, n, userId);
+      await this.note(tx, id, `Linhas: ${lines.map((l) => lineText(l)).join("; ")}`, userId);
+      const createdBy = `pela ${intake.origin}, com a encomenda ${code}`;
+      if (customer.created.company && customer.company) {
+        await tx.timelineEvent.create({ data: { entityType: "COMPANY", entityId: customer.company.id, type: "SYSTEM", description: `Empresa "${customer.company.name}" criada ${createdBy}.`, userId } });
+      }
+      if (customer.created.contact && customer.contact) {
+        await tx.timelineEvent.create({ data: { entityType: "CONTACT", entityId: customer.contact.id, type: "SYSTEM", description: `Contacto "${customer.contact.name}" criado ${createdBy}.`, userId } });
+      }
+      return intake.confirm ? this.confirmLocked(tx, id, userId) : null;
+    });
+    const view = await this.findOne(id);
+    this.webhooks.trigger("order.created", this.eventBase({ ...view, status: "DRAFT" }));
+    if (served) {
+      // Como na interface: completa logo ao confirmar não pede tarefa; outras que fiquem completas, sim.
+      served.delete(id);
+      await this.preparation.afterAllocation(served, userId);
+      this.statusChanged(view, "DRAFT");
+    }
     return view;
   }
 
@@ -582,7 +651,8 @@ export class OrdersService {
         data: { orderId: id, carrierId: carrier?.id ?? null, ...details, shippedAt: new Date(), createdById: userId, lines: { create: picks.map((p) => ({ orderLineId: p.line.id, quantity: p.quantity })) } },
         select: { id: true },
       });
-      if (!partial) await tx.salesOrder.update({ where: { id }, data: { status: "SHIPPED", shippedAt: new Date() } });
+      // Um envio parcial também conta como alteração da encomenda (sincronização por data na API, Fase 6e).
+      await tx.salesOrder.update({ where: { id }, data: partial ? { updatedAt: new Date() } : { status: "SHIPPED", shippedAt: new Date() } });
       await this.note(tx, id, partial ? `Envio parcial: ${picks.map((p) => reservationText(p.quantity, p.line)).join("; ")}` : "Encomenda enviada", userId);
       const transport = transportText({ carrierName: carrier?.name, ...details, weightKg: details.weightKg ?? null, cost: details.cost ?? null });
       if (transport) await this.note(tx, id, `Expedição: ${transport}`, userId);
@@ -652,6 +722,7 @@ export class OrdersService {
         transportText({ carrierName: s.carrier?.name, trackingCode: s.trackingCode, packages: s.packages, weightKg: s.weightKg === null ? null : Number(s.weightKg), cost: s.cost === null ? null : Number(s.cost) }) + `|${s.notes ?? ""}`;
       if (describe(updated) === describe(existing)) return false;
       const transport = describe(updated).split("|")[0];
+      await tx.salesOrder.update({ where: { id }, data: { updatedAt: new Date() } });
       await this.note(tx, id, `Expedição corrigida${transport ? `: ${transport}` : " (sem dados do transporte)"}`, userId);
       return true;
     });

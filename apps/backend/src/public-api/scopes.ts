@@ -6,6 +6,9 @@ export const API_SCOPES = {
   "companies:read": "Ler empresas",
   "contacts:read": "Ler contactos",
   "leads:write": "Criar leads (p. ex. a partir de um formulário do site)",
+  "products:read": "Ler produtos: preço, IVA e stock disponível (sem custos nem fornecedores)",
+  "orders:read": "Ler encomendas: estado, linhas e expedições",
+  "orders:write": "Criar encomendas (p. ex. a partir de uma loja online)",
 } as const;
 
 export type ApiScope = keyof typeof API_SCOPES;

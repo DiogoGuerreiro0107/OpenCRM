@@ -859,6 +859,16 @@ export function OrderDetailPage() {
             {dates.map(([label, value]) => `${label} ${value}`).join(" · ")}
             {order.createdBy && ` · por ${order.createdBy.name}`}
           </p>
+          {order.externalRefs.length > 0 && (
+            <p className="text-sm text-muted-foreground">
+              Veio pela API:{" "}
+              {order.externalRefs.map((r) => (
+                <span key={`${r.source}-${r.externalId}`} className="mr-2">
+                  {r.source} <span className="font-mono">n.º {r.externalId}</span>
+                </span>
+              ))}
+            </p>
+          )}
           {order.status === "CANCELLED" && order.cancelReason && <p className="text-sm text-red-700">Motivo do cancelamento: {order.cancelReason}</p>}
         </div>
         {canEdit && (

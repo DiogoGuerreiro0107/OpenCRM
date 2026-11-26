@@ -721,3 +721,54 @@ saber o que há de cada produto; o estado volta à loja pelos webhooks do 6d.
 - **Browser:** criar uma chave com os âmbitos novos; criar encomendas por `curl` (base de testes) e vê-las na lista e
   na ficha (origem «API»), com a empresa/contacto ligados ou criados.
 
+### Execução do 6e (2026-11-26)
+**Implementado como planeado**, com estes pormenores decididos na implementação:
+- **Tudo numa transação** (`OrdersService.createFromIntake`, regras do cliente e das linhas em
+  `orders/order-intake.ts`): primeiro a ligação ao id externo (um pedido simultâneo com o mesmo `external_id` espera
+  aí e recebe 409 quando o primeiro grava), depois o cliente, as linhas, a encomenda e, com `confirm`, a confirmação
+  com as reservas (o mesmo código da interface, extraído para `confirmLocked`). Uma falha desfaz tudo, também a
+  ligação.
+- **Cliente — um acerto ao plano:** sem NIF mas com `company_name`, se o contacto encontrado pelo email já tem
+  empresa, a encomenda fica com essa empresa em vez de criar outra (uma loja sem NIF voltava a criar a mesma empresa
+  a cada encomenda). Com NIF desconhecido e sem nome de empresa não se cria empresa; o NIF fica na timeline.
+  Sem empresa nem contacto possível → 422 (`details.field: "customer"`).
+- **Clientes iguais ao mesmo tempo:** a criação de cliente é serializada por NIF e por email (trincos da transação do
+  Postgres, sempre pela mesma ordem), para duas encomendas simultâneas de um cliente novo não criarem duas empresas.
+- **Linhas:** o `sku` compara sem maiúsculas (a referência exata primeiro); nas linhas de produto o preço, o desconto
+  e o IVA do pedido prevalecem, como na interface (o plano dizia «IVA do produto»: é o valor por omissão). Linhas
+  livres sem descrição, preço ou IVA → 400 (pedido mal formado); referência desconhecida, produto desativado ou sem
+  preço → 422 `unprocessable` com `line_index` e `reason`. `unprocessable` é um código de erro novo da v1 (acrescento).
+- **Webhooks:** `order.created` sai com `status: "DRAFT"` mesmo com `confirm`, seguido de `order.status_changed`
+  (`DRAFT` → `CONFIRMED`): a mesma sequência de quando se cria e confirma na interface.
+- **Sincronização das encomendas:** um envio parcial e a correção de uma expedição passam a mudar a data de alteração
+  da encomenda (antes não mudavam, e `updated_since` não os via).
+- **Origem na ficha:** «Veio pela API: <nome da chave> n.º <external_id>», a partir da ligação ao id externo (sem
+  coluna nova). Apagar o rascunho liberta o `external_id`, como nos leads.
+- **Sem migração:** os âmbitos são código e a `ExternalLink` já existia; o esquema não mudou (sem desvio).
+- **Produtos:** inclui também a `description`; os campos de stock vêm a null sem o módulo «Stock» ou num produto sem
+  controlo de stock.
+
+**Validação:**
+- 10 e2e novos (`public-api-orders.e2e-spec.ts`), com todas as respostas validadas contra o OpenAPI; os testes
+  estruturais (âmbitos de cada rota, OpenAPI = código) cobrem as rotas novas. Bateria completa: 556 e2e e
+  305 unitários.
+- **Prova por mutação:** 44 mutações, todas apanhadas. Na primeira corrida escaparam 6, que passaram a ser apanhadas com verificações
+  novas: NIF desconhecido com nome de empresa e um contacto de outra empresa (cria a empresa do NIF), os dois
+  trincos de cliente em separado (encomendas simultâneas só com o mesmo NIF, ou só com o mesmo email), a mensagem do
+  cliente vazio, o disponível depois de reservar (na API de produtos) e «parcialmente enviada» depois do envio total.
+  O ficheiro novo passou 3 vezes seguidas sem falhas.
+- **Um teste frágil, apanhado na bateria completa:** para confirmar que o custo da expedição (7,90) não sai na
+  API, o teste procurava «7.9» no texto da resposta, e uma data («…57.965Z») tinha-o por acaso. Passou a verificar
+  os nomes dos campos (`cost`, `notes`); o mesmo nos produtos. Depois disso, 3 voltas do ficheiro e a bateria completa
+  sem falhas.
+- **Browser** (base de testes, como Administrador), com as encomendas enviadas por um script com uma chave
+  «Loja online (teste)»:
+  - WEB-1001 (cliente novo com NIF, 5 toners a 42,50 € com 3 em stock + portes, `confirm`) → EN-0001 confirmada,
+    267,41 €, «Aguarda stock» na lista; a ficha mostra «Veio pela API: Loja online (teste) n.º WEB-1001», reservado
+    3 · aguarda 2, e a timeline (criada pela API, cliente criado, linhas, confirmada, reservas);
+  - a empresa «Papelaria Central, Lda.» criada com o contacto «Marta Ribeiro», «criada pela API … com a encomenda
+    EN-0001» na timeline e a encomenda na ficha;
+  - WEB-1002 (NIF «509 999 990» da Distribuidora Ibérica) → EN-0002 em rascunho, ligada à empresa existente;
+  - WEB-1001 outra vez → 409 com o id da existente; referência desconhecida → 422 com a mensagem da linha; na API
+    de produtos o TN-2420 ficou com stock 3, reservado 3, disponível 0;
+  - Configurações → Chaves de API: a chave com os três âmbitos e o diálogo «Nova chave» com as descrições novas.
