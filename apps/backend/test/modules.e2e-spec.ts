@@ -37,6 +37,29 @@ describe("Módulos opcionais (e2e)", () => {
   });
 
   describe("estado e permissões", () => {
+    it("extensões (E1.1): só o Administrador; os módulos como embutidas, com permissões declaradas e o estado", async () => {
+      await api().get("/extensions").set(as(comercial)).expect(403);
+      await api().get("/extensions").expect(401);
+      const res = await api().get("/extensions").set(as(admin)).expect(200);
+      expect(res.body.map((e: { id: string }) => e.id)).toEqual(MODULE_MANIFESTS.map((m) => m.id));
+      const zadarma = res.body.find((e: { id: string }) => e.id === "zadarma");
+      expect(zadarma).toMatchObject({ name: "Telefonia (Zadarma)", origin: "builtin", version: "1.0.0", sdk: "^1.0.0", enabled: true, provides: [], dependents: [] });
+      expect(zadarma.permissions).toEqual(
+        expect.arrayContaining([
+          { permission: "net:egress:api.zadarma.com", description: "Liga-se a api.zadarma.com" },
+          { permission: "secrets:own", description: "Guarda segredos próprios (palavras-passe, chaves), cifrados" },
+        ]),
+      );
+      const produtos = res.body.find((e: { id: string }) => e.id === "produtos");
+      expect(produtos.dependents.sort()).toEqual(["compras", "encomendas", "stock"]);
+      expect(res.body.find((e: { id: string }) => e.id === "compras").dependsOn).toEqual({ produtos: "^1.0.0", stock: "^1.0.0" });
+
+      // O estado é o do registo de módulos.
+      await setModule("zadarma", false);
+      const after = await api().get("/extensions").set(as(admin)).expect(200);
+      expect(after.body.find((e: { id: string }) => e.id === "zadarma").enabled).toBe(false);
+    });
+
     it("por omissão todos os módulos estão ativos", async () => {
       const res = await api().get("/modules").set(as(admin)).expect(200);
       expect(res.body.enabled.sort()).toEqual(["assistencias", "automations", "compras", "deals", "email", "encomendas", "leads", "produtos", "stock", "zadarma"]);

@@ -37,6 +37,7 @@ import { AutomationsModule } from "./automations/automations.module";
 import { ZadarmaModule } from "./zadarma/zadarma.module";
 import { RealtimeModule } from "./realtime/realtime.module";
 import { ModulesModule } from "./modules/modules.module";
+import { ExtensionsModule } from "./extensions/extensions.module";
 import { RealtimeInterceptor } from "./realtime/realtime.interceptor";
 
 @Module({
@@ -80,6 +81,7 @@ import { RealtimeInterceptor } from "./realtime/realtime.interceptor";
     ZadarmaModule,
     RealtimeModule,
     ModulesModule,
+    ExtensionsModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

@@ -15,6 +15,11 @@ export interface ModuleManifest {
   dependsOn: ModuleId[];
   /** Estado quando não há nenhuma definição guardada. Tudo ativo, para não mudar o comportamento de quem já usa. */
   defaultEnabled: boolean;
+  /**
+   * O que o módulo declara precisar, como qualquer extensão (Fase E1.1; vocabulário em extensions/permissions.ts).
+   * Declaração para o Administrador ler, não uma barreira: o código do módulo corre no backend.
+   */
+  permissions: string[];
 }
 
 export const MODULE_MANIFESTS: ModuleManifest[] = [
@@ -24,6 +29,7 @@ export const MODULE_MANIFESTS: ModuleManifest[] = [
     description: "Contactos de potenciais clientes e a sua conversão em empresa, contacto e negócio.",
     dependsOn: [],
     defaultEnabled: true,
+    permissions: ["data:leads:write", "data:companies:write", "data:contacts:write", "webhooks:emit"],
   },
   {
     id: "deals",
@@ -31,6 +37,7 @@ export const MODULE_MANIFESTS: ModuleManifest[] = [
     description: "Funis de vendas (Kanban), fases e negócios. Sem este módulo a conversão de leads não cria negócios.",
     dependsOn: [],
     defaultEnabled: true,
+    permissions: ["data:deals:write", "webhooks:emit"],
   },
   {
     id: "email",
@@ -38,6 +45,7 @@ export const MODULE_MANIFESTS: ModuleManifest[] = [
     description: "Caixa de email integrada (IMAP/SMTP), associação a contactos e modelos de email.",
     dependsOn: [],
     defaultEnabled: true,
+    permissions: ["data:sendEmail:write", "data:emailTemplates:write", "net:egress:configured", "secrets:own"],
   },
   {
     id: "zadarma",
@@ -45,6 +53,7 @@ export const MODULE_MANIFESTS: ModuleManifest[] = [
     description: "Chamadas com um clique e histórico de chamadas e gravações.",
     dependsOn: [],
     defaultEnabled: true,
+    permissions: ["data:makeCall:write", "net:egress:api.zadarma.com", "secrets:own", "jobs:schedule"],
   },
   {
     id: "automations",
@@ -53,6 +62,7 @@ export const MODULE_MANIFESTS: ModuleManifest[] = [
       "Regras «quando… então…» sobre negócios, tarefas e leads: mover, criar tarefas, atribuir, webhooks. Inclui a tarefa de primeiro contacto das leads novas: desligar o módulo desliga-a também.",
     dependsOn: [],
     defaultEnabled: true,
+    permissions: ["data:deals:write", "data:dailyWork:write", "net:egress:configured", "webhooks:emit", "jobs:schedule"],
   },
   {
     id: "assistencias",
@@ -61,6 +71,7 @@ export const MODULE_MANIFESTS: ModuleManifest[] = [
       "Pedidos de reparação e suporte técnico: equipamento, problema, diagnóstico e resolução, sobre as tarefas do tipo «Assistência» (passos, agenda e automações).",
     dependsOn: [],
     defaultEnabled: true,
+    permissions: ["data:dailyWork:write"],
   },
   {
     id: "produtos",
@@ -68,6 +79,7 @@ export const MODULE_MANIFESTS: ModuleManifest[] = [
     description: "Catálogo de produtos: referência, preço, IVA, categorias e fornecedores (com a referência e o preço de custo de cada um).",
     dependsOn: [],
     defaultEnabled: true,
+    permissions: ["data:catalog:write"],
   },
   {
     id: "stock",
@@ -75,6 +87,7 @@ export const MODULE_MANIFESTS: ModuleManifest[] = [
     description: "Stock dos produtos como registo de movimentos (entradas, saídas, devoluções, acertos de contagem), com alertas de stock mínimo e negativo.",
     dependsOn: ["produtos"],
     defaultEnabled: true,
+    permissions: ["data:stock:write"],
   },
   {
     id: "encomendas",
@@ -82,6 +95,7 @@ export const MODULE_MANIFESTS: ModuleManifest[] = [
     description: "Encomendas de clientes: linhas de produtos, totais indicativos e estados (rascunho, confirmada, enviada, entregue, cancelada).",
     dependsOn: ["produtos"],
     defaultEnabled: true,
+    permissions: ["data:orders:write", "data:companies:write", "data:contacts:write", "webhooks:emit"],
   },
   {
     id: "compras",
@@ -90,6 +104,7 @@ export const MODULE_MANIFESTS: ModuleManifest[] = [
       "Compras aos fornecedores: linhas de produtos com o custo do catálogo, receção (também em parte) que dá entrada no stock e serve as encomendas à espera, e sugestões do que comprar para as encomendas.",
     dependsOn: ["produtos", "stock"],
     defaultEnabled: true,
+    permissions: ["data:purchases:write"],
   },
 ];
 
