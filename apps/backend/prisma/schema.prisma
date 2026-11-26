@@ -49,6 +49,7 @@ model User {
   salesOrdersCreated    SalesOrder[]          @relation("SalesOrderCreatedBy")
   purchaseOrdersCreated PurchaseOrder[]       @relation("PurchaseOrderCreatedBy")
   shipmentsCreated      Shipment[]            @relation("ShipmentCreatedBy")
+  scheduledJobRuns      ScheduledJobRun[]
 }
 
 enum TimelineEventType {
@@ -1210,4 +1211,51 @@ model PurchaseOrderLine {
   @@unique([purchaseOrderId, productId])
   @@index([purchaseOrderId, position])
   @@index([productId])
+}
+
+/// Tarefas agendadas do núcleo (Fase E1.2, docs/plano-fase-e1-extensoes.md): o estado de cada tarefa do catálogo
+/// (jobs/job-catalog.ts). Sem linha = ligada, sem falhas.
+model ScheduledJobState {
+  jobId               String    @id
+  enabled             Boolean   @default(true)
+  /// Em pausa pelo disjuntor (falhas seguidas): só volta com «Retomar» ou com uma passagem manual bem-sucedida.
+  pausedAt            DateTime?
+  pausedReason        String?
+  consecutiveFailures Int       @default(0)
+  lastRunAt           DateTime?
+  lastSuccessAt       DateTime?
+  lastErrorAt         DateTime?
+  lastError           String?
+  updatedAt           DateTime  @updatedAt
+}
+
+enum ScheduledJobRunStatus {
+  SUCCESS
+  FAILED
+  TIMEOUT
+}
+
+enum ScheduledJobTrigger {
+  SCHEDULE
+  MANUAL
+}
+
+/// Uma passagem de uma tarefa agendada (Fase E1.2). Apagam-se ao fim de 30 dias.
+model ScheduledJobRun {
+  id            String                @id @default(uuid())
+  jobId         String
+  trigger       ScheduledJobTrigger
+  /// Quem a correu à mão (null nas automáticas).
+  triggeredById String?
+  triggeredBy   User?                 @relation(fields: [triggeredById], references: [id], onDelete: SetNull)
+  startedAt     DateTime
+  finishedAt    DateTime
+  status        ScheduledJobRunStatus
+  /// O que fez («3 entregas», «12 chamadas novas»).
+  summary       String?
+  /// Mensagem do erro, encurtada (nunca uma pilha).
+  error         String?
+
+  @@index([jobId, startedAt])
+  @@index([startedAt])
 }

@@ -2,7 +2,7 @@ import { INestApplication } from "@nestjs/common";
 import * as request from "supertest";
 import { bearerFor, createTestApp, createUser, prismaOf, resetDatabase } from "./helpers";
 import { ModulesService } from "../src/modules/modules.service";
-import { IdempotencyInterceptor } from "../src/public-api/idempotency.interceptor";
+import { IdempotencyCleanupService } from "../src/public-api/idempotency-cleanup.service";
 
 // Chaves de API e API pública /api/v1 (pacote E0c, docs/plano-e0-api-publica.md).
 describe("API pública /api/v1 e chaves de API (e2e)", () => {
@@ -397,7 +397,7 @@ describe("API pública /api/v1 e chaves de API (e2e)", () => {
       await prisma().idempotencyRecord.create({
         data: { apiKeyId: id, key: "antigo-00001", method: "POST", path: "/x", requestHash: "h", status: 201, createdAt: new Date(Date.now() - 25 * 3_600_000) },
       });
-      await app.get(IdempotencyInterceptor).purgeOld();
+      await app.get(IdempotencyCleanupService).purgeOld();
       const remaining = await prisma().idempotencyRecord.findMany();
       expect(remaining.map((r) => r.key)).toEqual(["recente-0001"]);
     });

@@ -1,5 +1,6 @@
 import { BadRequestException, Injectable, Logger, NotFoundException, OnApplicationBootstrap } from "@nestjs/common";
-import { Cron, CronExpression } from "@nestjs/schedule";
+import { JobsService } from "../jobs/jobs.service";
+import { JobOutcome } from "../jobs/job-catalog";
 import { AutomationRule, Prisma } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { WebhooksService } from "../webhooks/webhooks.service";
@@ -50,7 +51,11 @@ export class AutomationsService implements OnApplicationBootstrap {
     private readonly webhooks: WebhooksService,
     private readonly realtime: RealtimeService,
     private readonly modules: ModulesService,
-  ) {}
+    jobs: JobsService,
+  ) {
+    jobs.handle("automations.scheduled", () => this.runScheduled());
+    jobs.handle("automations.purge-runs", () => this.purgeOldRuns());
+  }
 
   /**
    * Escritas em tarefas feitas pelas ações (criar tarefa, mover tarefa). O serviço das tarefas regista-se aqui ao
@@ -246,11 +251,11 @@ export class AutomationsService implements OnApplicationBootstrap {
     return { ...page, items: page.items.map((r) => ({ ...r, entityLabel: labels.get(`${r.entityType}:${r.entityId}`) ?? null })) };
   }
 
-  /** Limpeza diária do histórico. */
-  @Cron(CronExpression.EVERY_DAY_AT_3AM)
-  async purgeOldRuns() {
+  /** Limpeza diária do histórico (tarefa «automations.purge-runs»). */
+  async purgeOldRuns(): Promise<JobOutcome> {
     const limit = new Date(Date.now() - RUN_RETENTION_DAYS * 24 * 60 * 60 * 1000);
-    await this.prisma.automationRun.deleteMany({ where: { createdAt: { lt: limit } } });
+    const { count } = await this.prisma.automationRun.deleteMany({ where: { createdAt: { lt: limit } } });
+    return { summary: `${count} ${count === 1 ? "registo apagado" : "registos apagados"}`, idle: count === 0 };
   }
 
   // ------------------------------------------------------------------------------------------------------------ motor
@@ -316,10 +321,14 @@ export class AutomationsService implements OnApplicationBootstrap {
     }
   }
 
-  /** De hora a hora: gatilhos agendados (ex.: parado há X dias no passo). Condições não cumpridas não vão ao histórico. */
-  @Cron(CronExpression.EVERY_HOUR)
-  async runScheduled() {
+  /**
+   * De hora a hora (tarefa «automations.scheduled»): gatilhos agendados (ex.: parado há X dias no passo). Condições não
+   * cumpridas não vão ao histórico; a falha de uma regra fica no histórico das automações e não para as outras.
+   */
+  async runScheduled(): Promise<JobOutcome> {
+    if (!this.modules.isEnabled("automations")) return { summary: "Módulo desligado", idle: true };
     const deps = this.engine();
+    let checked = 0;
     const scheduled = AUTOMATION_TRIGGER_IDS.filter((id) => AUTOMATION_TRIGGERS[id].scheduled);
     const rules = await this.prisma.automationRule.findMany({ where: { active: true, trigger: { in: scheduled } } });
     for (const raw of rules) {
@@ -330,10 +339,12 @@ export class AutomationsService implements OnApplicationBootstrap {
       for (const entityId of await findDue(this.prisma, rule)) {
         const record = await deps.load(rule.entityType, entityId);
         if (!record) continue;
+        checked++;
         await runRule(deps, rule, { entityType: rule.entityType, entityId, trigger: rule.trigger }, record, newChain(), false).catch((err: Error) =>
           this.logger.warn(`Automação agendada '${rule.name}': ${err.message}`),
         );
       }
     }
+    return { summary: `${checked} ${checked === 1 ? "registo verificado" : "registos verificados"}`, idle: checked === 0 };
   }
 }

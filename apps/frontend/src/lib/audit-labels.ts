@@ -60,6 +60,10 @@ const ACTION_LABELS: Record<string, string> = {
   "permission.updated": "Permissões alteradas",
   "permission.reset": "Permissões repostas na predefinição",
   "secrets.encrypted": "Segredos cifrados (comando do sistema)",
+  "job.run": "Tarefa agendada corrida à mão",
+  "job.toggled": "Tarefa agendada ligada/desligada",
+  "job.resumed": "Tarefa agendada retomada",
+  "job.paused": "Tarefa agendada em pausa (falhas seguidas)",
 };
 
 export const actionLabel = (action: string) => ACTION_LABELS[action] ?? action;
@@ -78,4 +82,5 @@ export const ACTION_GROUPS: Array<{ prefix: string; label: string }> = [
   { prefix: "purchase.", label: "Compras a fornecedor" },
   { prefix: "permission.", label: "Permissões" },
   { prefix: "secrets.", label: "Segredos (sistema)" },
+  { prefix: "job.", label: "Tarefas agendadas" },
 ];
