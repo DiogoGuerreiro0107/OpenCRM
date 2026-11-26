@@ -50,6 +50,7 @@ model User {
   purchaseOrdersCreated PurchaseOrder[]       @relation("PurchaseOrderCreatedBy")
   shipmentsCreated      Shipment[]            @relation("ShipmentCreatedBy")
   scheduledJobRuns      ScheduledJobRun[]
+  approvedExtensions    InstalledExtension[]  @relation("InstalledExtensionApprovedBy")
 }
 
 enum TimelineEventType {
@@ -1261,4 +1262,34 @@ model ScheduledJobRun {
 
   @@index([jobId, startedAt])
   @@index([startedAt])
+}
+
+/// Extensões instaladas da pasta `extensions/` (Fase E1.4, docs/plano-fase-e1-extensoes.md): código da equipa, que corre
+/// dentro do backend com confiança total. Só carrega com a impressão digital aprovada por um Administrador.
+model InstalledExtension {
+  /// O id do manifesto.
+  id                  String    @id
+  version             String
+  /// O último manifesto descoberto (já validado).
+  manifest            Json
+  /// Impressão digital (SHA-256) dos ficheiros na última descoberta.
+  checksum            String
+  /// A impressão digital que o Administrador aprovou. Diferente da atual = alterada, não carrega.
+  approvedChecksum    String?
+  approvedAt          DateTime?
+  approvedById        String?
+  approvedBy          User?     @relation("InstalledExtensionApprovedBy", fields: [approvedById], references: [id], onDelete: SetNull)
+  enabled             Boolean   @default(false)
+  /// A pasta deixou de existir (os dados ficam).
+  missing             Boolean   @default(false)
+  /// Definições (como `ModuleSetting.options`; segredos cifrados) e estado interno da extensão.
+  options             Json      @default("{}")
+  state               Json      @default("{}")
+  /// Falhas seguidas dos subscritores de eventos; o disjuntor desliga ao fim de 5.
+  consecutiveFailures Int       @default(0)
+  lastError           String?
+  /// Porque ficou desligada sem ser à mão (disjuntor, erro ao ativar).
+  disabledReason      String?
+  discoveredAt        DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 }

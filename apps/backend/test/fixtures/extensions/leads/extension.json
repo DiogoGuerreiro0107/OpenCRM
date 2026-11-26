@@ -1,0 +1,13 @@
+{
+  "id": "leads",
+  "name": "Leads falsas",
+  "description": "Extensão de exemplo para os testes (leads).",
+  "version": "1.0.0",
+  "sdk": "^1.0.0",
+  "origin": "installed",
+  "dependsOn": {},
+  "provides": [],
+  "permissions": [],
+  "defaultEnabled": false,
+  "settings": []
+}

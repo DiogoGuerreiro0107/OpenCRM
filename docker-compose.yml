@@ -126,6 +126,10 @@ services:
       N8N_WEBHOOK_URL: ${N8N_WEBHOOK_URL:-}
       # Usado nos links do email de recuperação de password.
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
+      # Extensões instaladas (Fase E1.4, docs/extensoes.md): a pasta, só de leitura dentro do contentor.
+      EXTENSIONS_DIR: /app/extensions
+    volumes:
+      - ./extensions:/app/extensions:ro
     ports:
       - "${BACKEND_PORT}:3000"
 

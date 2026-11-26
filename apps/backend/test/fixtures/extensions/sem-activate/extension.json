@@ -1,0 +1,14 @@
+{
+  "id": "sem-activate",
+  "name": "Sem activate",
+  "description": "Extensão de exemplo para os testes (sem-activate).",
+  "version": "1.0.0",
+  "sdk": "^1.0.0",
+  "origin": "installed",
+  "dependsOn": {},
+  "provides": [],
+  "permissions": [],
+  "defaultEnabled": false,
+  "settings": [],
+  "server": "index.js"
+}

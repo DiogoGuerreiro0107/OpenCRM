@@ -6,6 +6,7 @@ import { errorMessage } from "@/lib/errors";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { ExtensionSettingsForm } from "@/components/ExtensionSettingsForm";
+import { InstalledExtensionsSection } from "./InstalledExtensionsSection";
 
 export function ModulesSettingsPage() {
   const queryClient = useQueryClient();
@@ -86,6 +87,8 @@ export function ModulesSettingsPage() {
           </Card>
         ))}
       </div>
+
+      <InstalledExtensionsSection />
     </div>
   );
 }

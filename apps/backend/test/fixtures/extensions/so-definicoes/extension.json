@@ -1,0 +1,19 @@
+{
+  "id": "so-definicoes",
+  "name": "Só definições",
+  "description": "Extensão de exemplo para os testes (so-definicoes).",
+  "version": "1.0.0",
+  "sdk": "^1.0.0",
+  "origin": "installed",
+  "dependsOn": {},
+  "provides": [],
+  "permissions": [],
+  "defaultEnabled": false,
+  "settings": [
+    {
+      "key": "nota",
+      "label": "Nota",
+      "type": "text"
+    }
+  ]
+}

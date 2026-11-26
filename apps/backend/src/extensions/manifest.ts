@@ -30,6 +30,11 @@ export interface ExtensionManifest {
   defaultEnabled: boolean;
   /** Definições (Fase E1.3): o núcleo gera o formulário, valida e guarda; os segredos ficam cifrados. */
   settings: SettingField[];
+  /**
+   * Só nas instaladas (Fase E1.4): o ficheiro JavaScript (CommonJS) com `activate(contexto)`, relativo à pasta da
+   * extensão. Sem ele, a extensão só traz definições.
+   */
+  server?: string;
 }
 
 const ID = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/;
@@ -48,7 +53,18 @@ const FIELDS: Record<keyof ExtensionManifest, true> = {
   permissions: true,
   defaultEnabled: true,
   settings: true,
+  server: true,
 };
+
+/** Campos que podem faltar. */
+const OPTIONAL_FIELDS = new Set<string>(["server"]);
+
+/** Caminho relativo seguro para um ficheiro .js dentro da pasta da extensão (sem «..», sem começar por «/»). */
+export const isSafeServerPath = (value: unknown): value is string =>
+  typeof value === "string" &&
+  value.length <= 200 &&
+  /^[A-Za-z0-9_][A-Za-z0-9._-]*(\/[A-Za-z0-9_][A-Za-z0-9._-]*)*\.js$/.test(value) &&
+  !value.split("/").some((part) => part === ".." || part === ".");
 
 const isPlainObject = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
 const isText = (v: unknown, max: number) => typeof v === "string" && v.trim().length > 0 && v.length <= max;
@@ -62,7 +78,7 @@ export function manifestErrors(value: unknown): string[] {
   const err = (field: string, message: string) => errors.push(`${at}: ${field} ${message}`);
 
   for (const key of Object.keys(m)) if (!(key in FIELDS)) err(key, "não é um campo do manifesto");
-  for (const key of Object.keys(FIELDS)) if (!(key in m)) err(key, "é obrigatório");
+  for (const key of Object.keys(FIELDS)) if (!(key in m) && !OPTIONAL_FIELDS.has(key)) err(key, "é obrigatório");
 
   if ("id" in m && !(typeof m.id === "string" && m.id.length <= 50 && ID.test(m.id))) err("id", "tem de ter minúsculas, dígitos e hífens (até 50), a começar por uma letra");
   if ("name" in m && !isText(m.name, 80)) err("name", "tem de ter texto (até 80 caracteres)");
@@ -98,6 +114,10 @@ export function manifestErrors(value: unknown): string[] {
   list("provides", (s) => KNOWN_CONTRACTS.includes(s), "um contrato conhecido");
   list("permissions", isPermission, "uma permissão conhecida");
   if ("settings" in m) errors.push(...settingFieldsErrors(at, m.settings, m.permissions));
+  if ("server" in m) {
+    if (m.origin !== "installed") err("server", "só existe nas extensões instaladas");
+    else if (!isSafeServerPath(m.server)) err("server", "tem de ser um ficheiro .js dentro da pasta da extensão (ex.: dist/index.js)");
+  }
   return errors;
 }
 

@@ -358,3 +358,45 @@ Uma tabela nova (`InstalledExtension`); nada existente muda.
   ligar (recebe eventos, guarda estado, lê definições com segredo), alterar ficheiros depois de aprovada, desligar,
   disjuntor, manifesto inválido, sem `activate`, id de uma embutida, permissões (só Administrador), auditoria.
 - Prova por mutação; ensaio da migração; browser na base de testes.
+
+### Execução do E1.4 (2026-11-26)
+**Implementado como planeado**, com estes pormenores:
+- **Código:** `extensions/installed-extensions.service.ts` (descobrir, aprovar, ligar, desligar, carregar, eventos,
+  disjuntor), `extensions/fingerprint.ts` (impressão digital), `extensions/sdk.ts` (o contrato) e as rotas
+  `GET /extensions/installed`, `GET /extensions/installed/alerts`, `POST /extensions/installed/rescan`,
+  `POST /extensions/installed/:id/approve|enable|disable` (Administrador; auditoria pelo serviço). O manifesto ganhou
+  o campo opcional `server` (só nas instaladas; caminho seguro dentro da pasta).
+- **Eventos:** o `WebhooksService` ganhou subscritores internos (`subscribe`): cada evento chega em segundo plano,
+  com o envelope dos webhooks. As extensões subscrevem-no; o núcleo não depende delas.
+- **Definições das instaladas:** o serviço das definições passou a servir as duas origens (embutidas nas opções do
+  módulo, instaladas na própria linha); os segredos das instaladas usam o contexto
+  `InstalledExtension.options.<id>.<campo>` e entram no comando `secrets:encrypt`.
+- **Disjuntor:** a contagem recomeça sempre que a extensão é carregada (ligar à mão ou arrancar) — um teste
+  mostrou que, herdada da base, voltava a desligar a extensão à primeira falha depois de a religar.
+- **Ao arrancar** subscreve uma só vez (chamar o arranque duas vezes duplicava os eventos), procura a pasta e volta
+  a ligar as que estavam ligadas; uma alterada fica desligada, com aviso.
+- **Aviso dos Administradores:** o mesmo do E1.2 mostra também as extensões desligadas sem ser à mão.
+- **Docker:** `EXTENSIONS_DIR=/app/extensions` e o volume `./extensions:/app/extensions:ro`; a pasta `extensions/` do
+  repositório só tem um README. Guia para quem escreve extensões em [extensoes.md](extensoes.md).
+
+**Validação:**
+- Unitários novos (`fingerprint.spec.ts`: impressão digital e campo `server`) e 9 e2e novos
+  (`installed-extensions.e2e-spec.ts`, com as extensões de exemplo de `test/fixtures/extensions/` copiadas para uma
+  pasta temporária). Bateria completa: 589 e2e e 361 unitários.
+- **Prova por mutação:** 31 mutações, 29 apanhadas e 2 equivalentes (a verificação da impressão digital ao carregar
+  repete a de ligar e a do arranque; a regra contra «..» no `server` já é garantida pela expressão regular — ficam
+  como defesa em profundidade). Escaparam na primeira corrida, e passaram a ser apanhadas, o sucesso a zerar a
+  contagem do disjuntor e a contagem herdada ao religar; antes da corrida acrescentei o limite de tempo dos eventos
+  (encurtável nos testes) e a pasta com nome diferente do id.
+- **Migração** (uma tabela) ensaiada numa cópia da base de desenvolvimento: CHECK e chave estrangeira recusam valores
+  inválidos, sem desvio, reversão com impressões digitais iguais (ee0f8267… e e1314200…); base de desenvolvimento
+  migrada depois de uma cópia de segurança.
+- **Browser** (base de testes, com uma pasta com três extensões de exemplo): a secção «Extensões instaladas» mostrou a
+  pasta, a extensão com manifesto inválido e porquê, e as outras por aprovar; aprovar mostrou o aviso e a impressão
+  digital completa; «Olá mundo» ligada («recebe: lead.created») contou uma lead criada a seguir; «Falha sempre»
+  desligou-se ao fim de 5 leads e o aviso apareceu no topo; nenhum pedido falhado. Acerto feito: o aviso repetia
+  «desligada» («foi desligada: Desligada pelo disjuntor…»).
+- **Testes dependentes do tempo, apanhados na bateria completa:** os eventos chegam às extensões em segundo plano e
+  os testes esperavam 150 ms fixos; quando o ficheiro correu primeiro (tudo «a frio») não chegou. Passaram a esperar
+  pela condição (até 5 s) e, para verificar que algo não aconteceu, 600 ms. Depois: 3 voltas do ficheiro e a bateria
+  completa sem falhas.

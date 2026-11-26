@@ -1,0 +1,14 @@
+{
+  "id": "lenta",
+  "name": "Lenta",
+  "description": "Extensão de exemplo para os testes (lenta): cada evento demora.",
+  "version": "1.0.0",
+  "sdk": "^1.0.0",
+  "origin": "installed",
+  "dependsOn": {},
+  "provides": [],
+  "permissions": [],
+  "defaultEnabled": false,
+  "settings": [],
+  "server": "index.js"
+}
