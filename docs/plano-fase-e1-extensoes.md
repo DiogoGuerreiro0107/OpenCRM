@@ -301,3 +301,60 @@ Uma coluna nova (`ModuleSetting.state`, JSON, por omissão `{}`). A cópia da Za
   «Preenchido», a extensão 104 e a conta ativa; mudar a extensão para 105 gravou («Definições guardadas») sem o
   segredo na resposta; na base, o segredo ficou cifrado (sem o texto em claro) e a última sincronização no estado; o
   modo das leads mudou para «Só empresas» pelo formulário no cartão; nenhum pedido falhado.
+
+## Pacote E1.4 — Extensões instaladas da pasta `extensions/`
+Detalhado a 2026-11-26, depois do merge do E1.3. É **código da equipa** (forma B do desenho): corre dentro do backend
+com **confiança total**. As garantias são de processo, não de *sandbox* (§9): só a pasta controlada pelo
+Administrador, só com a impressão digital aprovada, auditoria e a página a dizê-lo.
+
+### Pasta e descoberta
+- `EXTENSIONS_DIR` (por omissão `extensions/` na pasta onde o backend corre). No Docker, um volume **só de leitura**
+  (`./extensions:/app/extensions:ro`).
+- Cada extensão é uma pasta com `extension.json` (o manifesto, com `origin: "installed"` e o campo novo `server`,
+  opcional: o ficheiro JavaScript, CommonJS, relativo à pasta) e o código.
+- **Ao arrancar e com «Procurar de novo»:** valida o manifesto (também: o id não pode ser o de uma embutida nem
+  repetir-se, o `server` tem de ficar dentro da pasta e existir), calcula a **impressão digital** (SHA-256 sobre os
+  caminhos e conteúdos de todos os ficheiros, ordenados; sem ligações simbólicas; no máximo 2000 ficheiros e 20 MB) e
+  regista em `InstalledExtension`. Uma pasta que desaparece fica «em falta» (os dados ficam).
+
+### Aprovar, ligar, desligar
+- **Aprovar:** o Administrador vê o manifesto, as permissões declaradas e a impressão digital, e aprova **essa**
+  impressão digital (o pedido leva-a; se a pasta mudou entretanto, 409). A página avisa que o código corre dentro do
+  CRM com acesso total.
+- **Ligar:** só aprovada e com a impressão digital atual igual à aprovada (recalculada ao ligar e ao arrancar).
+  Carrega o `server` e chama `activate(contexto)` (limite 10 s). **Desligar:** `deactivate()` se existir, tira os
+  subscritores, esquece o código carregado. Os dados ficam.
+- **Alterada** (ficheiros mudaram depois de aprovada): não carrega; fica «alterada — aprovar de novo».
+- Tudo na auditoria (aprovar, ligar, desligar, procurar de novo, disjuntor).
+
+### Contexto da extensão (o «SDK»)
+Tipos em `apps/backend/src/extensions/sdk.ts` e guia em `docs/extensoes.md`: `id`, `version`, `settings.get()`,
+`state.get()`/`state.set()`, `events.on(tipo | "*", handler)` (os mesmos eventos dos webhooks, com o mesmo envelope) e
+`log`. **Desvio ao plano:** sem pacote npm `@opencrm/extension-sdk` por agora — um pacote novo obriga a mexer no
+*lockfile* e no Docker e ainda ninguém escreve extensões fora deste repositório.
+
+### Eventos e disjuntor
+Cada evento dos webhooks é entregue, em segundo plano, a cada subscritor de cada extensão ligada, com limite de 10 s
+e o erro apanhado (nunca afeta quem originou o evento). **5 falhas seguidas** desligam a extensão (disjuntor), com
+auditoria e o aviso aos Administradores do E1.2.
+
+### Definições e estado
+As instaladas têm definições e estado como as embutidas (mesmo formato, mesmo formulário, segredos cifrados com o
+mesmo contexto), guardados na própria linha (`InstalledExtension.options` e `state`), e o comando dos segredos
+inclui-os.
+
+### Fora deste pacote
+Tarefas agendadas de extensões instaladas (entram com a primeira que precisar), tabelas e migrações próprias,
+carregar pela interface com assinatura de pacotes (E1b do desenho) e o *runner* isolado para código de terceiros
+(E1c).
+
+### Migração
+Uma tabela nova (`InstalledExtension`); nada existente muda.
+
+### Validação prevista
+- Unitários: impressão digital (ordem, conteúdo, ligações simbólicas, limites), validação do `server` e das regras das
+  instaladas.
+- e2e com extensões de exemplo em `test/fixtures/extensions/`: descobrir, aprovar (impressão digital certa e errada),
+  ligar (recebe eventos, guarda estado, lê definições com segredo), alterar ficheiros depois de aprovada, desligar,
+  disjuntor, manifesto inválido, sem `activate`, id de uma embutida, permissões (só Administrador), auditoria.
+- Prova por mutação; ensaio da migração; browser na base de testes.
