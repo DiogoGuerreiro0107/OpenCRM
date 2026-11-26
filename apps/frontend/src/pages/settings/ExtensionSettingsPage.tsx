@@ -1,13 +1,16 @@
 import { Link, useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { listExtensions } from "@/lib/modules-api";
+import { listInstalledExtensions } from "@/lib/extensions-api";
 import { ExtensionSettingsForm } from "@/components/ExtensionSettingsForm";
 import { Card, CardContent } from "@/components/ui/card";
 
 /** Configurações > definições de uma extensão (Fase E1.3), geradas a partir do manifesto. */
 export function ExtensionSettingsPage() {
   const { id = "" } = useParams();
-  const { data: extensions } = useQuery({ queryKey: ["modules", "extensions"], queryFn: listExtensions });
+  const { data: builtins } = useQuery({ queryKey: ["modules", "extensions"], queryFn: listExtensions });
+  const { data: installed } = useQuery({ queryKey: ["modules", "installed"], queryFn: listInstalledExtensions });
+  const extensions = builtins && installed ? [...builtins, ...installed.extensions.map((e) => ({ ...e, enabled: e.status === "enabled" }))] : undefined;
   const extension = extensions?.find((e) => e.id === id);
   return (
     <div className="mx-auto max-w-2xl space-y-4">

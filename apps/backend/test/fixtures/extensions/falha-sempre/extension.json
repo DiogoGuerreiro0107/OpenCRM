@@ -1,0 +1,14 @@
+{
+  "id": "falha-sempre",
+  "name": "Falha sempre",
+  "description": "Extensão de exemplo para os testes (falha-sempre).",
+  "version": "1.0.0",
+  "sdk": "^1.0.0",
+  "origin": "installed",
+  "dependsOn": {},
+  "provides": [],
+  "permissions": [],
+  "defaultEnabled": false,
+  "settings": [],
+  "server": "lib/main.js"
+}

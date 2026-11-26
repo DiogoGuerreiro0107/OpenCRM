@@ -169,6 +169,7 @@ Estado atual: **todas as fases do roadmap consolidado e a revisão final conclu�
   - [x] Módulos como extensões embutidas: manifesto validado (versões, dependências, permissões declaradas) e página «Módulos e extensões» com o que cada um declara fazer (Fase E1.1)
   - [x] Tarefas agendadas do núcleo: cada passagem registada, limite de tempo, pausa automática depois de falhas seguidas (com aviso aos Administradores) e a página «Tarefas agendadas» para correr, desligar e retomar (Fase E1.2)
   - [x] Definições das extensões: formulário gerado a partir do manifesto, segredos cifrados e nunca devolvidos; o modo das leads e as credenciais da Zadarma passam a usá-lo (Fase E1.3)
+  - [x] Extensões instaladas da pasta `extensions/` (código da equipa): só carregam com a impressão digital aprovada por um Administrador; recebem os eventos do CRM, têm definições e estado; disjuntor e aviso. Guia em [docs/extensoes.md](docs/extensoes.md) (Fase E1.4)
 
 ### Por fazer (backlog)
 

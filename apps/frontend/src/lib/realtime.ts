@@ -42,6 +42,8 @@ const KEYS_BY_RESOURCE: Record<string, string[]> = {
   "api-keys": ["api-keys"],
   // Tarefas agendadas (E1.2): a página e o aviso de pausa dos Administradores.
   jobs: ["jobs"],
+  // Extensões instaladas (E1.4): aprovar, ligar, desligar, procurar, disjuntor.
+  extensions: ["modules"],
   webhooks: ["webhooks"],
   // Um administrador mudou permissões: os botões de todas as sessões ajustam-se sem recarregar.
   permissions: ["permissions", "products"],

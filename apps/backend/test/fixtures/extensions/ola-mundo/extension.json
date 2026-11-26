@@ -1,0 +1,30 @@
+{
+  "id": "ola-mundo",
+  "name": "Olá mundo",
+  "description": "Extensão de exemplo: conta as leads criadas e lê as definições.",
+  "version": "1.0.0",
+  "sdk": "^1.0.0",
+  "origin": "installed",
+  "dependsOn": {
+    "leads": "^1.0.0"
+  },
+  "provides": [],
+  "permissions": [
+    "secrets:own"
+  ],
+  "defaultEnabled": false,
+  "settings": [
+    {
+      "key": "saudacao",
+      "label": "Saudação",
+      "type": "text",
+      "default": "Olá"
+    },
+    {
+      "key": "token",
+      "label": "Token",
+      "type": "secret"
+    }
+  ],
+  "server": "index.js"
+}

@@ -61,6 +61,7 @@ export async function encryptStoredSecrets(db: PrismaClient, keys: Buffer[]): Pr
     reports.push(report);
   }
   reports.push(await encryptSettingSecrets(db, keys));
+  reports.push(await encryptInstalledSecrets(db, keys));
   return reports;
 }
 
@@ -105,5 +106,37 @@ export async function countPlaintextSecrets(db: PrismaClient): Promise<number> {
     for (const row of await ACCESSORS[key].list(db)) if (!isEncrypted(row.value)) total++;
   }
   for (const s of await settingSecrets(db)) if (!isEncrypted(s.value)) total++;
+  for (const s of await installedSecrets(db)) if (!isEncrypted(s.value)) total++;
   return total;
+}
+
+/** Contexto de um segredo das definições de uma extensão instalada (igual ao de extension-settings.service.ts). */
+const installedContext = (id: string, key: string) => `InstalledExtension.options.${id}.${key}`;
+
+/** Os segredos das definições das extensões instaladas (Fase E1.4): os campos `secret` do manifesto de cada uma. */
+async function installedSecrets(db: PrismaClient) {
+  const rows = await db.installedExtension.findMany({ select: { id: true, manifest: true, options: true } });
+  return rows.flatMap((row) => {
+    const fields = ((row.manifest as { settings?: Array<{ key: string; type: string }> }).settings ?? []).filter((f) => f.type === "secret");
+    const options = (row.options ?? {}) as Record<string, unknown>;
+    return fields.flatMap((f) => (typeof options[f.key] === "string" && options[f.key] !== "" ? [{ id: row.id, key: f.key, value: options[f.key] as string }] : []));
+  });
+}
+
+async function encryptInstalledSecrets(db: PrismaClient, keys: Buffer[]): Promise<SecretsReport> {
+  const report: SecretsReport = { field: "InstalledExtension.options (definições das extensões instaladas)", encrypted: 0, recrypted: 0, unchanged: 0 };
+  for (const s of await installedSecrets(db)) {
+    const context = installedContext(s.id, s.key);
+    const decrypted = decryptSecret(s.value, keys, context);
+    if (!decrypted.legacy && decrypted.keyIndex === 0) {
+      report.unchanged++;
+      continue;
+    }
+    const row = await db.installedExtension.findUniqueOrThrow({ where: { id: s.id }, select: { options: true } });
+    const options = { ...((row.options ?? {}) as Record<string, unknown>), [s.key]: encryptSecret(decrypted.value, keys[0], context) };
+    await db.installedExtension.update({ where: { id: s.id }, data: { options: options as Prisma.InputJsonValue } });
+    if (decrypted.legacy) report.encrypted++;
+    else report.recrypted++;
+  }
+  return report;
 }

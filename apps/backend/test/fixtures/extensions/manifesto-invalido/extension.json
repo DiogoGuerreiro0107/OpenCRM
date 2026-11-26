@@ -1,0 +1,13 @@
+{
+  "id": "manifesto-invalido",
+  "name": "Manifesto invalido",
+  "description": "Extensão de exemplo para os testes (manifesto-invalido).",
+  "version": "1.0",
+  "sdk": "^1.0.0",
+  "origin": "installed",
+  "dependsOn": {},
+  "provides": [],
+  "permissions": [],
+  "defaultEnabled": false,
+  "settings": []
+}

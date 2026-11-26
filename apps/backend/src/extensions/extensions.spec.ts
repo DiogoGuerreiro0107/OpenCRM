@@ -79,7 +79,7 @@ describe("manifesto de uma extensão", () => {
   it("campos em falta e desconhecidos", () => {
     const { version: _v, ...noVersion } = valid();
     expect(manifestErrors(noVersion)).toEqual(["«faturacao-exemplo»: version é obrigatório"]);
-    expect(manifestErrors({ ...valid(), server: "dist/index.js" })).toEqual(["«faturacao-exemplo»: server não é um campo do manifesto"]);
+    expect(manifestErrors({ ...valid(), migrations: "migrations/" })).toEqual(["«faturacao-exemplo»: migrations não é um campo do manifesto"]);
     expect(manifestErrors(null)).toEqual(["o manifesto tem de ser um objeto"]);
     expect(manifestErrors([valid()])).toEqual(["o manifesto tem de ser um objeto"]);
   });

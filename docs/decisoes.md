@@ -759,3 +759,12 @@ Terceiro pacote da [Fase E1](plano-fase-e1-extensoes.md).
 - **Estado interno das extensões** (ex.: até quando a Zadarma sincronizou) numa coluna própria (`ModuleSetting.state`), separado das definições.
 - **Desvio ao plano:** o contrato `TelephonyProvider` fica para quando houver uma segunda telefonia (regra de dois); o primeiro contrato entra com a faturação.
 - **Validação:** 580 e2e e 355 unitários, 32 mutações (todas apanhadas), migração ensaiada e revertida. Detalhes no plano, em «Execução do E1.3».
+
+## Fase E1.4: extensões instaladas da pasta (2026-11-26)
+Último pacote da [Fase E1](plano-fase-e1-extensoes.md); guia em [extensoes.md](extensoes.md).
+- **Código da equipa, dentro do backend, com confiança total** (forma B do desenho). As garantias são de processo: só a pasta do servidor (só de leitura no Docker), só com a **impressão digital aprovada** por um Administrador (SHA-256 de todos os ficheiros; mudou → não carrega até nova aprovação), tudo na auditoria, e a página a dizê-lo antes de aprovar.
+- **Contexto mínimo** (`sdk.ts`): definições, estado, eventos (os dos webhooks, com o mesmo envelope) e registo. Limite de 10 s por `activate`, `deactivate` e evento; um evento nunca afeta quem o originou.
+- **Disjuntor:** 5 falhas seguidas desligam a extensão, com aviso aos Administradores.
+- **Sem pacote npm do SDK por agora** (tipos no backend e guia): um pacote novo obriga a mexer no *lockfile* e no Docker e ainda ninguém escreve extensões fora deste repositório.
+- **Fora:** tarefas agendadas e tabelas próprias para instaladas, carregar pela interface com assinatura (E1b do desenho) e o *runner* isolado (E1c).
+- **Validação:** 589 e2e e 361 unitários, 31 mutações (29 apanhadas, 2 equivalentes), migração ensaiada e revertida. Detalhes no plano, em «Execução do E1.4».
