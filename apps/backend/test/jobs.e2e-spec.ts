@@ -39,7 +39,7 @@ describe("Tarefas agendadas (e2e)", () => {
 
   const runsOf = (jobId: string) => prisma().scheduledJobRun.findMany({ where: { jobId }, orderBy: [{ startedAt: "asc" }, { id: "asc" }] });
   const stateOf = (jobId: string) => prisma().scheduledJobState.findUnique({ where: { jobId } });
-  const zadarmaAccount = () => prisma().zadarmaAccount.create({ data: { apiKey: "k", apiSecret: "s", callerExtension: "100", active: true } });
+  const zadarmaAccount = () => api().patch("/extensions/zadarma/settings").set("Authorization", admin).send({ apiKey: "k", apiSecret: "s", callerExtension: "100" }).expect(200);
   type JobView = { id: string; enabled: boolean; pausedAt: string | null; pausedReason: string | null; consecutiveFailures: number; lastError: string | null; running: boolean; extension: { id: string; label: string; enabled: boolean } | null };
   const view = async (id: string) => ((await api().get("/jobs").set("Authorization", admin).expect(200)).body as JobView[]).find((j) => j.id === id)!;
 

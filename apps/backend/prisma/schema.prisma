@@ -681,6 +681,9 @@ model ModuleSetting {
   moduleId  String   @id
   enabled   Boolean
   options   Json     @default("{}")
+  /// Estado interno da extensão (Fase E1.3; ex.: até quando a Zadarma já sincronizou). Não são definições: nunca sai
+  /// pela API das definições.
+  state     Json     @default("{}")
   updatedAt DateTime @updatedAt
 }
 

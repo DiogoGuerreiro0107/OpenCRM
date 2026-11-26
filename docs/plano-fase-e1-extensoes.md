@@ -264,3 +264,40 @@ Uma coluna nova (`ModuleSetting.state`, JSON, por omissão `{}`). A cópia da Za
   das leads pelo formulário, a Zadarma a ligar e a sincronizar com as definições, a cópia do `ZadarmaAccount` (com
   segredo cifrado e em claro), o comando dos segredos.
 - Prova por mutação; ensaio da migração; browser na base de testes.
+
+### Execução do E1.3 (2026-11-26)
+**Implementado como planeado** (com o desvio acima: sem `TelephonyProvider`), com estes pormenores:
+- **Código:** `extensions/settings.ts` (formato, validação dos campos no manifesto e dos valores), `extensions/
+  extension-settings.service.ts` (ler com os valores por omissão, ver sem segredos, gravar com cifra e auditoria) e
+  `GET/PATCH /extensions/:id/settings`. `ExtensionsModule` passou a global (as extensões leem as definições).
+  `ModulesService` ganhou `getState`/`setState` (coluna `state`).
+- **Auditoria:** a rota tem `@Audit(…, { recordedByService: true })` — opção nova: o serviço regista o evento (só ele
+  sabe que campos mudaram) e o interceptor não o duplica; a marca continua a contar para o teste de cobertura da
+  auditoria, que a exigiu. Sem mudanças, não há evento.
+- **Obrigatórios:** uma gravação tem de deixar as definições válidas (a primeira gravação da Zadarma pede a chave e o
+  segredo, como a página antiga); um segredo já guardado não precisa de vir de novo.
+- **Zadarma:** `GET/POST /zadarma/account`, o DTO e a página própria saíram; o item «Zadarma» do menu abre
+  `/configuracoes/extensoes/zadarma`. A cópia da tabela antiga corre ao arrancar, depois de recarregar as opções dos
+  módulos (a ordem de arranque não garante que já estejam carregadas, e a cópia podia gravar por cima). Trata o
+  segredo cifrado e o ainda em claro; com a chave errada não copia nem impede o arranque. A tabela antiga fica.
+- **Comando `secrets:encrypt`:** cifra e roda também os segredos das definições (relatório próprio, «ModuleSetting.options
+  (definições das extensões)»), sem mexer nas outras definições. O aviso de segredos em claro ao arrancar conta-os.
+- **Interface:** formulário gerado (`ExtensionSettingsForm`) na página genérica e no cartão de cada extensão com
+  definições («Definições», abre ali mesmo, ou «Abrir numa página»). O seletor antigo do modo das leads saiu; a rota
+  `PATCH /leads/settings` ficou (mesma gravação).
+
+**Validação:**
+- Unitários novos (`settings.spec.ts`: campos no manifesto e valores; e as definições validadas como parte do
+  manifesto) e 5 e2e novos (`extension-settings.e2e-spec.ts`); os testes da Zadarma e dos segredos passaram para as
+  definições e ganharam a cópia da tabela antiga (cifrado, em claro, chave errada, uma só vez). Bateria completa: 580
+  e2e e 355 unitários.
+- **Prova por mutação:** 32 mutações, todas apanhadas. Duas escaparam na primeira corrida (a validação das definições
+  através do manifesto e o estado a juntar em vez de substituir) e passaram a ser apanhadas.
+- **Migração** (uma coluna) ensaiada numa cópia da base de desenvolvimento, com reversão e impressões digitais iguais
+  (e5fb1faf… e ed9251a3…); base de desenvolvimento migrada depois de uma cópia de segurança. A base de desenvolvimento
+  não tem conta Zadarma: a cópia foi verificada no browser.
+- **Browser** (base de testes, com uma conta Zadarma antiga com o segredo em claro): ao arrancar, o backend registou
+  «A conta da Zadarma passou para as definições da extensão»; a página da Zadarma mostrou a chave, o segredo como
+  «Preenchido», a extensão 104 e a conta ativa; mudar a extensão para 105 gravou («Definições guardadas») sem o
+  segredo na resposta; na base, o segredo ficou cifrado (sem o texto em claro) e a última sincronização no estado; o
+  modo das leads mudou para «Só empresas» pelo formulário no cartão; nenhum pedido falhado.

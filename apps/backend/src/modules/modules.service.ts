@@ -111,4 +111,20 @@ export class ModulesService implements OnModuleInit {
     await this.reload();
     return this.getOptions(id);
   }
+
+  /** Estado interno de uma extensão (coluna `state`, Fase E1.3): lido da base (não é usado em cada pedido). */
+  async getState(id: ModuleId): Promise<Record<string, unknown>> {
+    const row = await this.prisma.moduleSetting.findUnique({ where: { moduleId: id }, select: { state: true } });
+    return (row?.state ?? {}) as Record<string, unknown>;
+  }
+
+  /** Junta `patch` ao estado interno, sem mexer no resto. */
+  async setState(id: ModuleId, patch: Record<string, unknown>) {
+    const merged = { ...(await this.getState(id)), ...patch } as Prisma.InputJsonValue;
+    await this.prisma.moduleSetting.upsert({
+      where: { moduleId: id },
+      update: { state: merged },
+      create: { moduleId: id, enabled: this.enabled.get(id) ?? manifestOf(id).defaultEnabled, state: merged },
+    });
+  }
 }

@@ -15,6 +15,7 @@ const valid = (over: Partial<ExtensionManifest> = {}): ExtensionManifest => ({
   provides: [],
   permissions: ["net:egress:api.exemplo.pt", "secrets:own"],
   defaultEnabled: false,
+  settings: [],
   ...over,
 });
 
@@ -101,6 +102,14 @@ describe("manifesto de uma extensão", () => {
     expect(manifestErrors(valid({ sdk: "^2.0.0" }))).toEqual([`«faturacao-exemplo»: sdk «^2.0.0» não aceita a versão do núcleo (${SDK_VERSION})`]);
     expect(manifestErrors(valid({ sdk: "1.x" }))[0]).toMatch(/sdk tem de ser um intervalo/);
     expect(manifestErrors(valid({ sdk: ">=1.0.0" }))).toEqual([]);
+  });
+
+  it("definições: validadas como parte do manifesto (um segredo exige secrets:own)", () => {
+    expect(manifestErrors(valid({ settings: [{ key: "token", label: "Token", type: "secret" }] }))).toEqual([]);
+    expect(manifestErrors(valid({ permissions: [], settings: [{ key: "token", label: "Token", type: "secret" }] }))).toEqual([
+      "«faturacao-exemplo»: settings[0]: um segredo exige a permissão secrets:own",
+    ]);
+    expect(manifestErrors(valid({ settings: {} as never }))).toEqual(["«faturacao-exemplo»: settings tem de ser uma lista de campos"]);
   });
 
   it("dependências, contratos e permissões", () => {

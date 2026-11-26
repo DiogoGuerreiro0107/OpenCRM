@@ -60,6 +60,7 @@ const ACTION_LABELS: Record<string, string> = {
   "permission.updated": "Permissões alteradas",
   "permission.reset": "Permissões repostas na predefinição",
   "secrets.encrypted": "Segredos cifrados (comando do sistema)",
+  "extension.settings_updated": "Definições de uma extensão alteradas",
   "job.run": "Tarefa agendada corrida à mão",
   "job.toggled": "Tarefa agendada ligada/desligada",
   "job.resumed": "Tarefa agendada retomada",
@@ -83,4 +84,5 @@ export const ACTION_GROUPS: Array<{ prefix: string; label: string }> = [
   { prefix: "permission.", label: "Permissões" },
   { prefix: "secrets.", label: "Segredos (sistema)" },
   { prefix: "job.", label: "Tarefas agendadas" },
+  { prefix: "extension.", label: "Extensões" },
 ];

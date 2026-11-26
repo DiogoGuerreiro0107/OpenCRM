@@ -1,18 +1,25 @@
-import { BadRequestException, Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, Logger, NotFoundException, OnModuleInit } from "@nestjs/common";
 import { JobsService } from "../jobs/jobs.service";
 import { JobOutcome } from "../jobs/job-catalog";
 import axios from "axios";
-import { CallDirection, ZadarmaAccount } from "@prisma/client";
+import { CallDirection } from "@prisma/client";
 import { PrismaService } from "../prisma/prisma.service";
 import { KeyField, orderByKey, readPage } from "../common/pagination";
-import { SaveZadarmaAccountDto } from "./dto/save-zadarma-account.dto";
 import { MakeCallDto } from "./dto/make-call.dto";
 import { QueryCallRecordsDto } from "./dto/query-call-records.dto";
 import { normalizePhone, signZadarmaRequest } from "./zadarma.utils";
 import { ModulesService } from "../modules/modules.service";
 import { SecretsService } from "../common/secrets.service";
+import { ExtensionSettingsService, settingSecretContext } from "../extensions/extension-settings.service";
 
 const ZADARMA_API_BASE = "https://api.zadarma.com";
+
+/** As credenciais, das definições da extensão (Fase E1.3). */
+interface ZadarmaCredentials {
+  apiKey: string;
+  apiSecret: string;
+  callerExtension: string | null;
+}
 
 /** Mais recente primeiro (startedAt, id): cursor e ordem das chamadas. */
 const CALLS_RECENT_FIRST: KeyField[] = [
@@ -21,53 +28,59 @@ const CALLS_RECENT_FIRST: KeyField[] = [
 ];
 
 @Injectable()
-export class ZadarmaService {
+export class ZadarmaService implements OnModuleInit {
   private readonly logger = new Logger(ZadarmaService.name);
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly modules: ModulesService,
     private readonly secrets: SecretsService,
+    private readonly settings: ExtensionSettingsService,
     jobs: JobsService,
   ) {
     jobs.handle("zadarma.sync", () => this.syncCallHistory());
   }
 
-  /** Nunca devolve apiKey/apiSecret — só o suficiente para a UI saber se já
-   * está configurado e mostrar a extensão/estado. */
-  async getAccount() {
-    const account = await this.prisma.zadarmaAccount.findFirst({
-      orderBy: { createdAt: "desc" },
-      select: { id: true, callerExtension: true, active: true, lastSyncAt: true },
-    });
-    if (!account) return null;
-    return { ...account, hasCredentials: true };
+  async onModuleInit() {
+    await this.migrateLegacyAccount();
   }
 
-  async saveAccount(dto: SaveZadarmaAccountDto) {
-    const existing = await this.prisma.zadarmaAccount.findFirst();
-    if (existing) {
-      await this.prisma.zadarmaAccount.update({
-        where: { id: existing.id },
-        data: {
-          apiKey: dto.apiKey || undefined,
-          apiSecret: dto.apiSecret ? this.secrets.encrypt(dto.apiSecret, "ZadarmaAccount.apiSecret") : undefined,
-          callerExtension: dto.callerExtension,
-          active: dto.active,
-        },
+  /**
+   * Fase E1.3: a conta da tabela antiga (`ZadarmaAccount`) passa para as definições da extensão, uma vez, só se as
+   * definições ainda não tiverem credenciais. O segredo é decifrado com o contexto antigo e cifrado com o novo. Nunca
+   * impede o arranque: um erro (p. ex. a chave dos segredos errada) fica no registo e a cópia tenta-se no arranque
+   * seguinte. Devolve se copiou.
+   */
+  async migrateLegacyAccount(): Promise<boolean> {
+    try {
+      // As opções têm de estar carregadas (a ordem de arranque dos módulos não o garante): senão a cópia podia
+      // gravar por cima de definições que já existem.
+      await this.modules.reload();
+      const options = this.modules.getOptions("zadarma");
+      if (typeof options.apiKey === "string" && options.apiKey !== "") return false;
+      const legacy = await this.prisma.zadarmaAccount.findFirst({ orderBy: { createdAt: "desc" } });
+      if (!legacy) return false;
+      const secret = this.secrets.decrypt(legacy.apiSecret, "ZadarmaAccount.apiSecret");
+      await this.modules.setOptions("zadarma", {
+        apiKey: legacy.apiKey,
+        apiSecret: this.secrets.encrypt(secret, settingSecretContext("zadarma", "apiSecret")),
+        callerExtension: legacy.callerExtension ?? null,
+        active: legacy.active,
       });
-    } else {
-      if (!dto.apiKey || !dto.apiSecret) {
-        throw new BadRequestException("API key e API secret são obrigatórios na primeira configuração");
-      }
-      await this.prisma.zadarmaAccount.create({
-        data: {
-          apiKey: dto.apiKey,
-          apiSecret: this.secrets.encrypt(dto.apiSecret, "ZadarmaAccount.apiSecret"),
-          callerExtension: dto.callerExtension, active: dto.active },
-      });
+      if (legacy.lastSyncAt) await this.modules.setState("zadarma", { lastSyncAt: legacy.lastSyncAt.toISOString() });
+      this.logger.log("A conta da Zadarma passou para as definições da extensão (Fase E1.3).");
+      return true;
+    } catch (err) {
+      this.logger.error(`Não foi possível passar a conta da Zadarma para as definições: ${(err as Error).message}`);
+      return false;
     }
-    return this.getAccount();
+  }
+
+  /** As credenciais, se a conta estiver configurada e ativa. */
+  private credentials(): ZadarmaCredentials | null {
+    const s = this.settings.get("zadarma");
+    if (!s.active || typeof s.apiKey !== "string" || typeof s.apiSecret !== "string") return null;
+    return { apiKey: s.apiKey, apiSecret: s.apiSecret, callerExtension: typeof s.callerExtension === "string" ? s.callerExtension : null };
   }
 
   async listCallRecords(query: QueryCallRecordsDto) {
@@ -80,7 +93,8 @@ export class ZadarmaService {
   /** Inicia uma chamada "click-to-call": a Zadarma liga primeiro para a extensão
    * configurada e, quando atendida, liga automaticamente para o número indicado. */
   async makeCall(dto: MakeCallDto) {
-    const account = await this.requireActiveAccount();
+    const account = this.credentials();
+    if (!account) throw new NotFoundException("Nenhuma conta Zadarma configurada");
     if (!account.callerExtension) {
       throw new BadRequestException("Configura a tua extensão/número Zadarma nas definições antes de ligar");
     }
@@ -102,10 +116,11 @@ export class ZadarmaService {
    */
   async syncCallHistory(): Promise<JobOutcome> {
     if (!this.modules.isEnabled("zadarma")) return { summary: "Módulo desligado", idle: true };
-    const account = await this.prisma.zadarmaAccount.findFirst({ where: { active: true } });
+    const account = this.credentials();
     if (!account) return { summary: "Sem conta ativa", idle: true };
 
-    const since = account.lastSyncAt ?? new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const state = await this.modules.getState("zadarma");
+    const since = typeof state.lastSyncAt === "string" ? new Date(state.lastSyncAt) : new Date(Date.now() - 24 * 60 * 60 * 1000);
     const now = new Date();
 
     try {
@@ -120,7 +135,7 @@ export class ZadarmaService {
         if (await this.upsertCallRecord(call)) created++;
       }
 
-      await this.prisma.zadarmaAccount.update({ where: { id: account.id }, data: { lastSyncAt: now } });
+      await this.modules.setState("zadarma", { lastSyncAt: now.toISOString() });
       return { summary: `${created} ${created === 1 ? "chamada nova" : "chamadas novas"}`, idle: created === 0 };
     } catch (err) {
       this.logger.warn(`Falha ao sincronizar histórico de chamadas da Zadarma: ${(err as Error).message}`);
@@ -184,29 +199,18 @@ export class ZadarmaService {
     return {};
   }
 
-  private async requireActiveAccount(): Promise<ZadarmaAccount> {
-    const account = await this.prisma.zadarmaAccount.findFirst({ where: { active: true } });
-    if (!account) throw new NotFoundException("Nenhuma conta Zadarma configurada");
-    return account;
-  }
-
   private formatZadarmaDate(date: Date) {
     return date.toISOString().slice(0, 19).replace("T", " ");
   }
 
   /** Pedido assinado à API da Zadarma (algoritmo de assinatura em zadarma.utils.ts). */
   private async request(
-    account: ZadarmaAccount,
+    account: ZadarmaCredentials,
     method: "GET" | "POST",
     path: string,
     params: Record<string, string>,
   ) {
-    const { queryString, authorization } = signZadarmaRequest(
-      account.apiKey,
-      this.secrets.decrypt(account.apiSecret, "ZadarmaAccount.apiSecret"),
-      path,
-      params,
-    );
+    const { queryString, authorization } = signZadarmaRequest(account.apiKey, account.apiSecret, path, params);
 
     const url = `${ZADARMA_API_BASE}${path}${queryString ? `?${queryString}` : ""}`;
     const response = await axios.request({

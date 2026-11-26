@@ -52,8 +52,9 @@ export const emailModule: FrontendModule = {
 
 export const zadarmaModule: FrontendModule = {
   id: "zadarma",
-  nav: [{ id: "zadarma:settings", label: "Zadarma", icon: Phone, to: "/configuracoes/zadarma", section: "settings", order: 50, roles: ADMIN_ONLY }],
-  routes: [{ path: "/configuracoes/zadarma", roles: ADMIN_ONLY, page: lazy(() => import("@/pages/settings/ZadarmaSettingsPage").then((m) => ({ default: m.ZadarmaSettingsPage }))) }],
+  // As credenciais são definições da extensão (Fase E1.3), na página genérica.
+  nav: [{ id: "zadarma:settings", label: "Zadarma", icon: Phone, to: "/configuracoes/extensoes/zadarma", section: "settings", order: 50, roles: ADMIN_ONLY }],
+  routes: [],
   recordPanels: [
     {
       id: "zadarma:calls",

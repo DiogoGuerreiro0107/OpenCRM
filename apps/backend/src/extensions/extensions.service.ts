@@ -25,6 +25,7 @@ export class ExtensionsService implements OnModuleInit {
       enabled: enabled.has(m.id),
       dependents: BUILTIN_EXTENSIONS.filter((other) => m.id in other.dependsOn).map((other) => other.id),
       permissions: m.permissions.map((p) => ({ permission: p, description: describePermission(p)! })),
+      hasSettings: m.settings.length > 0,
     }));
   }
 }
