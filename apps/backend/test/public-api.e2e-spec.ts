@@ -108,7 +108,7 @@ describe("API pública /api/v1 e chaves de API (e2e)", () => {
     it("lista os âmbitos disponíveis; revogar duas vezes é inofensivo; id inexistente dá 404", async () => {
       const { auth } = await setupAdmin();
       const scopes = await api().get("/api-keys/scopes").set("Authorization", auth).expect(200);
-      expect(scopes.body.map((s: { scope: string }) => s.scope).sort()).toEqual(["companies:read", "contacts:read", "leads:write"]);
+      expect(scopes.body.map((s: { scope: string }) => s.scope).sort()).toEqual(["companies:read", "contacts:read", "leads:write", "orders:read", "orders:write", "products:read"]);
 
       const { id } = await makeKey(auth);
       const first = await api().post(`/api-keys/${id}/revoke`).set("Authorization", auth).expect(200);

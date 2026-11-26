@@ -9,9 +9,9 @@ import { V1ListQueryDto } from "./dto/v1-list-query.dto";
 import { V1CreateLeadDto } from "./dto/v1-create-lead.dto";
 import { publicCompany, publicContact, publicLead } from "./mappers";
 import { ApiError } from "./v1-error.filter";
+import { apiKeyProvider } from "./external-provider";
 
-/** Dono das ligações a ids externos criadas pela API pública: a própria chave (duas integrações não colidem). */
-export const apiKeyProvider = (apiKeyId: string) => `api_key:${apiKeyId}`;
+export { apiKeyProvider };
 
 const DEFAULT_LIMIT = 50;
 

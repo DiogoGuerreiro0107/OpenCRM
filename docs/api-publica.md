@@ -16,7 +16,7 @@ curl -H "Authorization: Bearer ocrm_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 ```
 
 - A chave tem o formato `ocrm_` + 43 caracteres e **só se vê uma vez**, ao criar. O CRM guarda apenas um hash; se a perderes, revoga-a e cria outra.
-- **Âmbitos:** cada chave só pode fazer o que lhe deram (`companies:read`, `contacts:read`, `leads:write`). Sem o âmbito → `403`.
+- **Âmbitos:** cada chave só pode fazer o que lhe deram (`companies:read`, `contacts:read`, `leads:write`, `products:read`, `orders:read`, `orders:write`). Sem o âmbito → `403`.
 - **Duas portas separadas:** a `/api/v1` aceita **só** chaves de API (nunca o login de uma pessoa), e a API da interface aceita **só** login (nunca chaves).
 - Chave em falta, inválida, **revogada ou expirada** dão o **mesmo** `401` (não se revela qual).
 - **Limite:** por omissão 120 pedidos por minuto por chave (configurável). Acima disso, `429` com `Retry-After` (segundos).
@@ -38,10 +38,11 @@ curl -H "Authorization: Bearer ocrm_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
 | `unauthorized` | 401 | chave em falta, inválida, revogada ou expirada |
 | `insufficient_scope` | 403 | a chave não tem o âmbito necessário |
 | `not_found` | 404 | recurso inexistente (ou módulo desligado) |
-| `conflict` | 409 | pedido igual ainda em curso com o mesmo `Idempotency-Key` |
+| `conflict` | 409 | pedido igual ainda em curso com o mesmo `Idempotency-Key`, ou `external_id` já usado por esta chave |
 | `idempotency_key_reuse` | 422 | mesmo `Idempotency-Key` com um pedido diferente |
 | `rate_limited` | 429 | limite de pedidos da chave excedido |
 | `internal_error` | 5xx | erro do servidor (sem detalhes) |
+| `unprocessable` | 422 | pedido bem formado que não se pode cumprir (ex.: referência de produto desconhecida numa encomenda); `details` diz o quê |
 
 ### Paginação e sincronização
 
@@ -55,7 +56,7 @@ Sincronização incremental típica: guarda a data do início da última sincron
 
 ### Idempotência (`Idempotency-Key`)
 
-Todo o `POST` aceita o cabeçalho `Idempotency-Key` (8 a 128 caracteres visíveis, sem espaços; usa um UUID), e **é obrigatório** em `POST /leads`:
+Todo o `POST` aceita o cabeçalho `Idempotency-Key` (8 a 128 caracteres visíveis, sem espaços; usa um UUID), e **é obrigatório** em `POST /leads` e `POST /orders`:
 
 - repetir o **mesmo pedido** (mesmo corpo) devolve a **mesma resposta**, com o cabeçalho `Idempotent-Replayed: true`, e **não cria nada de novo** — é seguro repetir depois de um *timeout*;
 - o mesmo `Idempotency-Key` com um corpo diferente dá `422`;
@@ -93,6 +94,64 @@ curl -X POST http://IP-DO-CRM:3000/api/v1/leads \
 Corpo: `name` (obrigatório), `kind` (`COMPANY` ou `PERSON`; sem valor, conforme o modo do módulo de leads — com `company_name` fica `COMPANY`), `company_name`, `tax_id` (NIF), `phone`, `email`, `source` (por omissão «API: <nome da chave>»), `interest`, `notes`, `external_id`. Se o módulo estiver configurado só para um tipo, o outro é recusado com `400`. Outros campos são ignorados: uma integração **não escolhe** o estado nem o responsável (o lead entra como `NOVO`). Resposta `201` com o lead (`id`, `kind`, `tax_id`, `name`, `company_name`, `phone`, `email`, `source`, `interest`, `status`, `notes`, `created_at`, `updated_at`).
 
 Efeitos (iguais a criar um lead na interface): fica criada a tarefa «Contactar lead», atribuída a **quem criou a chave**; é disparado o webhook `lead.created` para o n8n (se configurado); a lista de leads atualiza-se nos browsers abertos.
+
+### `GET /api/v1/products` · `GET /api/v1/products/{id}` — âmbito `products:read`
+Só com o módulo de **Produtos** ligado (senão `404`). Filtro opcional `sku` (referência exata, sem distinguir maiúsculas), além da paginação.
+
+Campos: `id`, `sku`, `name`, `description`, `barcode`, `unit`, `sale_price` (**sem IVA**; `null` = sem preço), `vat_rate`, `active`, `tracks_stock`, `category` (`{ id, name }` ou `null`), `stock_on_hand`, `reserved` (para encomendas confirmadas), `available` (= `stock_on_hand − reserved`; pode ser negativo), `created_at`, `updated_at`. Os três campos de stock vêm a `null` sem o módulo de **Stock** ou num produto que não controla stock. **Nunca** inclui custos nem fornecedores.
+
+O stock muda sem mudar a data de alteração do produto: a sincronização por `updated_since` serve para o **catálogo**; para o stock atual lê o produto (ou a lista completa).
+
+### `POST /api/v1/orders` — âmbito `orders:write`
+Exige `Idempotency-Key`. Só com o módulo de **Encomendas** ligado (senão `404`). Faz o mesmo que criar a encomenda na interface.
+
+```bash
+curl -X POST http://IP-DO-CRM:3000/api/v1/orders \
+  -H "Authorization: Bearer ocrm_…" \
+  -H "Idempotency-Key: 0b7f6a52-2a4b-4d0e-8f7e-5c1d9a3b2e10" \
+  -H "Content-Type: application/json" \
+  -d '{
+        "external_id": "1001",
+        "confirm": true,
+        "customer": { "tax_id": "PT 509 999 990", "company_name": "Nova Loja Lda", "name": "João Lopes", "email": "joao@novaloja.pt", "phone": "912345678" },
+        "lines": [
+          { "sku": "TN-2420", "quantity": 2 },
+          { "sku": "PAP-A4", "quantity": 10, "unit_price": 3.99 },
+          { "description": "Portes", "quantity": 1, "unit_price": 5, "vat_rate": 23 }
+        ],
+        "delivery_address": "Rua das Flores, 1, 1000-001 Lisboa",
+        "notes": "Entregar de manhã"
+      }'
+```
+
+- **Cliente** (`customer`, pelo menos um de `tax_id`, `email`, `company_name`, `name`):
+  - **empresa** — a que tiver o mesmo NIF («PT 509 999 990» = «509999990»); sem NIF mas com `company_name`, a do contacto encontrado pelo email (se tiver); senão, com `company_name`, é **criada** (com o NIF);
+  - **contacto** — o que tiver o mesmo email (sem distinguir maiúsculas); senão, com `name` ou `email`, é **criado** (na empresa da encomenda);
+  - um contacto encontrado que é de **outra empresa** não entra na encomenda (fica só a empresa; a timeline diz porquê); um contacto sem empresa passa a ter a da encomenda;
+  - o que for criado fica com «criada pela API (chave «…»)» na timeline. Sem cliente encontrado nem dados para o criar → `422` (`details.field: "customer"`).
+- **Linhas** (`lines`, 1 a 200): por `sku` (produto **ativo** do catálogo) ou **livres** (`description`, `unit_price` e `vat_rate` obrigatórios — ex.: portes). `quantity` > 0 (até duas casas decimais). Nas linhas de produto, `unit_price` (**sem IVA**) é opcional: sem ele, o preço do catálogo; com ele, o da loja (promoções). `discount_pct` e `vat_rate` opcionais (por omissão 0 e o IVA do produto). Os totais são calculados pelo CRM.
+- **Outros:** `customer_reference` (por omissão o `external_id`), `delivery_address`, `notes` (internas; não voltam na API).
+- **`confirm`** (por omissão `false`): com `true` a encomenda nasce **confirmada** e **reserva stock** — o que falta fica «a aguardar stock» e entra nas sugestões de compra; com `false` fica em **rascunho** para a equipa rever. Uma encomenda já paga na loja vem normalmente com `true`.
+- **Tudo ou nada:** se uma linha não se puder cumprir, **nada** fica criado (nem empresa, nem contacto, nem encomenda) e o `external_id` fica livre. Resposta `422`:
+
+```json
+{ "error": { "code": "unprocessable", "message": "Linha 2: não há nenhum produto com a referência «NAO-EXISTE»",
+             "details": { "line_index": 1, "sku": "NAO-EXISTE", "reason": "unknown_sku" } } }
+```
+
+  `reason`: `unknown_sku`, `inactive_product` ou `missing_price` (produto sem preço no catálogo e sem `unit_price`). `line_index` começa em 0.
+- **`external_id`** (até 100 caracteres): o número da encomenda na loja; repetido pela mesma chave → `409` com `details.existing_id` (como nos leads, abaixo).
+- Fica **criada por quem criou a chave** (uma chave não é uma pessoa), sem responsável. Na ficha aparece «Veio pela API: <nome da chave> n.º <external_id>».
+- Efeitos (iguais à interface): timeline, webhooks `order.created` (com `status: "DRAFT"`) e, com `confirm`, `order.status_changed` (`DRAFT` → `CONFIRMED`); a tarefa «Preparar encomenda» segue as regras de sempre; as listas atualizam-se nos browsers abertos.
+
+Resposta `201` com a encomenda (os campos de `GET /orders/{id}`).
+
+### `GET /api/v1/orders` · `GET /api/v1/orders/{id}` — âmbito `orders:read`
+Só com o módulo de **Encomendas** ligado. Todas as encomendas (também as feitas na interface). Filtro opcional `external_id` (o que **esta** chave deu), além da paginação. Um envio parcial ou a correção de uma expedição também contam como alteração (`updated_since`).
+
+Campos: `id`, `code` («EN-0001», sem valor fiscal), `status` (`DRAFT`, `CONFIRMED`, `SHIPPED`, `DELIVERED`, `CANCELLED`), `partially_shipped`, `customer` (`company_id`, `contact_id`), `customer_reference`, `delivery_address`, `subtotal`, `vat_total`, `total`, `external_id` (o desta chave, ou `null`), `lines` (`id`, `product_id`, `sku`, `description`, `quantity`, `unit_price`, `discount_pct`, `vat_rate`, `line_total`, `shipped_quantity`), `shipments` (`id`, `shipped_at`, `carrier`, `tracking_code`, `tracking_url`, `packages`, `weight_kg`, `lines` com `order_line_id`, `sku`, `description`, `quantity`), `confirmed_at`, `shipped_at`, `delivered_at`, `cancelled_at`, `cancel_reason`, `created_at`, `updated_at`. **Sem** o custo das expedições, as notas internas, quem criou ou o responsável.
+
+Para a loja saber quando a encomenda sai, o melhor são os **webhooks** `order.shipped` e `order.status_changed` (abaixo); a leitura serve para conferir ou recuperar.
 
 ## Webhooks (o CRM avisa o teu sistema)
 
@@ -164,7 +223,7 @@ Se o teu sistema tem um id próprio para o objeto (número do pedido da loja, id
 { "error": { "code": "conflict", "message": "Já existe um lead com este external_id", "details": { "existing_id": "…" } } }
 ```
 
-Cada chave tem o seu próprio espaço de ids (duas lojas podem ter ambas um pedido «1001»). A resposta do lead inclui `external_id` (`null` se não foi enviado). Se o lead for apagado no CRM, o `external_id` fica livre.
+Cada chave tem o seu próprio espaço de ids (duas lojas podem ter ambas um pedido «1001»). A resposta do lead inclui `external_id` (`null` se não foi enviado). Se o lead for apagado no CRM, o `external_id` fica livre. As **encomendas** (`POST /orders`) funcionam da mesma maneira («Já existe uma encomenda com este external_id»); se o rascunho for apagado no CRM, o `external_id` fica livre.
 
 **Idempotência ou `external_id`?** Os dois: o `Idempotency-Key` protege as repetições de um mesmo pedido (*timeouts*, 24 h); o `external_id` protege contra o mesmo objeto enviado de novo em pedidos diferentes, sem limite de tempo.
 

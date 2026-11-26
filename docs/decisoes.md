@@ -721,3 +721,14 @@ Quarto pacote da [Fase 6](plano-fase-6-encomendas.md).
 - **Webhooks novos:** `order.created`, `order.status_changed` (com `from`, `to` e o motivo), `order.shipped` (cada expedição, com `partial`) e `order.shipment_updated`.
 - **Limpeza da base nos testes com `DELETE`, não `TRUNCATE`** (`test/helpers.ts`): o `TRUNCATE` reconstrói e grava em disco todos os índices e, com cada vez mais tabelas, passava às vezes dos 30 s do `beforeEach` (falhas intermitentes na bateria completa, também antes do 6d). Os `DELETE` correm com `session_replication_role = replica` (superutilizador da base de testes, local e CI), com o `TRUNCATE` como alternativa. A bateria passou de 16–17 para 7–8 min. Consequência: sem `ORDER BY` as linhas já não vêm pela ordem de escrita, por isso **um teste que compara uma lista tem de a ordenar** (um teste do 6a não o fazia e falhou no CI).
 - **Validação:** 9 e2e e 3 unitários novos (546 e2e e 305 unitários), 36 mutações (35 apanhadas, 1 equivalente), migração ensaiada e revertida. Detalhes no plano, em «Execução do 6d».
+
+## Fase 6e: API de encomendas (2026-11-26)
+Último pacote da [Fase 6](plano-fase-6-encomendas.md): a loja online cria encomendas no CRM e sabe o que há de cada produto.
+- **Âmbitos novos:** `products:read`, `orders:read`, `orders:write`. As rotas respeitam os módulos («Produtos», «Encomendas»: 404 desligados). Contrato em [api-publica.md](api-publica.md) e no OpenAPI.
+- **Produtos para fora sem custos nem fornecedores**; o disponível (stock − reservado) só com o módulo «Stock».
+- **Criar encomenda = o mesmo que na interface, numa transação:** cliente encontrado (empresa pelo NIF normalizado, contacto pelo email) ou criado; linhas por referência ou livres; tudo ou nada (uma linha impossível → 422 e nada fica criado). Idempotente (`Idempotency-Key` obrigatório) e sem duplicados por `external_id` da chave (409 com a encomenda existente).
+- **Rascunho ou confirmada, pedido a pedido** (`confirm`), em vez de uma opção por chave: com `true` reserva stock como no 6b. Fica criada por quem criou a chave, sem responsável.
+- **Sem NIF, a empresa do contacto conhecido** em vez de criar outra; contacto de outra empresa não entra na encomenda (a timeline diz porquê).
+- **Clientes novos iguais em simultâneo** serializados por NIF e email (trinco da transação), para não nascerem duplicados.
+- **Leitura de encomendas sem o custo das expedições nem notas internas**; o envio parcial e a correção de uma expedição passam a contar como alteração (sincronização por data).
+- **Validação:** 10 e2e novos (556 e2e e 305 unitários), 44 mutações (todas apanhadas), sem migração. Detalhes no plano, em «Execução do 6e».

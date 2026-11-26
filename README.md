@@ -165,6 +165,7 @@ Estado atual: **todas as fases do roadmap consolidado e a revisão final conclu�
   - [x] Reservas de stock para as encomendas: confirmar reserva o disponível, linhas «a aguardar stock» servidas pela ordem da confirmação a cada entrada, enviar lança as saídas, cancelar liberta; reservado e disponível nos produtos (Fase 6b)
   - [x] Compras a fornecedor: rascunho com o custo do catálogo, enviada, receção (também em parte) que dá entrada no stock e serve as encomendas à espera, fechar com falta; «O que comprar» a partir das encomendas; tarefa «Preparar encomenda» quando uma encomenda à espera fica completa (Fase 6c)
   - [x] Expedições: transportadoras com link de seguimento, cada envio com transportadora, código, volumes, peso e custo; envio parcial por linha (o resto continua a aguardar stock); «dar por enviada sem o resto»; webhooks `order.created`, `order.status_changed`, `order.shipped` e `order.shipment_updated` (Fase 6d)
+  - [x] API de encomendas para a loja online: `POST /api/v1/orders` (cliente por NIF/email, encontrado ou criado; linhas por referência; rascunho ou confirmada com reserva de stock; idempotente e sem duplicados por `external_id`), `GET /api/v1/orders` e `GET /api/v1/products` com o disponível (Fase 6e)
 
 ### Por fazer (backlog)
 
